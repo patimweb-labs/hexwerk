@@ -1570,10 +1570,19 @@ fn ui_lang(ui: &Rc<Ui>) -> String {
     ui.settings_view.settings().language.clone()
 }
 
+/// Adresse und Schluessel des Katalogdienstes.
+///
+/// Bewusst im Programm und nicht in den Einstellungen: der Nutzer soll nichts
+/// einrichten muessen. Der Schluessel oeffnet nur den Katalogabruf; wer ihn
+/// missbraucht, wird beim Dienst gesperrt, ohne dass eine neue Fassung noetig
+/// waere. In der Einstellungsdatei laesst sich beides weiterhin ueberschreiben
+/// (`urls`/`keys` mit dem Namen `catalog`), was fuer die Entwicklung reicht.
+const CATALOG_URL: &str = "https://hexwerk-api.weppelmann.eu";
+const CATALOG_KEY: &str = "3rp4y4t5zyexg8rcaej84tbpp44sx2bc";
+
 /// Holt den Katalog vom Dienst und uebernimmt ihn in den Index.
 ///
-/// Laeuft im Hintergrund: der Abruf kann einige Megabyte sein. Ohne Schluessel
-/// passiert nichts, weil der Dienst ohne Schluessel nichts herausgibt.
+/// Laeuft im Hintergrund: der Abruf kann einige Megabyte sein.
 fn start_catalog_sync(ui: &Rc<Ui>) {
     let settings = crate::settings_view::Settings::load();
     let base = settings
@@ -1581,13 +1590,13 @@ fn start_catalog_sync(ui: &Rc<Ui>) {
         .iter()
         .find(|(name, _)| name == "catalog")
         .map(|(_, value)| value.clone())
-        .unwrap_or_else(|| "https://hexwerk-api.weppelmann.eu".to_string());
+        .unwrap_or_else(|| CATALOG_URL.to_string());
     let key = settings
         .keys
         .iter()
         .find(|(name, _)| name == "catalog")
         .map(|(_, value)| value.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| CATALOG_KEY.to_string());
     if key.trim().is_empty() {
         return;
     }

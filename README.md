@@ -33,9 +33,13 @@ Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
 | ![Scan](docs/screenshots/scan.png) | ![Clients](docs/screenshots/clients.png) |
 | Scan beim Start | Gefundene Clients je Herkunft |
 | ![Installiert](docs/screenshots/installiert.png) | ![Katalog](docs/screenshots/katalog.png) |
-| Addons je Client-Ordner | Katalog aus dem lokalen Index |
+| Addons je Client-Ordner | Katalog, geliefert vom Dienst |
+| ![Einstellungen](docs/screenshots/einstellungen.png) | ![Addon-Detail](docs/screenshots/detail.png) |
+| Sprache, Aussehen, Ablage | Ein Addon mit Quellen, Version und Ziel |
 
-![Addon-Detail](docs/screenshots/detail.png)
+Der Katalog kommt fertig vom Dienst (`hexwerk-api.weppelmann.eu`): die App haelt
+keinen CurseForge-Schluessel und laedt nur den gepackten Snapshot. Bilder liegen
+offen auf dem CDN und werden direkt geladen.
 
 ## Installation
 

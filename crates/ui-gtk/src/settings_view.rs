@@ -231,15 +231,6 @@ fn string_after(text: &str, key: &str) -> Option<String> {
     Some(tail[..close].to_string())
 }
 
-/// Setzt einen Eintrag in einer Paarliste: ersetzen, anhaengen oder entfernen.
-/// Bewusst keine Abbildung, weil die Einstellungsdatei die Reihenfolge haelt.
-fn update(list: &mut Vec<(String, String)>, name: &str, value: String) {
-    list.retain(|(key, _)| key != name);
-    if !value.is_empty() {
-        list.push((name.to_string(), value));
-    }
-}
-
 type ChangeCallback = Box<dyn Fn(Settings)>;
 
 pub struct SettingsView {
@@ -298,60 +289,6 @@ impl SettingsView {
         let appearance_slot = gtk::Box::new(gtk::Orientation::Vertical, 8);
         appearance_slot.set_margin_bottom(16);
 
-        // Katalogdienst: Adresse und Schluessel. Die Quellen selbst sind aus
-        // der Oberflaeche verschwunden, weil der Katalog fertig vom Dienst
-        // kommt. Was hier steht, ist die Verbindung zu diesem Dienst.
-        let catalog_box = gtk::Box::new(gtk::Orientation::Vertical, 8);
-        catalog_box.add_css_class("hw-card");
-        catalog_box.set_margin_bottom(16);
-
-        let url_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        let url_label = gtk::Label::new(Some(crate::lang::t(&lang, "set.catalog.url")));
-        url_label.add_css_class("hw-cell");
-        url_label.set_xalign(0.0);
-        url_label.set_width_chars(10);
-        let url_entry = gtk::Entry::new();
-        url_entry.set_hexpand(true);
-        url_entry.set_placeholder_text(Some("https://hexwerk-api.weppelmann.eu"));
-        url_entry.set_text(
-            &settings
-                .urls
-                .iter()
-                .find(|(name, _)| name == "catalog")
-                .map(|(_, value)| value.clone())
-                .unwrap_or_else(|| "https://hexwerk-api.weppelmann.eu".to_string()),
-        );
-        url_row.append(&url_label);
-        url_row.append(&url_entry);
-
-        let key_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        let key_label = gtk::Label::new(Some(crate::lang::t(&lang, "set.catalog.key")));
-        key_label.add_css_class("hw-cell");
-        key_label.set_xalign(0.0);
-        key_label.set_width_chars(10);
-        let key_entry = gtk::PasswordEntry::new();
-        key_entry.set_hexpand(true);
-        key_entry.set_show_peek_icon(true);
-        key_entry.set_text(
-            &settings
-                .keys
-                .iter()
-                .find(|(name, _)| name == "catalog")
-                .map(|(_, value)| value.clone())
-                .unwrap_or_default(),
-        );
-        key_row.append(&key_label);
-        key_row.append(&key_entry);
-
-        let catalog_hint = gtk::Label::new(Some(crate::lang::t(&lang, "set.catalog.hint")));
-        catalog_hint.add_css_class("hw-dim2");
-        catalog_hint.set_xalign(0.0);
-        catalog_hint.set_wrap(true);
-        catalog_hint.set_max_width_chars(90);
-
-        catalog_box.append(&url_row);
-        catalog_box.append(&key_row);
-        catalog_box.append(&catalog_hint);
 
         // Kompakte Leiste: nur Symbole, Statistik weg. Der Schalter steht bei
         // „Aussehen", weil er die Form der Oberflaeche aendert, nicht ihren Inhalt.
@@ -385,9 +322,6 @@ impl SettingsView {
         tracked.push((title.clone(), "set.title"));
         tracked.push((sub.clone(), "set.hint.priority"));
         tracked.push((nav_label.clone(), "set.nav.compact"));
-        tracked.push((url_label.clone(), "set.catalog.url"));
-        tracked.push((key_label.clone(), "set.catalog.key"));
-        tracked.push((catalog_hint.clone(), "set.catalog.hint"));
 
         let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
         body.set_margin_top(20);
@@ -398,7 +332,7 @@ impl SettingsView {
         body.append(&sub);
         // Die Quellen sind aus der Oberflaeche verschwunden: der Katalog kommt
         // fertig vom Dienst, die Herkunft ist fuer die Bedienung ohne Belang.
-        for key in ["set.language", "set.appearance", "set.catalog", "set.file"] {
+        for key in ["set.language", "set.appearance", "set.file"] {
             let label = section(crate::lang::t(&lang, key));
             tracked.push((label.clone(), key));
             body.append(&label);
@@ -408,7 +342,6 @@ impl SettingsView {
                     body.append(&appearance_slot);
                     body.append(&nav_row);
                 }
-                "set.catalog" => body.append(&catalog_box),
                 _ => body.append(&path_label),
             }
         }
@@ -436,36 +369,6 @@ impl SettingsView {
             labels: RefCell::new(tracked),
         });
         view.rebuild();
-        {
-            let weak = Rc::downgrade(&view);
-            let url_entry_save = url_entry.clone();
-            let key_entry_save = key_entry.clone();
-            let store = move || {
-                let Some(view) = weak.upgrade() else {
-                    return;
-                };
-                let mut settings = view.settings.borrow_mut();
-                let url = url_entry_save.text().trim().to_string();
-                let key = key_entry_save.text().trim().to_string();
-                update(&mut settings.urls, "catalog", url);
-                update(&mut settings.keys, "catalog", key);
-                drop(settings);
-                view.persist();
-            };
-            let store_a = store.clone();
-            url_entry.connect_activate(move |_| store_a());
-            let store_b = store.clone();
-            key_entry.connect_activate(move |_| store_b());
-            let store_c = store.clone();
-            let focus_url = gtk::EventControllerFocus::new();
-            focus_url.connect_leave(move |_| store_c());
-            url_entry.add_controller(focus_url);
-
-            let store_d = store.clone();
-            let focus_key = gtk::EventControllerFocus::new();
-            focus_key.connect_leave(move |_| store_d());
-            key_entry.add_controller(focus_key);
-        }
         {
             let weak = Rc::downgrade(&view);
             view.nav_switch.connect_active_notify(move |switch| {
