@@ -435,8 +435,6 @@ pub fn show_local_detail(detail: &crate::detail_view::LocalDetail) {
     }
 }
 
-/// Bildschirm zeigen und Leiste nachziehen. Idempotent, damit Aufrufe aus
-/// Rueckrufen und aus der Leiste sich nicht im Kreis drehen.
 // ---------------------------------------------------------------------------
 // Quellen
 // ---------------------------------------------------------------------------
@@ -590,6 +588,8 @@ fn set_crumb(ui: &Ui, name: &str) {
     ui.crumb.set_visible(true);
 }
 
+/// Bildschirm zeigen und Leiste nachziehen. Idempotent, damit Aufrufe aus
+/// Rueckrufen und aus der Leiste sich nicht im Kreis drehen.
 fn show_page(ui: &Rc<Ui>, name: &str) {
     if ui.stack.visible_child_name().as_deref() != Some(name) {
         ui.stack.set_visible_child_name(name);

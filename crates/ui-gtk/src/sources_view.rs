@@ -299,12 +299,14 @@ impl SourcesView {
         }
 
         let info = infos.get(&source).cloned().unwrap_or_default();
-        let mut row = 0;
-        for (label, value) in [
+        for (row, (label, value)) in [
             ("Endpunkt", endpoint(source).to_string()),
             ("Schlüssel", key_text(source, keys)),
             ("Einträge im Index", info.entries.to_string()),
-        ] {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let key = gtk::Label::new(Some(label));
             key.add_css_class("hw-badge");
             key.set_xalign(0.0);
@@ -312,9 +314,8 @@ impl SourcesView {
             val.add_css_class("hw-card-title");
             val.set_xalign(0.0);
             val.set_selectable(true);
-            self.detail_rows.attach(&key, 0, row, 1, 1);
-            self.detail_rows.attach(&val, 1, row, 1, 1);
-            row += 1;
+            self.detail_rows.attach(&key, 0, row as i32, 1, 1);
+            self.detail_rows.attach(&val, 1, row as i32, 1, 1);
         }
 
         let state = match &info.test {
