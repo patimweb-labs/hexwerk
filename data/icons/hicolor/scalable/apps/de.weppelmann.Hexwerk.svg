@@ -41,6 +41,10 @@
     </clipPath>
   </defs>
 
+  <!-- Vergroessert um die Mitte: die Zeichnung sass mit 75 Prozent Hoehe
+       zu klein im Quadrat, in der Programmleiste fiel das als kleiner Fleck auf.
+       Der Massstab 1.13 laesst links und rechts 5 Einheiten Rand. -->
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
   <!-- Rahmenband -->
   <path d="M 478.00,258.00 L 367.00,450.26 L 145.00,450.26 L 34.00,258.00 L 145.00,65.74 L 367.00,65.74 Z" fill="url(#rahmen)"/>
   <!-- Grundplatte -->
@@ -59,4 +63,5 @@
 
   <!-- Aussenkante des Rahmens -->
   <path d="M 478.00,258.00 L 367.00,450.26 L 145.00,450.26 L 34.00,258.00 L 145.00,65.74 L 367.00,65.74 Z" fill="none" stroke="#39DD93" stroke-width="2.6" opacity="0.55"/>
+  </g>
 </svg>

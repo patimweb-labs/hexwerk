@@ -60,7 +60,9 @@ auf dem Host verändern würde.
 
 Im Sandkasten zeigt `XDG_DATA_HOME` nach `~/.var/app/de.weppelmann.Hexwerk/data`. Läge der
 Papierkorb dort, wäre er beim Deinstallieren der App weg und die Kommandozeile auf dem Host
-fände ihn nicht. `hexwerk::data_root()` benutzt deshalb im Flatpak bewusst das echte
+fände ihn nicht. Der Papierkorb liegt deshalb gar nicht in der Datenwurzel, sondern nach der
+Freedesktop-Spezifikation unter `~/.local/share/Trash`: dort sehen ihn der Dateimanager und
+"Papierkorb leeren" des Desktops, und `gio trash --empty` räumt ihn auf. `hexwerk::data_root()` benutzt deshalb im Flatpak bewusst das echte
 `~/.local/share/hexwerk`, denselben Ort wie die Kommandozeile. Reihenfolge:
 `HEXWERK_DATA_DIR`, dann im Flatpak das echte Home, dann `XDG_DATA_HOME`.
 
@@ -70,7 +72,7 @@ fände ihn nicht. `hexwerk::data_root()` benutzt deshalb im Flatpak bewusst das 
 |---|---|
 | Index | `~/.local/share/hexwerk/index.db` |
 | Sicherungen | `~/.local/share/hexwerk/backup` |
-| Papierkorb | `~/.local/share/hexwerk/trash` |
+| Papierkorb | `~/.local/share/Trash` (Freedesktop, der des Desktops) |
 | Schlüssel | `~/.config/hexwerk/keys.json` |
 | Fensterzustand | `~/.config/hexwerk/ui.json` |
 | HTTP-Zwischenspeicher | `~/.cache/hexwerk` |

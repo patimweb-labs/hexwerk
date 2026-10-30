@@ -1,19 +1,25 @@
-//! Papierkorb statt Loeschen (`~/.local/share/hexwerk/trash`).
+//! Loeschen ueber den Papierkorb des Desktops.
 //!
-//! Ein Eintrag liegt unter `trash/<zeitstempel>-<ordner>/` und enthaelt:
+//! Ablage nach der Freedesktop-Spezifikation, also dort, wo auch Dateien und
+//! Nautilus ihren Muell ablegen:
 //!
 //! ```text
-//! <zeitstempel>-<ordner>/meta          Ziel-Client als Text (folder=…, addons_dir=…)
-//! <zeitstempel>-<ordner>/tree/<ordner> der entfernte Ordner, unveraendert
+//! ~/.local/share/Trash/files/<name>           der verschobene Ordner
+//! ~/.local/share/Trash/info/<name>.trashinfo  Herkunft und Zeitpunkt
 //! ```
 //!
-//! Das `meta` ist der Grund fuer die eine Ebene mehr: "rueckgaengig" muss auch
-//! nach einem Neustart der Oberflaeche funktionieren, und ohne den Zielpfad
-//! waere nicht bekannt, in welchen Client zurueckzulegen ist - dieselbe Falle
-//! wie bei "installiere fuer alle".
+//! Der Grund ist die Leerung: einen eigenen Papierkorb unter
+//! `~/.local/share/hexwerk/trash` leert niemand, er waechst still weiter und
+//! ist in keinem Dateimanager zu sehen. Im echten Papierkorb gilt
+//! "Papierkorb leeren" des Desktops, und `gio trash --empty` raeumt ihn auf.
 //!
-//! Der zurueckgegebene Pfad ist der Eintragsordner, nicht der Addon-Ordner:
-//! damit kann die Oberflaeche den Eintrag spaeter gezielt loeschen.
+//! Das `Path=` in der `.trashinfo` ist die Herkunft; ohne sie kann
+//! "rueckgaengig" nach einem Neustart nicht wissen, in welchen Client-Ordner
+//! zurueckzulegen ist.
+//!
+//! Liegt das Spiel auf einem anderen Dateisystem als das Benutzerverzeichnis,
+//! wird kopiert statt verschoben. Der Papierkorb bleibt trotzdem der eine des
+//! Benutzers, damit "rueckgaengig" und die Liste eine einzige Quelle haben.
 
 use std::fs;
 use std::io::ErrorKind;
@@ -27,18 +33,34 @@ use crate::{unique_path, InstallError, Paths};
 pub struct TrashEntry {
     /// Ordnername im Addon-Verzeichnis.
     pub folder: String,
-    /// Ablage im Papierkorb (enthaelt `meta` und `tree/`).
-    pub path: PathBuf,
+    /// Name in `files/` und, mit `.trashinfo`, in `info/`.
+    pub name: String,
+    /// Wurzel des Papierkorbs, enthaelt `files/` und `info/`.
+    pub root: PathBuf,
     /// Vollstaendiger Pfad, an dem der Ordner vorher lag.
     pub original: PathBuf,
     /// Addon-Verzeichnis des Clients, aus dem entfernt wurde.
     pub addons_dir: PathBuf,
 }
 
-/// Verschiebt `<addons_dir>/<folder>` in den Papierkorb.
+impl TrashEntry {
+    /// Pfad des verschobenen Ordners im Papierkorb.
+    pub fn path(&self) -> PathBuf {
+        self.root.join("files").join(&self.name)
+    }
+
+    /// Pfad der Herkunftsdatei.
+    pub fn info_path(&self) -> PathBuf {
+        self.root
+            .join("info")
+            .join(format!("{}.trashinfo", self.name))
+    }
+}
+
+/// Verschiebt `<addons_dir>/<folder>` in den Papierkorb des Benutzers.
 ///
 /// Der Ordner verschwindet damit aus dem Spiel, bleibt aber vollstaendig
-/// erhalten. `paths.trash_dir` wird bei Bedarf angelegt.
+/// erhalten und ist im Dateimanager zu sehen.
 pub fn trash_addon(
     addons_dir: &Path,
     folder: &str,
@@ -50,67 +72,70 @@ pub fn trash_addon(
         return Err(InstallError::NotFound(source.display().to_string()));
     }
 
-    fs::create_dir_all(&paths.trash_dir)?;
-    let entry_dir = unique_path(
-        &paths.trash_dir,
-        &format!("{}-{folder}", crate::timestamp_now()),
-        None,
-    );
-    fs::create_dir(&entry_dir)?;
+    let root = paths.trash_root.clone();
+    fs::create_dir_all(root.join("files"))?;
+    fs::create_dir_all(root.join("info"))?;
+
+    // Namen nicht ueberschreiben: liegt schon ein "Tidy" im Papierkorb, wird
+    // der neue Eintrag "Tidy.2". Sonst waere der aeltere Eintrag weg, obwohl
+    // der Nutzer zwei Loeschvorgaenge gemacht hat.
+    let target = unique_path(&root.join("files"), &folder, None);
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| folder.clone());
 
     let entry = TrashEntry {
-        folder: folder.clone(),
-        path: entry_dir.clone(),
+        folder,
+        name,
+        root,
         original: source.clone(),
         addons_dir: addons_dir.to_path_buf(),
     };
 
-    if let Err(e) = write_meta(&entry).and_then(|()| {
-        fs::create_dir_all(entry_dir.join("tree"))?;
-        move_dir(&source, &entry_dir.join("tree").join(&folder))
-    }) {
-        // Kein halber Eintrag: sonst stuende das Addon im Papierkorb, ohne
-        // dass "rueckgaengig" es findet.
-        let _ = fs::remove_dir_all(&entry_dir);
+    // Erst die Herkunft schreiben, dann verschieben. Scheitert das Schreiben,
+    // liegt nichts im Papierkorb, das niemand mehr zuordnen kann.
+    if let Err(e) = write_info(&entry).and_then(|()| move_dir(&source, &target)) {
+        let _ = fs::remove_file(entry.info_path());
+        let _ = fs::remove_dir_all(&target);
         return Err(e);
     }
     Ok(entry)
 }
 
-/// Alle Papierkorb-Eintraege, neueste zuerst.
+/// Alle Eintraege im Papierkorb des Benutzers, neueste zuerst.
 ///
-/// Eintraege ohne lesbares `meta` werden uebersprungen: sie sind mit fremder
-/// Hand entstanden und nicht sicher zuzuordnen.
+/// Eintraege ohne lesbare Herkunft werden uebersprungen: sie koennen mit
+/// fremder Hand entstanden sein, und ohne Pfad waere nicht klar, wohin
+/// zurueckzulegen ist.
 pub fn list_trash(paths: &Paths) -> Result<Vec<TrashEntry>, InstallError> {
     let mut out = Vec::new();
-    let entries = match fs::read_dir(&paths.trash_dir) {
+    let info_dir = paths.trash_root.join("info");
+    let entries = match fs::read_dir(&info_dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(out),
         Err(e) => return Err(e.into()),
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.is_dir() {
+        if path.extension().and_then(|e| e.to_str()) != Some("trashinfo") {
             continue;
         }
-        if let Some(trash) = read_meta(&path) {
+        if let Some(trash) = read_info(&path, &paths.trash_root) {
             out.push(trash);
         }
     }
-    out.sort_by(|a, b| b.path.cmp(&a.path));
+    out.sort_by(|a, b| b.name.cmp(&a.name));
     Ok(out)
 }
 
 /// Holt einen Eintrag zurueck an seinen alten Platz.
-///
-/// Der Zielname ist der gespeicherte Ordnername, nicht der Eintragsname -
-/// `20261030T153012Z-Tidy` enthaelt den Stempel nur fuer die Sortierung.
 pub fn restore_from_trash(entry: &TrashEntry) -> Result<PathBuf, InstallError> {
-    let source = entry.path.join("tree").join(&entry.folder);
+    let source = entry.path();
     if !source.is_dir() {
         return Err(InstallError::NotFound(source.display().to_string()));
     }
-    let target = entry.addons_dir.join(&entry.folder);
+    let target = entry.original.clone();
     if target.exists() {
         // Nicht ueberschreiben: der Nutzer hat inzwischen etwas anderes dort.
         return Err(InstallError::AlreadyInstalled(target.display().to_string()));
@@ -118,55 +143,91 @@ pub fn restore_from_trash(entry: &TrashEntry) -> Result<PathBuf, InstallError> {
 
     fs::create_dir_all(&entry.addons_dir)?;
     move_dir(&source, &target)?;
-    // Der Eintrag ist damit leer und hat keinen Zweck mehr.
-    let _ = fs::remove_dir_all(&entry.path);
+    // Eintrag und Herkunft gehoeren zusammen weg, sonst bleibt eine
+    // Herkunftsdatei ohne Ordner im Papierkorb liegen.
+    let _ = fs::remove_file(entry.info_path());
     Ok(target)
 }
 
 /// Loescht einen Papierkorb-Eintrag endgueltig.
 pub fn remove_trash_entry(entry: &TrashEntry) -> Result<(), InstallError> {
-    match fs::remove_dir_all(&entry.path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e.into()),
+    let dir = entry.path();
+    match fs::remove_dir_all(&dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
     }
-}
-
-fn write_meta(entry: &TrashEntry) -> Result<(), InstallError> {
-    let text = format!(
-        "folder={}\naddons_dir={}\n",
-        entry.folder,
-        entry.addons_dir.display()
-    );
-    fs::write(entry.path.join("meta"), text)?;
+    let _ = fs::remove_file(entry.info_path());
     Ok(())
 }
 
-fn read_meta(dir: &Path) -> Option<TrashEntry> {
-    let text = fs::read_to_string(dir.join("meta")).ok()?;
-    let mut folder = None;
-    let mut addons_dir = None;
+fn write_info(entry: &TrashEntry) -> Result<(), InstallError> {
+    let text = format!(
+        "[Trash Info]\nPath={}\nDeletionDate={}\n",
+        percent_encode(&entry.original.display().to_string()),
+        crate::iso_timestamp_now()
+    );
+    fs::write(entry.info_path(), text)?;
+    Ok(())
+}
+
+fn read_info(info_path: &Path, root: &Path) -> Option<TrashEntry> {
+    let text = fs::read_to_string(info_path).ok()?;
+    let mut original = None;
     for line in text.lines() {
-        if let Some((key, value)) = line.split_once('=') {
-            match key.trim() {
-                "folder" => folder = Some(value.trim().to_string()),
-                "addons_dir" => addons_dir = Some(PathBuf::from(value.trim())),
-                _ => {}
-            }
+        if let Some(value) = line.strip_prefix("Path=") {
+            original = Some(PathBuf::from(percent_decode(value.trim())?));
         }
     }
-    let folder = folder?;
-    let addons_dir = addons_dir?;
+    let original = original?;
+    let name = info_path.file_stem()?.to_string_lossy().to_string();
+    let folder = original.file_name()?.to_string_lossy().to_string();
+    let addons_dir = original.parent()?.to_path_buf();
     Some(TrashEntry {
-        original: addons_dir.join(&folder),
-        path: dir.to_path_buf(),
         folder,
+        name,
+        root: root.to_path_buf(),
+        original,
         addons_dir,
     })
 }
 
-/// Verschiebt einen Ordner; scheitert `rename` (EXDEV: Papierkorb auf einem
-/// anderen Dateisystem als das Spiel), wird kopiert und danach geloescht.
+/// Kodiert einen Pfad fuer die `.trashinfo`.
+///
+/// Der Schraegstrich bleibt stehen, alles andere ausser den unbedingt
+/// erlaubten Zeichen wird prozentkodiert, so wie es GLib auch macht.
+fn percent_encode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        let keep = byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/');
+        if keep {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+fn percent_decode(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = text.get(i + 1..i + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+/// Verschiebt einen Ordner; scheitert `rename` (EXDEV: Spiel auf einem
+/// anderen Dateisystem als der Papierkorb), wird kopiert und danach geloescht.
 fn move_dir(source: &Path, target: &Path) -> Result<(), InstallError> {
     match fs::rename(source, target) {
         Ok(()) => Ok(()),
@@ -217,16 +278,15 @@ mod tests {
         let entry = trash_addon(&addons, "Tidy", &paths).unwrap();
 
         assert!(!folder.exists());
-        assert!(entry.path.starts_with(&paths.trash_dir));
-        let name = entry
-            .path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        assert!(name.ends_with("-Tidy"), "{name}");
-        assert!(entry.path.join("tree/Tidy/lib/a.lua").is_file());
+        assert_eq!(entry.name, "Tidy");
+        assert_eq!(entry.path(), paths.trash_root.join("files/Tidy"));
+        assert!(entry.path().join("lib/a.lua").is_file());
         assert_eq!(entry.original, folder);
+        assert!(
+            entry.info_path().is_file(),
+            "Herkunft fehlt: {}",
+            entry.info_path().display()
+        );
 
         let back = restore_from_trash(&entry).unwrap();
 
@@ -235,11 +295,29 @@ mod tests {
             fs::read_to_string(folder.join("lib/a.lua")).unwrap(),
             "inhalt"
         );
+        assert!(!entry.path().exists(), "Ordner blieb im Papierkorb liegen");
         assert!(
-            !entry.path.exists(),
-            "leerer Eintrag bleibt liegen: {}",
-            entry.path.display()
+            !entry.info_path().exists(),
+            "Herkunft blieb im Papierkorb liegen"
         );
+    }
+
+    #[test]
+    fn herkunft_steht_im_klartext_und_prozentkodiert() {
+        let (addons, paths, folder) = addons_with_folder("trash-herkunft");
+
+        let entry = trash_addon(&addons, "Tidy", &paths).unwrap();
+        let text = fs::read_to_string(entry.info_path()).unwrap();
+
+        assert!(text.starts_with("[Trash Info]\n"), "{text}");
+        let erwartet = format!("Path={}", folder.display());
+        assert!(
+            text.contains(&erwartet),
+            "Pfad fehlt oder falsch kodiert: {text}"
+        );
+        assert!(text.contains("\nDeletionDate="), "{text}");
+        assert_eq!(percent_encode("/a b/ä"), "/a%20b/%C3%A4");
+        assert_eq!(percent_decode("/a%20b/%C3%A4").unwrap(), "/a b/ä");
     }
 
     #[test]
@@ -252,7 +330,7 @@ mod tests {
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].folder, "Tidy");
         assert_eq!(list[0].addons_dir, addons);
-        assert_eq!(list[0].path, entry.path);
+        assert_eq!(list[0].path(), entry.path());
     }
 
     #[test]
@@ -280,7 +358,53 @@ mod tests {
         let entry = trash_addon(&addons, "Tidy", &paths).unwrap();
         remove_trash_entry(&entry).unwrap();
 
-        assert!(!entry.path.exists());
+        assert!(!entry.path().exists());
+        assert!(!entry.info_path().exists());
+        assert!(list_trash(&paths).unwrap().is_empty());
+    }
+
+    #[test]
+    fn zweiter_eintrag_ueberschreibt_den_ersten_nicht() {
+        let (addons, paths, _folder) = addons_with_folder("trash-doppelt");
+
+        let first = trash_addon(&addons, "Tidy", &paths).unwrap();
+        fs::create_dir_all(addons.join("Tidy")).unwrap();
+        fs::write(addons.join("Tidy/Tidy.toc"), "## Version: 2\n").unwrap();
+        let second = trash_addon(&addons, "Tidy", &paths).unwrap();
+
+        assert_ne!(first.name, second.name);
+        assert_eq!(list_trash(&paths).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn fremde_papierkorb_eintraege_werden_nicht_angefasst() {
+        let (addons, paths, _folder) = addons_with_folder("trash-fremd");
+        let fremd = paths.trash_root.join("files/Urlaub.mp4");
+        fs::create_dir_all(fremd.parent().unwrap()).unwrap();
+        fs::create_dir_all(paths.trash_root.join("info")).unwrap();
+        fs::write(&fremd, "nicht von hexwerk").unwrap();
+        fs::write(
+            paths.trash_root.join("info/Urlaub.mp4.trashinfo"),
+            "[Trash Info]\nPath=/home/jemand/Urlaub.mp4\nDeletionDate=2026-01-01T00:00:00\n",
+        )
+        .unwrap();
+
+        let entry = trash_addon(&addons, "Tidy", &paths).unwrap();
+        let list = list_trash(&paths).unwrap();
+
+        assert!(list.iter().any(|e| e.name == "Urlaub.mp4"));
+        assert!(list.iter().any(|e| e.name == entry.name));
+        remove_trash_entry(&entry).unwrap();
+        assert!(!entry.path().exists());
+        assert!(fremd.exists(), "fremder Eintrag wurde geloescht");
+    }
+
+    #[test]
+    fn eintrag_ohne_herkunft_wird_nicht_gelistet() {
+        let (addons, paths, _folder) = addons_with_folder("trash-ohne-herkunft");
+        let entry = trash_addon(&addons, "Tidy", &paths).unwrap();
+        fs::remove_file(entry.info_path()).unwrap();
+
         assert!(list_trash(&paths).unwrap().is_empty());
     }
 
@@ -291,16 +415,5 @@ mod tests {
             trash_addon(&addons, "GibtsNicht", &paths),
             Err(InstallError::NotFound(_))
         ));
-    }
-
-    #[test]
-    fn eintraege_ohne_meta_werden_ignoriert() {
-        let (addons, paths, _folder) = addons_with_folder("trash-fremd");
-        fs::create_dir_all(paths.trash_dir.join("von-hand")).unwrap();
-        assert!(list_trash(&paths).unwrap().is_empty());
-
-        let entry = trash_addon(&addons, "Tidy", &paths).unwrap();
-        assert_eq!(list_trash(&paths).unwrap().len(), 1);
-        assert!(entry.path.join("meta").is_file());
     }
 }

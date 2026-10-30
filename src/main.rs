@@ -393,7 +393,7 @@ fn remove_cmd(args: &[String]) -> ExitCode {
         match hexwerk_install::trash_addon(&addons_dir, folder, &paths) {
             Ok(entry) => {
                 done += 1;
-                println!("verschoben: {} -> {}", folder, entry.path.display());
+                println!("verschoben: {} -> {}", folder, entry.path().display());
             }
             Err(err) => {
                 eprintln!("{folder}: {err}");
@@ -404,7 +404,7 @@ fn remove_cmd(args: &[String]) -> ExitCode {
     println!(
         "{done} von {} verschoben, Papierkorb: {}",
         folders.len(),
-        paths.trash_dir.display()
+        paths.trash_root.display()
     );
     ExitCode::SUCCESS
 }
@@ -428,7 +428,7 @@ fn clear_cmd(args: &[String]) -> ExitCode {
             "{} Addons in {} werden in den Papierkorb verschoben ({}).",
             count,
             addons_dir.display(),
-            paths.trash_dir.display()
+            paths.trash_root.display()
         );
         print!("Weiter? [j/N] ");
         use std::io::Write;
@@ -448,7 +448,7 @@ fn clear_cmd(args: &[String]) -> ExitCode {
                 "{} Addons verschoben ({}), Papierkorb: {}",
                 outcome.folders,
                 fmt_bytes(outcome.bytes),
-                paths.trash_dir.display()
+                paths.trash_root.display()
             );
             ExitCode::SUCCESS
         }

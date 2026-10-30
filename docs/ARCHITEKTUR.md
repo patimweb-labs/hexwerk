@@ -230,7 +230,7 @@ keinen fremden Schlüssel aus.
 |---|---|
 | Index | `~/.local/share/hexwerk/index.db` |
 | Sicherungen | `~/.local/share/hexwerk/backup` |
-| Papierkorb | `~/.local/share/hexwerk/trash` |
+| Papierkorb | `~/.local/share/Trash` (der des Desktops) |
 | Schlüssel | `~/.config/hexwerk/keys.json` |
 | Fensterzustand | `~/.config/hexwerk/ui.json` |
 | HTTP-Zwischenspeicher | `~/.cache/hexwerk` |

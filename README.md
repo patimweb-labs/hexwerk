@@ -23,7 +23,7 @@ Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
   `.toc` und über einen Fingerprint des Ordners. Updates funktionieren damit
   auch für Addons, die von Hand installiert wurden.
 * Installation entpackt mit Ordnerkorrektur, sichert vorher den alten Stand und
-  verschiebt Gelöschtes in einen Papierkorb.
+  verschiebt Gelöschtes in den Papierkorb des Desktops und holt es auf Wunsch zurück.
 * Dunkle und helle Darstellung, Umschaltung im Fenster, Wahl wird gemerkt.
 
 ## Screenshots

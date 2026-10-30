@@ -201,8 +201,9 @@ Verhalten:
 
 1. Ziel ist immer genau ein Client-Ordner (`_retail_`, `_classic_era_` und so weiter), nie
    das ganze Spielverzeichnis und nie alle Clients auf einmal.
-2. Die Ordner wandern in den Papierkorb (`~/.local/share/hexwerk/trash`), nicht in die Tonne,
-   und lassen sich mit einem Klick zurückholen. Eine zusätzliche ZIP-Sicherung entfällt
+2. Die Ordner wandern in den Papierkorb des Desktops (`~/.local/share/Trash`, Freedesktop),
+   nicht in die Tonne, und lassen sich mit einem Klick zurückholen. Geleert wird er dadurch
+   auch mit dem Dateimanager; die App hält keinen zweiten, unsichtbaren Müllberg. Eine zusätzliche ZIP-Sicherung entfällt
    bewusst: bei einem vollen Classic-Ordner sind das mehrere Gigabyte, eine Sicherung würde
    den Platz verdoppeln. Verschieben auf demselben Datenträger kostet dagegen nichts.
 3. Bestätigung im Fenster verlangt das Eintippen des Client-Ordners (etwa `_classic_era_`).

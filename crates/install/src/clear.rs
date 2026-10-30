@@ -25,8 +25,8 @@ pub struct ClearOutcome {
 }
 
 impl ClearOutcome {
-    pub fn trash_dirs(&self) -> Vec<&Path> {
-        self.trashed.iter().map(|t| t.path.as_path()).collect()
+    pub fn trash_dirs(&self) -> Vec<PathBuf> {
+        self.trashed.iter().map(|t| t.path()).collect()
     }
 }
 

@@ -93,33 +93,44 @@ impl From<zip::result::ZipError> for InstallError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Paths {
     pub backup_dir: PathBuf,
-    pub trash_dir: PathBuf,
+    /// Wurzel des Papierkorbs: enthaelt `files/` und `info/` und ist der
+    /// Papierkorb des Desktops, nicht ein eigener.
+    pub trash_root: PathBuf,
 }
 
 impl Paths {
-    /// Vorgabe aus der Umgebung: `$XDG_DATA_HOME/hexwerk` bzw.
-    /// `~/.local/share/hexwerk`.
+    /// Vorgabe aus der Umgebung: Sicherungen unter `$XDG_DATA_HOME/hexwerk`,
+    /// Papierkorb unter `$XDG_DATA_HOME/Trash`.
     pub fn system() -> Self {
-        Self::at(hexwerk::data_root())
+        Self {
+            backup_dir: data_root().join("backup"),
+            // Im Flatpak zeigt XDG_DATA_HOME in den Sandkasten; der Papierkorb
+            // muss der des Desktops bleiben, also das echte Home.
+            trash_root: hexwerk::user_data_home().join("Trash"),
+        }
     }
 
-    /// Feste Datenwurzel, z. B. fuer Tests.
+    /// Feste Datenwurzel, z. B. fuer Tests. Der Papierkorb liegt daneben.
     pub fn at(data_root: impl Into<PathBuf>) -> Self {
         let base = data_root.into();
         Self {
             backup_dir: base.join("backup"),
-            trash_dir: base.join("trash"),
+            trash_root: base.join("Trash"),
         }
+    }
+}
+
+/// `$XDG_DATA_HOME` bzw. `~/.local/share`.
+pub fn xdg_data_home() -> PathBuf {
+    match std::env::var_os("XDG_DATA_HOME") {
+        Some(v) if !v.is_empty() => PathBuf::from(v),
+        _ => home().join(".local").join("share"),
     }
 }
 
 /// Datenwurzel `~/.local/share/hexwerk` (bzw. `$XDG_DATA_HOME/hexwerk`).
 pub fn data_root() -> PathBuf {
-    let base = match std::env::var_os("XDG_DATA_HOME") {
-        Some(v) if !v.is_empty() => PathBuf::from(v),
-        _ => home().join(".local").join("share"),
-    };
-    base.join("hexwerk")
+    xdg_data_home().join("hexwerk")
 }
 
 fn home() -> PathBuf {
@@ -149,6 +160,27 @@ fn format_stamp(now: SystemTime) -> String {
     let (y, m, d) = civil_from_days(days);
     format!(
         "{y:04}{m:02}{d:02}T{:02}{:02}{:02}Z",
+        rest / 3600,
+        (rest % 3600) / 60,
+        rest % 60
+    )
+}
+
+/// Zeitstempel `2026-10-30T15:30:12` (UTC) im Format der `.trashinfo`.
+pub fn iso_timestamp_now() -> String {
+    format_iso(SystemTime::now())
+}
+
+fn format_iso(now: SystemTime) -> String {
+    let secs = now
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0) as i64;
+    let days = secs.div_euclid(86_400);
+    let rest = secs.rem_euclid(86_400);
+    let (y, m, d) = civil_from_days(days);
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}",
         rest / 3600,
         (rest % 3600) / 60,
         rest % 60
