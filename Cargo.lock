@@ -676,6 +676,9 @@ dependencies = [
  "glib",
  "gtk4",
  "hexwerk-core",
+ "hexwerk-index",
+ "hexwerk-install",
+ "hexwerk-sources",
  "libadwaita",
 ]
 

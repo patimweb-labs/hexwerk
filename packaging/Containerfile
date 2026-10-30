@@ -1,0 +1,44 @@
+# Bauumgebung für Hexwerk.
+#
+# Auf Bazzite und Fedora Atomic fehlen die GTK4- und libadwaita-Header, also
+# baut die Oberfläche in diesem Container. Die Versionen entsprechen dem, was
+# die GNOME-Laufzeit des Flatpaks mitbringt.
+#
+#   podman build -t hexwerk-buildenv -f packaging/Containerfile .
+#   podman run --rm -v "$PWD":/work:z -w /work hexwerk-buildenv \
+#     sh -lc 'cd crates/ui-gtk && cargo build --release'
+FROM registry.fedoraproject.org/fedora:44
+
+# GTK und libadwaita zum Bauen, Rust aus den Fedora-Paketen (kein rustup, damit
+# die Version reproduzierbar bleibt), dazu die Werkzeuge für die Prüfung der
+# Oberfläche und der Paketdateien.
+RUN dnf install -y --setopt=install_weak_deps=False \
+      gtk4-devel \
+      libadwaita-devel \
+      glib2-devel \
+      pkgconf-pkg-config \
+      sqlite-devel \
+      gcc \
+      gcc-c++ \
+      cargo \
+      rust \
+      rustfmt \
+      clippy \
+      zip \
+      unzip \
+      desktop-file-utils \
+      libappstream-glib \
+      librsvg2-tools \
+      xorg-x11-server-Xvfb \
+      xdotool \
+      ImageMagick \
+      dbus-x11 \
+      python3-pyatspi \
+      python3-gobject \
+ && dnf clean all
+
+ENV CARGO_TERM_COLOR=always \
+    GDK_BACKEND=x11 \
+    GTK_A11Y=1
+
+WORKDIR /work

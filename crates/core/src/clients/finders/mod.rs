@@ -44,7 +44,7 @@ fn note_for(origin: Origin, roots: &[PathBuf], found: &[Client]) -> Note {
     } else if !roots.iter().any(|r| r.is_dir()) {
         (
             NoteStatus::Skip,
-            format!("{}: nicht installiert", origin.label()),
+            format!("{}: keine WoW-Installation gefunden", origin.label()),
         )
     } else {
         (

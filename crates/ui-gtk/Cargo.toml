@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "hexwerk-gtk"
 path = "src/main.rs"
 
+# Die Oberflaeche haengt an allen vier Paketen: der Kern liefert Clients und
+# `.toc`, der Index die Suchantworten, die Quellen die Downloads und die
+# Installation das Entpacken. Das ist der Zuschnitt aus PLAN §3 - die UI selbst
+# enthaelt keine Quellen- und keine ZIP-Logik.
 [dependencies]
 hexwerk = { package = "hexwerk-core", path = "../core" }
 hexwerk-sources = { path = "../sources" }
@@ -21,6 +25,10 @@ hexwerk-install = { path = "../install" }
 gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }
 adw = { package = "libadwaita", version = "0.7", features = ["v1_6"] }
 glib = "0.20"
+# Der Scan, der Indexaufbau und die Installation laufen in std::thread;
+# async-channel traegt ihre Ergebnisse zurueck in die MainContext (glib 0.20
+# hat MainContext::channel entfernt).
+async-channel = "2.5"
 
 [workspace]
 members = []

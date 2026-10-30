@@ -16,7 +16,7 @@
 
 window.hw-window {
   font-family: "JetBrains Mono", "Adwaita Mono", "DejaVu Sans Mono", monospace;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* ---- Palette dunkel (Entwurf) ---- */
@@ -107,7 +107,7 @@ headerbar.hw-header {
   background-color: var(--hw-head);
   border-top: 1px solid var(--hw-line);
   color: var(--hw-dim2);
-  font-size: 10px;
+  font-size: 12px;
   padding: 7px 14px;
 }
 
@@ -119,15 +119,15 @@ headerbar.hw-header {
 /* ---- Wortmarke und Abschnitte ---- */
 .hw-wordmark {
   color: var(--hw-signal);
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 4px;
   font-weight: 600;
 }
 
 .hw-section {
   color: var(--hw-dim2);
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 1.5px;
   margin: 16px 16px 6px 16px;
 }
 
@@ -137,36 +137,43 @@ headerbar.hw-header {
   background-image: none;
 }
 
-.hw-nav row {
-  padding: 6px 14px 6px 12px;
-  border-left: 2px solid transparent;
+/* Die Ansichten sind echte Knoepfe, keine Zeilen einer Liste: so sind sie mit
+   Tastatur und Screenreader erreichbar, statt nur mit der Maus. */
+button.hw-nav-item {
   background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 7px 14px 7px 12px;
+  min-height: 34px;
 }
 
-.hw-nav row:hover {
+button.hw-nav-item:hover {
   background-color: var(--hw-sel);
 }
 
-.hw-nav row:selected {
+button.hw-nav-item.on {
   background-color: var(--hw-sel);
   border-left-color: var(--hw-signal);
 }
 
 .hw-nav-label {
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
 }
 
-.hw-nav row:selected .hw-nav-label {
+button.hw-nav-item.on .hw-nav-label {
   color: var(--hw-ink);
 }
 
 .hw-nav-count {
   color: var(--hw-dim2);
-  font-size: 11px;
+  font-size: 12px;
 }
 
-.hw-nav row:selected .hw-nav-count {
+button.hw-nav-item.on .hw-nav-count {
   color: var(--hw-signal);
 }
 
@@ -175,25 +182,25 @@ headerbar.hw-header {
 .hw-info-row {
   padding: 5px 16px;
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .hw-info-value {
   color: var(--hw-dim2);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ---- Kopf und Fliesstext einer Seite ---- */
 .hw-h1 {
   color: var(--hw-ink);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
 }
 
 .hw-sub {
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .hw-dim {
@@ -206,7 +213,7 @@ headerbar.hw-header {
 
 .hw-lead {
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* ---- Karten ---- */
@@ -242,20 +249,20 @@ headerbar.hw-header {
 
 .hw-card-title {
   color: var(--hw-ink);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 1px;
 }
 
 .hw-badge {
   color: var(--hw-dim2);
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 1.5px;
 }
 
 .hw-path {
   color: var(--hw-dim2);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ---- Flavor-Zeile im Client-Ordner ---- */
@@ -267,7 +274,7 @@ headerbar.hw-header {
 
 .hw-flavor-name {
   color: var(--hw-ink);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -275,7 +282,7 @@ headerbar.hw-header {
 .hw-chip {
   border: 1px solid var(--hw-line);
   color: var(--hw-dim);
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 7px;
   border-radius: 2px;
   letter-spacing: 1px;
@@ -318,7 +325,7 @@ button.hw-btn {
   border: 1px solid var(--hw-signal-dim);
   box-shadow: none;
   color: var(--hw-signal);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1px;
   padding: 6px 12px;
   border-radius: 2px;
@@ -405,7 +412,7 @@ columnview.hw-table header button {
   border-radius: 0;
   box-shadow: none;
   color: var(--hw-dim2);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   padding: 7px 10px;
   min-height: 0;
@@ -426,13 +433,13 @@ columnview.hw-table row:selected {
 
 .hw-cell {
   color: var(--hw-ink);
-  font-size: 12px;
+  font-size: 14px;
   padding: 7px 10px;
 }
 
 .hw-cell-dim {
   color: var(--hw-dim);
-  font-size: 11px;
+  font-size: 12px;
   padding: 7px 10px;
 }
 
@@ -467,14 +474,14 @@ progressbar.hw-bar progress {
 
 .hw-banner-title {
   color: var(--hw-ink);
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: 1px;
 }
 
 .hw-banner-byline {
   color: var(--hw-dim);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .hw-stats {
@@ -489,20 +496,20 @@ progressbar.hw-bar progress {
 
 .hw-stat-value {
   color: var(--hw-ink);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .hw-stat-label {
   color: var(--hw-dim2);
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 1.5px;
 }
 
 .hw-gal-cell {
   background-image: linear-gradient(135deg, var(--hw-cell), var(--hw-bg));
   border: 1px solid var(--hw-line);
   color: var(--hw-dim2);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
   min-height: 84px;
 }
@@ -519,7 +526,7 @@ progressbar.hw-bar progress {
   border-radius: 0;
   box-shadow: none;
   color: var(--hw-dim);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1px;
   padding: 7px 13px;
   min-height: 0;
@@ -536,7 +543,7 @@ progressbar.hw-bar progress {
 
 .hw-prose {
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .hw-prose-strong {
@@ -554,8 +561,8 @@ progressbar.hw-bar progress {
 
 .hw-side-title {
   color: var(--hw-dim2);
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 1.5px;
 }
 
 .hw-srcrow {
@@ -565,25 +572,25 @@ progressbar.hw-bar progress {
 
 .hw-srcrow-name {
   color: var(--hw-dim);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .hw-srcrow-value {
   color: var(--hw-dim2);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 /* ---- Hinweiskaesten ---- */
 .hw-note {
   border: 1px dashed var(--hw-line);
   color: var(--hw-dim2);
-  font-size: 11px;
+  font-size: 14px;
   padding: 9px 11px;
 }
 
 .hw-note-title {
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 1px;
 }
@@ -603,7 +610,7 @@ button.hw-choice {
   border-radius: 0;
   box-shadow: none;
   color: var(--hw-dim);
-  font-size: 12px;
+  font-size: 14px;
   padding: 7px 10px;
   min-height: 0;
 }
@@ -614,4 +621,108 @@ button.hw-choice:hover {
 
 button.hw-choice.on {
   color: var(--hw-signal);
+}
+
+/* ---- Bedienbarkeit ---------------------------------------------------------
+ * Drei Zusagen, die keine Geschmacksfrage sind:
+ * 1. Alles Anklickbare zeigt den Zeigefinger. GTK setzt ihn nicht von selbst,
+ *    und ein Knopf ohne Zeiger sieht aus wie eine Beschriftung.
+ * 2. Jedes Ziel ist mindestens 24px hoch. Kleiner trifft man mit dem Trackpad
+ *    nicht zuverlaessig (WCAG 2.5.8 nennt 24px als Untergrenze).
+ * 3. Tastaturfokus ist sichtbar, und „aus“ sieht anders aus als „an“ - ein
+ *    grauer Knopf, der wie ein aktiver aussieht, ist die haeufigste Fehlerquelle
+ *    bei Formularen.
+ */
+
+/* Kein `cursor: pointer` hier: GTK4 kennt das CSS-Attribut `cursor` nicht mehr
+   (der Parser meldet „No property named cursor“). Der Zeigefinger wird deshalb
+   im Code gesetzt, an genau den Widgets, die klickbar sind - siehe
+   `theme::pointer` in crates/ui-gtk/src/theme.rs. */
+
+button,
+togglebutton,
+menubutton > button,
+dropdown > button,
+entry {
+  min-height: 28px;
+}
+
+entry.hw-search {
+  min-height: 30px;
+}
+
+/* Filterchips sind Umschalter: 24px, damit sie als Ziel taugen. */
+togglebutton.hw-chip {
+  min-height: 24px;
+  padding: 2px 9px;
+}
+
+listbox > row {
+  min-height: 32px;
+}
+
+columnview row {
+  min-height: 28px;
+}
+
+columnview.hw-table header button {
+  min-height: 28px;
+}
+
+button:focus-visible,
+togglebutton:focus-visible,
+dropdown:focus-visible,
+listbox > row:focus-visible,
+columnview row:focus-visible,
+.hw-card-clickable:focus-visible,
+entry:focus-within {
+  outline: 2px solid var(--hw-signal);
+  outline-offset: 1px;
+  border-color: var(--hw-signal);
+}
+
+/* Deaktiviert: blasser Text, gestrichelter Rahmen, kein Hover. Drei Signale,
+   weil eines davon allein in einem dunklen Raster untergeht. */
+button:disabled,
+togglebutton:disabled,
+dropdown > button:disabled,
+entry:disabled {
+  background-color: transparent;
+  background-image: none;
+  border-color: var(--hw-line);
+  box-shadow: none;
+  color: var(--hw-dim2);
+  opacity: 0.5;
+}
+
+button.hw-btn:disabled {
+  border-style: dashed;
+  color: var(--hw-dim2);
+  background-color: transparent;
+}
+
+/* Karten sind Knoepfe: gleiche Flaeche wie eine Karte, aber ohne
+   Adwaita-Rundung und ohne Innenabstand, den die Karte schon mitbringt. */
+button.hw-card {
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 14px;
+}
+
+button.hw-card:hover {
+  border-color: var(--hw-signal-dim);
+}
+
+/* Kontrast in der hellen Palette: der Tabellenkopf war bei #8492A6 auf Weiss
+   kaum zu lesen, deaktivierte Knoepfe bei 0.5 Deckkraft ebenso wenig. */
+columnview.hw-table header button {
+  color: var(--hw-dim);
+}
+
+button:disabled,
+togglebutton:disabled,
+dropdown > button:disabled,
+entry:disabled {
+  opacity: 0.65;
 }

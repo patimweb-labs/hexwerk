@@ -4,7 +4,7 @@
 `org.gnome.Sdk//51`. Im Sandkasten wird **kein** Rust gebaut: die Binaries
 `hexwerk` und `hexwerk-gtk` entstehen in der CI und werden als Datei-Quellen aus
 `prebuilt/` eingesetzt. Die Cargo-Abhängigkeiten aus `Cargo.lock` liegen trotzdem
-eingefroren in `new-sources.json` — als Prüfsummenkontrolle, damit eine veraltete
+eingefroren in `new-sources.json`, als Prüfsummenkontrolle, damit eine veraltete
 Liste auffällt und ein fehlendes Paket den Bau abbricht.
 
 ## new-sources.json erzeugen
@@ -27,7 +27,7 @@ Dann im Wurzelverzeichnis des Repos, direkt neben `Cargo.lock`:
     Cargo.lock -o flatpak/new-sources.json
 ```
 
-Ergebnis prüfen — je eingefrorenem Paket ein Archiv und eine Prüfsummen-Datei:
+Ergebnis prüfen: je eingefrorenem Paket ein Archiv und eine Prüfsummen-Datei:
 
 ```
 grep -c '"type": "archive"' flatpak/new-sources.json
@@ -38,7 +38,7 @@ Das Skript legt keine Hilfsdateien im Repo ab; es muss nicht mitversioniert werd
 
 ## Wann neu erzeugen
 
-Immer wenn sich `Cargo.lock` ändert — nach jedem `cargo update`, jedem neuen Paket
+Immer wenn sich `Cargo.lock` ändert, also nach jedem `cargo update`, jedem neuen Paket
 und jedem Versionssprung in einem der Crates. Der Zählschritt im Modul
 `cargo-quellen` vergleicht die Zahl der eingefrorenen Archive mit den entpackten
 Verzeichnissen und bricht bei Abweichung ab.
@@ -65,7 +65,7 @@ flatpak run org.flatpak.Builder --force-clean --user --disable-rofiles-fuse \
 ## Ohne new-sources.json
 
 Fehlt die Datei, läuft der Bau **nicht** stillschweigend durch. `flatpak-builder`
-selbst meldet eine fehlende Quellenliste nicht als Fehler — deshalb prüft das
+selbst meldet eine fehlende Quellenliste nicht als Fehler. Deshalb prüft das
 Modul `cargo-quellen` die Datei ausdrücklich und bricht mit Hinweis ab:
 
 ```

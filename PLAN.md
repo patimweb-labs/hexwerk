@@ -1,4 +1,4 @@
-# Hexwerk — Umsetzungsplan
+# Hexwerk: Umsetzungsplan
 
 Stand 2026-10-30. Grundlage: Fensterentwurf `design/entwurf-2026-10-30.html`, gemessene
 Umgebung in `README.md`, Stack-Ablesung aus Crosspoint (`crates/core` + `crates/ui-gtk`,
@@ -19,14 +19,14 @@ Nicht-Ziele: Windows/macOS, Retail-Spielstart, Addon-Entwicklung, Lua-Ausführun
 | Baustein | Wahl | Begründung |
 |---|---|---|
 | Sprache | Rust 2021, Workspace wie Crosspoint | gleicher Stack, gleicher Zuschnitt |
-| Oberfläche | `gtk4 0.9` + `libadwaita 0.7` (`v4_6`) | `gtk4 0.9` = Crosspoint; libadwaita liefert `AdwSpinner`, `AdwToast`, `AdwStyleManager` (Dark/Light) — die von dir gewünschten Animationen ohne Eigenbau |
+| Oberfläche | `gtk4 0.9` + `libadwaita 0.7` (`v4_6`) | `gtk4 0.9` = Crosspoint; libadwaita liefert `AdwSpinner`, `AdwToast`, `AdwStyleManager` für Dunkel und Hell, also die gewünschten Animationen ohne Eigenbau |
 | HTTP | `ureq` (blockierend, rustls) in eigenem Thread | kein async-Ökosystem nötig; in `std::thread` + Kanal zur UI |
 | ZIP | `zip` | Entpacken mit Ordnerkorrektur |
 | Index | `rusqlite` (bundled, FTS5) | einprozentiger Suchindex, kein Server |
 | Hash | `sha2` | Fingerprint der Addon-Ordner |
 | Konfiguration | `serde` + `serde_json` | wie Crosspoint (`macros`) |
 
-Abweichungen von Crosspoint, die der Zweck erzwingt: HTTP-Client, ZIP, SQLite — Crosspoint
+Abweichungen von Crosspoint, die der Zweck erzwingt: HTTP-Client, ZIP, SQLite; Crosspoint
 braucht nichts davon. Alles andere (Kern als eigenes Paket, UI als eigenes Paket mit eigener
 `[workspace]`-Tabelle, UI hinter Feature `ui`, Flatpak aus vorgebauten Binaries) bleibt gleich.
 
@@ -61,7 +61,7 @@ Je Herkunft ein eigener Sucher, alle liefern `Client { origin, prefix, game_dir,
 | Herkunft | Suchorte |
 |---|---|
 | Steam | `libraryfolders.vdf` → `steamapps/compatdata/*/pfx/drive_c/**/World of Warcraft`, `appmanifest_*.acf` für den Namen |
-| Faugus/UMU | `~/Faugus/*`, `~/.config/faugus-launcher/prefixes`, `~/.var/app/io.github.Faugus.faugus-launcher/data` — **Präfix hat `drive_c/` und `pfx/drive_c/` auf derselben Ebene** |
+| Faugus/UMU | `~/Faugus/*`, `~/.config/faugus-launcher/prefixes`, `~/.var/app/io.github.Faugus.faugus-launcher/data`. **Der Präfix hat `drive_c/` und `pfx/drive_c/` auf derselben Ebene** |
 | Heroic | `~/Games/Heroic/Prefixes/*`, `~/.var/app/com.heroicgameslauncher.hgl/config/heroic/GamesConfig/*.json` |
 | Lutris | `~/Games/*/drive_c`, `~/.var/app/net.lutris.Lutris/data/lutris/games/*.yml` |
 | Bottles | `~/.var/app/com.usebottles.bottles/data/bottles/bottles/*/drive_c`, `~/.local/share/bottles/bottles/*` |
@@ -138,7 +138,7 @@ der Kopfleiste (System / Dunkel / Hell), Auswahl in `~/.config/hexwerk/ui.json`.
 
 ## 9. Marke
 
-- **Logo/App-Icon:** „H" als Runen-Glyph im WoW-Icon-Stil — Sechseck-Rahmen, innen das H aus
+- **Logo/App-Icon:** „H" als Runen-Glyph im WoW-Icon-Stil: Sechseck-Rahmen, innen das H aus
   gemeißelten Balken mit Fase, Verlauf dunkel → Signalgrün, als SVG mit PNG-Renderings
   16/32/48/64/128/256/512.
 - **Tray-Icon:** eigene, vereinfachte 22×22-Fassung (nur Hexagon + H, einfarbig, lesbar bei
@@ -180,9 +180,9 @@ parallel dazu. Der Rahmen (`Cargo.toml` je Crate, `lib.rs` mit den öffentlichen
 
 1. **GTK4-Header fehlen auf dem Host** (Bazzite, kein `gtk4-devel`). Gebaut und geprüft wird in
    einem Fedora-Container mit `gtk4-devel libadwaita-devel`; die CI macht dasselbe.
-2. **CurseForge** ohne Schlüssel nicht erreichbar — deshalb abschaltbar und nie Voraussetzung.
+2. **CurseForge** ohne Schlüssel nicht erreichbar, deshalb abschaltbar und nie Voraussetzung.
 3. **WowUp-Hub** ohne Zusage; Fingerprint nur als Beschleuniger, Fallback ist die `.toc`-ID.
-4. **Addon-ZIPs ohne Ordnernamen** (manche Release-Assets entpacken flach) — Ordnername kommt
+4. **Addon-ZIPs ohne Ordnernamen** (manche Release-Assets entpacken flach): Ordnername kommt
    aus dem `.toc`-Namen, nicht aus dem ZIP.
 5. **Multi-Client**: dasselbe Addon mit verschiedenen Builds je Client; Installation immer
    client-scharf, nie „für alle".

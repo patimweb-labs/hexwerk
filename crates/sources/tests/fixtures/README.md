@@ -16,4 +16,4 @@ PLAN.md §5/§12). Aufgenommen am 2026‑10‑30.
 
 Regeln: keine echten Zugangsdaten, keine Nutzerdaten, `_note` nur bei den beiden
 nicht gemessenen Dateien. Wer eine Fixture neu aufnimmt, kürzt auf die Felder,
-die der Parser liest — nicht auf Werte, die er gern hätte.
+die der Parser liest, nicht auf Werte, die er gern hätte.

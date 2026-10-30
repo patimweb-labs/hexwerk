@@ -47,7 +47,7 @@ fn notizen_unterscheiden_nicht_installiert_von_leerem_praefix() {
     assert!(faugus.detail.contains("kein Praefix"), "{}", faugus.detail);
     assert_eq!(steam.status, NoteStatus::Skip);
     assert!(
-        steam.detail.contains("nicht installiert"),
+        steam.detail.contains("keine WoW-Installation"),
         "{}",
         steam.detail
     );

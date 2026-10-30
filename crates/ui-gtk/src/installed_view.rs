@@ -1,0 +1,618 @@
+//! Bildschirm „Installiert": die Addons eines Client-Ordners als Tabelle mit
+//! Mehrfachauswahl.
+//!
+//! Die Zeilen sind genau das, was in den `.toc`-Dateien steht — keine eigene
+//! Datenbank, keine geschaetzte Version. Eine Spalte „Status" gibt es trotzdem:
+//! sie sagt ehrlich „unbekannt", solange keine Quelle den Ordner zuordnen kann.
+//! Sobald der Index steht, vergleicht dieselbe Spalte gegen die Quellen.
+
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
+use adw::prelude::*;
+
+use crate::detail_view::LocalDetail;
+use crate::format::{interface_list, shorten_home};
+use crate::state::{source_rows, ScanData};
+
+/// Was die Tabelle je Zeile braucht; wird beim Filtern neu gebaut.
+struct CellView {
+    folder: String,
+    version: String,
+    interface: String,
+    source: String,
+    source_id: String,
+    status: String,
+    tone: String,
+}
+
+mod imp {
+    use glib::prelude::*;
+    use glib::subclass::prelude::*;
+    use std::cell::RefCell;
+
+    /// Eine Zeile. Warum ein GObject? `ColumnView` haengt an einem `ListModel`,
+    /// und das nimmt nur GObjects - Zeilen als reine Strings wuerden die
+    /// Spalten an eine feste Reihenfolge binden.
+    #[derive(Default, glib::Properties)]
+    #[properties(wrapper_type = super::AddonRow)]
+    pub struct AddonRow {
+        #[property(get, set)]
+        folder: RefCell<String>,
+        #[property(get, set)]
+        version: RefCell<String>,
+        #[property(get, set)]
+        interface: RefCell<String>,
+        #[property(get, set)]
+        source: RefCell<String>,
+        #[property(get, set)]
+        source_id: RefCell<String>,
+        #[property(get, set)]
+        status: RefCell<String>,
+        #[property(get, set)]
+        tone: RefCell<String>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for AddonRow {
+        const NAME: &'static str = "HexwerkAddonRow";
+        type Type = super::AddonRow;
+    }
+
+    #[glib::derived_properties]
+    impl ObjectImpl for AddonRow {}
+}
+
+glib::wrapper! {
+    pub struct AddonRow(ObjectSubclass<imp::AddonRow>);
+}
+
+impl AddonRow {
+    fn new(cell: CellView) -> Self {
+        glib::Object::builder()
+            .property("folder", cell.folder)
+            .property("version", cell.version)
+            .property("interface", cell.interface)
+            .property("source", cell.source)
+            .property("source-id", cell.source_id)
+            .property("status", cell.status)
+            .property("tone", cell.tone)
+            .build()
+    }
+
+    fn prop(&self, name: &str) -> String {
+        self.property::<String>(name)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Filter {
+    All,
+    WithSource,
+    NoSource,
+}
+
+impl Filter {
+    const ALL: [Filter; 3] = [Filter::All, Filter::WithSource, Filter::NoSource];
+
+    fn label(self) -> &'static str {
+        match self {
+            Filter::All => "Alle",
+            Filter::WithSource => "mit Quell-ID",
+            Filter::NoSource => "ohne Quell-ID",
+        }
+    }
+
+    fn keeps(self, addon: &hexwerk::InstalledAddon) -> bool {
+        let has_source = addon
+            .toc
+            .as_ref()
+            .map(|toc| {
+                let ids = &toc.source_ids;
+                ids.github.is_some()
+                    || ids.tukui.is_some()
+                    || ids.wowinterface.is_some()
+                    || ids.wago.is_some()
+                    || ids.curseforge.is_some()
+                    || ids.website.is_some()
+            })
+            .unwrap_or(false);
+        match self {
+            Filter::All => true,
+            Filter::WithSource => has_source,
+            Filter::NoSource => !has_source,
+        }
+    }
+}
+
+/// Was beim Doppelklick auf eine Zeile passiert. Eigener Typ, damit das Feld
+/// nicht als unlesbare Verschachtelung dasteht.
+///
+/// Mitgeliefert wird der Index-Schluessel des Client-Ordners (`client::variante`)
+/// und der Addon-Ordner: nur damit findet der Aufrufer im Index die Zuordnung
+/// zu einem Katalogeintrag. Der `.toc`-Inhalt reist als Rueckfallebene mit,
+/// damit ein Addon ohne Katalogeintrag trotzdem eine Detailseite bekommt.
+pub struct OpenRequest {
+    pub client_key: String,
+    pub folder: String,
+    pub local: LocalDetail,
+}
+
+type OpenCallback = Box<dyn Fn(OpenRequest)>;
+
+/// Ein waehlbarer Ziel-Client: Index in `ScanData.clients` und `flavors`.
+#[derive(Clone, Copy)]
+struct Target {
+    client: usize,
+    flavor: usize,
+}
+
+pub struct InstalledView {
+    root: gtk::Box,
+    target: gtk::DropDown,
+    columns: gtk::ColumnView,
+    store: gtk::gio::ListStore,
+    selection: gtk::MultiSelection,
+    chips: gtk::Box,
+    count: gtk::Label,
+    empty: gtk::Box,
+    data: RefCell<Option<Rc<ScanData>>>,
+    targets: RefCell<Vec<Target>>,
+    filter: Cell<Filter>,
+    on_open: RefCell<Option<OpenCallback>>,
+}
+
+impl InstalledView {
+    pub fn new() -> Rc<Self> {
+        let title = gtk::Label::new(Some("Installiert"));
+        title.add_css_class("hw-h1");
+        title.set_xalign(0.0);
+
+        let sub = gtk::Label::new(Some(
+            "Alle Zeilen stammen aus den TOC-Dateien im Addon-Ordner. Doppelklick öffnet die \
+             Detailansicht.",
+        ));
+        sub.add_css_class("hw-sub");
+        sub.set_xalign(0.0);
+        sub.set_wrap(true);
+        sub.set_margin_top(2);
+        sub.set_margin_bottom(14);
+
+        let target_label = gtk::Label::new(Some("ZIEL-CLIENT"));
+        target_label.add_css_class("hw-badge");
+
+        let target = gtk::DropDown::from_strings(&["—"]);
+        target.set_sensitive(false);
+        target.add_css_class("hw-drop");
+        target.set_tooltip_text(Some("Client-Ordner, dessen Addons die Tabelle zeigt"));
+
+        let target_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        target_row.set_margin_bottom(12);
+        target_row.append(&target_label);
+        target_row.append(&target);
+        let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        spacer.set_hexpand(true);
+        target_row.append(&spacer);
+
+        let chips = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+
+        let count = gtk::Label::new(Some("—"));
+        count.add_css_class("hw-dim2");
+
+        let remove = gtk::Button::with_label("Deinstallieren…");
+        crate::theme::pointer(&remove);
+        remove.add_css_class("hw-btn");
+        remove.add_css_class("ghost");
+        remove.set_sensitive(false);
+        remove.set_tooltip_text(Some(
+            "Kommt mit hexwerk-install: sichern, in den Papierkorb, rückgängig machen.",
+        ));
+
+        let update = gtk::Button::with_label("Aktualisieren…");
+        crate::theme::pointer(&update);
+        update.add_css_class("hw-btn");
+        update.set_sensitive(false);
+        update.set_tooltip_text(Some(
+            "Braucht Index und Quellen. Beides ist noch nicht angebunden.",
+        ));
+
+        let filter_bar = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        filter_bar.set_margin_bottom(12);
+        filter_bar.append(&chips);
+        let gap = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        gap.set_hexpand(true);
+        filter_bar.append(&gap);
+        filter_bar.append(&count);
+        filter_bar.append(&remove);
+        filter_bar.append(&update);
+
+        let store = gtk::gio::ListStore::new::<AddonRow>();
+        // `MultiSelection` erlaubt Strg- und Umschalt-Auswahl ohne weiteres
+        // Zutun; ein eigener Auswahlmodus waere GTK3-Denke.
+        let selection = gtk::MultiSelection::new(Some(store.clone()));
+
+        let columns = gtk::ColumnView::new(Some(selection.clone()));
+        columns.add_css_class("hw-table");
+        columns.set_vexpand(true);
+        columns.set_tooltip_text(Some(
+            "Mehrfachauswahl mit Strg- oder Umschalt-Klick; Doppelklick öffnet das Addon.",
+        ));
+        columns.append_column(&text_column("Addon", "folder", 220, true, "hw-cell"));
+        columns.append_column(&text_column("Version", "version", 90, false, "hw-cell-dim"));
+        columns.append_column(&text_column(
+            "Interface",
+            "interface",
+            170,
+            false,
+            "hw-cell-dim",
+        ));
+        columns.append_column(&chip_column("Quelle", "source"));
+        columns.append_column(&chip_column("Status", "status"));
+        // Die Zeilen oeffnen die Detailseite; der Zeiger gehoert auf die Tabelle,
+        // weil jede Zeile ein Ziel ist (Kopfzeile ausgenommen - der Unterschied
+        // ist im Raster klein genug, um ihn zu verschmerzen).
+        crate::theme::pointer(&columns);
+
+        let empty = empty_state();
+
+        // Die Tabelle bekommt einen eigenen Scrollbereich mit fester Hoehe.
+        // Ohne ihn waechst das Widget mit der Zeilenzahl, und bei sehr vielen
+        // Addons in einem Ordner verlangt das Fenster eine Hoehe, die der
+        // X-Server nicht mehr annimmt (BadAlloc).
+        let table_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vscrollbar_policy(gtk::PolicyType::Automatic)
+            .min_content_height(160)
+            .child(&columns)
+            .build();
+        table_scroll.set_vexpand(true);
+
+        let table_area = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        table_area.set_vexpand(true);
+        table_area.append(&empty);
+        table_area.append(&table_scroll);
+
+        let note = gtk::Label::new(Some(
+            "„unbekannt“ heißt: die TOC-Datei nennt keine Quell-ID. Solche Ordner bleiben unangetastet, \
+             Hexwerk löscht nichts, was es nicht sicher zuordnen kann.",
+        ));
+        note.add_css_class("hw-note");
+        note.set_xalign(0.0);
+        note.set_wrap(true);
+        note.set_margin_top(12);
+
+        let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        body.add_css_class("hw-pane");
+        body.set_margin_top(20);
+        body.set_margin_bottom(20);
+        body.set_margin_start(24);
+        body.set_margin_end(24);
+        body.set_vexpand(true);
+        body.append(&title);
+        body.append(&sub);
+        body.append(&target_row);
+        body.append(&filter_bar);
+        body.append(&table_area);
+        body.append(&note);
+
+        let view = Rc::new(Self {
+            root: body,
+            target,
+            columns,
+            store,
+            selection,
+            chips,
+            count,
+            empty,
+            data: RefCell::new(None),
+            targets: RefCell::new(Vec::new()),
+            filter: Cell::new(Filter::All),
+            on_open: RefCell::new(None),
+        });
+        view.wire();
+        view
+    }
+
+    pub fn widget(&self) -> &gtk::Widget {
+        self.root.upcast_ref()
+    }
+
+    pub fn set_on_open<F: Fn(OpenRequest) + 'static>(self: &Rc<Self>, f: F) {
+        *self.on_open.borrow_mut() = Some(Box::new(f));
+    }
+
+    /// Rueckrufe erst nach dem `Rc`: sie brauchen einen schwachen Verweis auf
+    /// genau dieses Objekt, sonst entstuende ein Kreis (Widget -> Closure ->
+    /// View -> Widget).
+    fn wire(self: &Rc<Self>) {
+        for filter in Filter::ALL {
+            let button = gtk::Button::with_label(filter.label());
+            button.add_css_class("hw-chip");
+            button.set_tooltip_text(Some("Filtert die Zeilen nach Quell-Kennung in der .toc"));
+            let weak = Rc::downgrade(self);
+            button.connect_clicked(move |_| {
+                if let Some(view) = weak.upgrade() {
+                    view.filter.set(filter);
+                    view.rebuild();
+                }
+            });
+            crate::theme::pointer(&button);
+            self.chips.append(&button);
+        }
+
+        let weak = Rc::downgrade(self);
+        self.target.connect_selected_notify(move |_| {
+            if let Some(view) = weak.upgrade() {
+                view.rebuild();
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        self.columns.connect_activate(move |_, position| {
+            if let Some(view) = weak.upgrade() {
+                view.open_at(position);
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        self.selection.connect_selection_changed(move |_, _, _| {
+            if let Some(view) = weak.upgrade() {
+                view.update_count();
+            }
+        });
+    }
+
+    pub fn set_data(&self, data: Rc<ScanData>) {
+        let mut targets = Vec::new();
+        let mut labels = Vec::new();
+        for (ci, client) in data.clients.iter().enumerate() {
+            for (fi, flavor) in client.flavors.iter().enumerate() {
+                targets.push(Target {
+                    client: ci,
+                    flavor: fi,
+                });
+                labels.push(format!("{} · {}", client.label, flavor.dir_name));
+            }
+        }
+        *self.targets.borrow_mut() = targets;
+        *self.data.borrow_mut() = Some(data);
+
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let strings = gtk::StringList::new(&refs);
+        self.target.set_model(Some(&strings));
+        self.target.set_sensitive(!labels.is_empty());
+
+        let has_targets = !labels.is_empty();
+        self.empty.set_visible(!has_targets);
+        self.columns.set_visible(has_targets);
+        if has_targets {
+            self.target.set_selected(0);
+        }
+        self.rebuild();
+    }
+
+    fn rebuild(&self) {
+        self.store.remove_all();
+        self.update_chip_classes();
+
+        let Some(data) = self.data.borrow().clone() else {
+            self.update_count();
+            return;
+        };
+        let target = self
+            .targets
+            .borrow()
+            .get(self.target.selected() as usize)
+            .copied();
+        let Some(target) = target else {
+            self.update_count();
+            return;
+        };
+        let Some(client) = data.clients.get(target.client) else {
+            self.update_count();
+            return;
+        };
+        let Some(flavor) = client.flavors.get(target.flavor) else {
+            self.update_count();
+            return;
+        };
+
+        let filter = self.filter.get();
+        for addon in flavor.addons.iter().filter(|a| filter.keeps(a)) {
+            let sources = source_rows(addon);
+            let (source, source_id) = match sources.first() {
+                Some((name, id)) => (name.clone(), id.clone()),
+                None => ("—".to_string(), String::new()),
+            };
+            let known = !sources.is_empty();
+            self.store.append(&AddonRow::new(CellView {
+                folder: addon.folder.clone(),
+                version: addon.version.clone().unwrap_or_else(|| "—".to_string()),
+                interface: interface_list(&addon.interface_numbers),
+                source,
+                source_id,
+                status: if known {
+                    "nicht geprüft".to_string()
+                } else {
+                    "unbekannt".to_string()
+                },
+                tone: if known { "warn" } else { "off" }.to_string(),
+            }));
+        }
+        self.update_count();
+    }
+
+    fn update_chip_classes(&self) {
+        let active = self.filter.get();
+        let mut child = self.chips.first_child();
+        let mut index = 0usize;
+        while let Some(widget) = child {
+            if let Some(button) = widget.downcast_ref::<gtk::Button>() {
+                button.remove_css_class("sig");
+                if Filter::ALL.get(index).copied() == Some(active) {
+                    button.add_css_class("sig");
+                }
+                index += 1;
+            }
+            child = widget.next_sibling();
+        }
+    }
+
+    fn update_count(&self) {
+        let shown = self.store.n_items();
+        let selected = self.selection.selection().size();
+        let text = if selected > 0 {
+            format!("{shown} Zeilen · {selected} ausgewählt")
+        } else {
+            format!("{shown} Zeilen")
+        };
+        self.count.set_text(&text);
+    }
+
+    /// Doppelklick auf eine Zeile: Detailansicht fuer dieses Addon bauen. Alles,
+    /// was dort steht, kommt aus der `.toc` und dem Dateisystem.
+    fn open_at(&self, position: u32) {
+        let Some(row) = self
+            .store
+            .item(position)
+            .and_then(|o| o.downcast::<AddonRow>().ok())
+        else {
+            return;
+        };
+        let folder = row.prop("folder");
+
+        let data = self.data.borrow().clone();
+        let Some(data) = data else {
+            return;
+        };
+        let target = self
+            .targets
+            .borrow()
+            .get(self.target.selected() as usize)
+            .copied();
+        let Some(target) = target else {
+            return;
+        };
+        let Some(client) = data.clients.get(target.client) else {
+            return;
+        };
+        let Some(flavor) = client.flavors.get(target.flavor) else {
+            return;
+        };
+        let Some(addon) = flavor.addons.iter().find(|a| a.folder == folder) else {
+            return;
+        };
+
+        let detail = LocalDetail::from_addon(
+            addon,
+            &client.label,
+            &flavor.dir_name,
+            &shorten_home(&flavor.addons_dir),
+        );
+        if let Some(callback) = self.on_open.borrow().as_ref() {
+            callback(OpenRequest {
+                // Genau der Schluessel, den `Index::sync_clients` bildet:
+                // Client-Kennung und Varianten-Ordner.
+                client_key: format!("{}::{}", client.id, flavor.dir_name),
+                folder: addon.folder.clone(),
+                local: detail,
+            });
+        }
+    }
+}
+
+fn text_column(
+    title: &str,
+    property: &'static str,
+    width: i32,
+    expand: bool,
+    css: &'static str,
+) -> gtk::ColumnViewColumn {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(move |_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let label = gtk::Label::new(None);
+        label.set_xalign(0.0);
+        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        label.add_css_class(css);
+        item.set_child(Some(&label));
+    });
+    factory.connect_bind(move |_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let (Some(row), Some(label)) = (
+            item.item().and_then(|o| o.downcast::<AddonRow>().ok()),
+            item.child().and_then(|c| c.downcast::<gtk::Label>().ok()),
+        ) else {
+            return;
+        };
+        label.set_text(&row.prop(property));
+    });
+
+    let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
+    column.set_fixed_width(width);
+    column.set_expand(expand);
+    column.set_resizable(true);
+    column
+}
+
+/// Spalte mit Chip-Optik. Die Farbe haengt an der Zeile (`tone`) - so bleibt
+/// „unbekannt" grau und „nicht geprüft" gelb, ohne dass die Spalte die
+/// Bedeutung kennen muss.
+fn chip_column(title: &str, property: &'static str) -> gtk::ColumnViewColumn {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let label = gtk::Label::new(None);
+        label.set_halign(gtk::Align::Start);
+        label.set_valign(gtk::Align::Center);
+        item.set_child(Some(&label));
+    });
+    factory.connect_bind(move |_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let (Some(row), Some(label)) = (
+            item.item().and_then(|o| o.downcast::<AddonRow>().ok()),
+            item.child().and_then(|c| c.downcast::<gtk::Label>().ok()),
+        ) else {
+            return;
+        };
+        label.set_text(&row.prop(property));
+        let tone = row.prop("tone");
+        label.set_css_classes(&["hw-chip", &tone]);
+        let id = row.prop("source_id");
+        if id.is_empty() {
+            label.set_tooltip_text(None);
+        } else {
+            label.set_tooltip_text(Some(&id));
+        }
+    });
+
+    let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
+    column.set_fixed_width(130);
+    column
+}
+
+fn empty_state() -> gtk::Box {
+    let box_ = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    box_.add_css_class("hw-card");
+    let title = gtk::Label::new(Some("Kein Client-Ordner mit Addons"));
+    title.add_css_class("hw-note-title");
+    title.set_xalign(0.0);
+    let text = gtk::Label::new(Some(
+        "Sobald ein Scan einen Ordner mit `Interface/AddOns` findet, stehen die Addons hier.",
+    ));
+    text.add_css_class("hw-dim");
+    text.set_xalign(0.0);
+    text.set_wrap(true);
+    box_.append(&title);
+    box_.append(&text);
+    box_.set_visible(false);
+    box_
+}

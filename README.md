@@ -1,121 +1,129 @@
 # Hexwerk
 
-Addon-Manager für **World of Warcraft unter Linux**, gebaut für Installationen in
-**Steam-Proton-Präfixen**. Alle Client-Versionen: `_retail_`, `_classic_`,
-`_classic_era_`, `_anniversary_` und die PTR-Varianten.
+Addon-Manager für World of Warcraft unter Linux. Hexwerk findet jede
+WoW-Installation in einem Wine-Präfix, egal ob sie über Steam und Proton,
+Faugus, Heroic, Lutris, Bottles, PortProton oder von Hand angelegt wurde, und
+verwaltet die Addons aller Client-Versionen aus einem Fenster.
 
-Ziel: Addons finden, installieren, aktualisieren und aufräumen, ohne dass der
-Nutzer je eine Addon-ID einträgt und ohne dass irgendetwas im Wine-Präfix
-mitlaufen muss. Hexwerk arbeitet von außen auf dem Dateisystem des Präfixes.
+Native Oberfläche mit GTK4 und libadwaita, Kern in Rust, lokaler Index für die
+Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
 
-## Status
+## Funktionen
 
-Lauffähig als Kommandozeile; die Oberfläche steht und wird gerade an Index und
-Quellen angeschlossen. Gebaut und getestet:
+* Erkennt Steam und Proton, Faugus und UMU, Heroic, Lutris, Bottles,
+  PortProton und jeden Ordner, den du selbst auswählst.
+* Alle Client-Versionen: Retail, Classic, Classic Era, Anniversary, Forever und
+  die PTR-Varianten, jede mit eigener Addon-Liste.
+* Katalog aus mehreren Quellen. Dasselbe Addon aus mehreren Märkten ist ein
+  Eintrag mit den Versionen je Quelle.
+* Suche über einen lokalen Index (SQLite mit FTS5), damit das Fenster auch ohne
+  Netz und während eines Scans bedienbar bleibt.
+* Addons werden erkannt, nicht eingetragen: über die Projektkennungen in der
+  `.toc` und über einen Fingerprint des Ordners. Updates funktionieren damit
+  auch für Addons, die von Hand installiert wurden.
+* Installation entpackt mit Ordnerkorrektur, sichert vorher den alten Stand und
+  verschiebt Gelöschtes in einen Papierkorb.
+* Dunkle und helle Darstellung, Umschaltung im Fenster, Wahl wird gemerkt.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Scan](docs/screenshots/scan.png) | ![Clients](docs/screenshots/clients.png) |
+| Scan beim Start | Gefundene Clients je Herkunft |
+| ![Installiert](docs/screenshots/installiert.png) | ![Katalog](docs/screenshots/katalog.png) |
+| Addons je Client-Ordner | Katalog aus dem lokalen Index |
+
+![Addon-Detail](docs/screenshots/detail.png)
+
+## Installation
+
+Ein Flatpak ist vorbereitet (`flatpak/de.weppelmann.Hexwerk.yml`, Runtime
+`org.gnome.Platform//51`), aber noch nicht veröffentlicht.
+
+Aus dem Quelltext, Kommandozeile:
+
+```bash
+cargo build --release
+./target/release/hexwerk scan
+```
+
+Oberfläche: sie braucht die GTK4- und libadwaita-Entwicklungspakete. Fehlen sie
+auf dem System, baut man sie in einem Container:
+
+```bash
+podman build -t hexwerk-buildenv -f packaging/Containerfile .
+podman run --rm -v "$PWD":/work:z -w /work hexwerk-buildenv \
+  sh -lc 'cd crates/ui-gtk && cargo build --release'
+```
+
+## Benutzung
+
+Kommandozeile:
+
+```bash
+hexwerk scan                 # Präfixe und Clients suchen
+hexwerk addons               # Clients und ihre Addons listen
+hexwerk index                # lokalen Index aus dem Dateisystem bauen
+hexwerk index --net bags     # Quellen befragen und Katalog füllen
+hexwerk search weakauras     # im lokalen Index suchen
+hexwerk keys list            # Quellen mit Schlüssel und ihre Herkunft
+hexwerk keys set wago <token>
+hexwerk keys test            # jede Quelle mit einer echten Anfrage prüfen
+```
+
+Im Fenster: links die Ansichten, in der Kopfleiste der Umschalter zwischen
+System, Dunkel und Hell. Der Katalog liest ausschließlich den lokalen Index,
+der beim Start im Hintergrund aus den Quellen ergänzt wird.
+
+## Quellen und Schlüssel
+
+Ohne Zugangsdaten nutzbar: **GitHub**, **Tukui**, **WoWInterface**.
+Mit eigenem Schlüssel: **Wago** (Token) und **CurseForge** (API-Key). Beide sind
+abgeschaltet, solange kein Schlüssel hinterlegt ist.
+
+Hexwerk liefert bewusst keinen fremden Schlüssel mit: CurseForge vergibt Keys an
+den einzelnen Entwickler und nicht übertragbar. Ein eigener Key wird gesetzt
+über `hexwerk keys set curseforge <key>`, über `~/.config/hexwerk/keys.json`
+(Modus 0600) oder über `HEXWERK_CURSEFORGE_KEY`. Ausgegeben wird ein Schlüssel
+nie vollständig, nur die letzten vier Zeichen.
+
+Die gemessenen Endpunkte und Antwortformen stehen in
+[`docs/QUELLEN.md`](docs/QUELLEN.md).
+
+## Aufbau
+
+| Paket | Aufgabe |
+|---|---|
+| `crates/core` | Präfixe finden, `.toc` lesen, installierte Addons erfassen |
+| `crates/sources` | Quellen: GitHub, Tukui, WoWInterface, Wago, CurseForge, Fingerprint |
+| `crates/index` | lokaler Index (SQLite, FTS5) für Suche, Katalog und Bestand |
+| `crates/install` | Installation, Sicherung, Papierkorb |
+| `crates/ui-gtk` | Oberfläche (GTK4, libadwaita) |
+| `src/` | Kommandozeile |
+
+Datenfluss und Datenmodell als Diagramm in
+[`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md). Arbeitspakete und Risiken in
+[`PLAN.md`](PLAN.md). Entwicklungsumgebung und Prüfwerkzeuge in
+[`docs/ENTWICKLUNG.md`](docs/ENTWICKLUNG.md).
+
+## Stand
+
+Version 0.1.0, kein Release. Kern und Oberfläche laufen, der Katalog zieht echte
+Daten aus den Quellen.
 
 | Teil | Stand |
 |---|---|
-| Präfix-Erkennung (`crates/core`) | Steam, Faugus/UMU, Heroic, Lutris, Bottles, PortProton, manuelle Ordner — 48 Tests |
-| Quellen (`crates/sources`) | GitHub, Tukui, WoWInterface ohne Schlüssel; Wago, CurseForge mit Schlüssel — 50 Tests, echter Netztest über `examples/probe` |
-| Index (`crates/index`) | SQLite + FTS5 für Clients, Katalog, installierte Addons, Update-Erkennung — 37 Tests |
-| Installation (`crates/install`) | ZIP mit Ordnerkorrektur, Sicherung, Papierkorb, Zip-Slip-Schutz — 30 Tests |
-| Oberfläche (`crates/ui-gtk`) | fünf Bildschirme, Dunkel/Hell, Scan im Hintergrund; baut gegen GTK 4.22.5 / libadwaita 1.9.4 |
-| Marke und Pakete | Logo, Icons 16–512, symbolisches Tray-Icon, Desktop-Eintrag, AppStream-Metainfo, Flatpak-Manifest, CI |
+| Präfix-Erkennung | fertig, 48 Tests |
+| Quellen | fertig, 50 Tests, echter Netztest über `crates/sources/examples/probe.rs` |
+| Index | fertig, 37 Tests |
+| Installation | fertig, 30 Tests |
+| Oberfläche | fünf Bildschirme, Dunkel und Hell, Katalog und Detail aus dem Index |
+| Flatpak | Manifest und CI vorhanden, Bau lokal mit Attrappen-Binaries geprüft |
 
-## Bauen und starten
+Offen: Veröffentlichung als Flatpak, Addon-Profile (schaltbare Sammlungen),
+Bilder in der Detailansicht aus den Quellen, Nachladen beim Scrollen im Katalog.
 
-```bash
-cargo build --release                        # Kommandozeile
-./target/release/hexwerk scan                # Installationen finden
-./target/release/hexwerk index               # lokalen Index bauen (ohne Netz)
-./target/release/hexwerk index --net bags    # Quellen befragen, Katalog füllen
-./target/release/hexwerk search weakauras
-./target/release/hexwerk keys test           # Quellen mit Schlüssel prüfen
-./target/release/hexwerk keys set curseforge <key>
-```
+## Lizenz
 
-Die Oberfläche braucht GTK4- und libadwaita-Header, die auf Bazzite fehlen.
-Gebaut wird deshalb im Container (Image mit `gtk4-devel`, `libadwaita-devel`):
-
-```bash
-podman run -d --name hexwerk-build -v "$PWD":/work:z localhost/hexwerk-buildenv:1 sleep infinity
-podman exec -w /work hexwerk-build sh -lc 'cd crates/ui-gtk && cargo build'
-```
-
-
-## Quellen — gemessen am 2026-10-30
-
-| Quelle | Endpunkt | Ergebnis |
-|---|---|---|
-| WowUp Hub (Index) | `GET https://hub.wowup.io/addons/search?query=…` | `200`, JSON, unauthentifiziert, Feld `source` (u. a. `GitHub`) + `repository` |
-| WowUp Hub (Fingerprint) | `POST https://hub.wowup.io/addons/fingerprint` `{"fingerprints":[…]}` | `200` → `{"exactMatches":[]}` |
-| Tukui | `GET https://api.tukui.org/v1/addons` | `200`, 3.770 Byte Gesamtliste |
-| WoWInterface | `GET https://api.mmoui.com/v4/game/WOW/filelist.json` (Fallback `v3`) | `200`, 2.744.891 Byte, mit `UIMD5` und CDN-URL |
-| CurseForge | `GET https://api.curseforge.com/v1/games/1` | `403` ohne API-Key |
-| Wago | `https://addons.wago.io/api/...` | `302` auf die Website, ohne Token nicht nutzbar |
-
-Damit sind drei Quellen ohne Zugangsdaten nutzbar: **GitHub-Releases**,
-**Tukui**, **WoWInterface**. CurseForge scheidet aus, solange kein eigener
-API-Key vergeben wird (Keys sind an den einzelnen Entwickler gebunden und nicht
-übertragbar).
-
-## Verfahren, das übernommen wird
-
-**Erkennung statt Registrierung.** Installierte Addon-Ordner werden gehasht und
-über einen Fingerprint-Index einem Addon zugeordnet. Nur so funktionieren
-Updates für Addons, die der Nutzer nie explizit hinzugefügt hat. WowUp macht
-das in `wowup-lib/src/addon-providers/wowup-addon-provider.ts`
-(`getAddonIdsByFingerprints`) und `addon-fingerprint.service.ts`.
-
-**Externe IDs stehen im `.toc`.** `X-Curse-Project-ID`, `X-WoWI-ID`,
-`X-Tukui-Project-ID` — daraus leitet der Manager die Quelle ab, ohne den
-Addon-Namen zu raten. WowUp bildet das in `addon-install.service.ts` ab
-(`ADDON_PROVIDER_TOC_EXTERNAL_ID_MAP`).
-
-**Installation ist Entpacken mit Ordnerkorrektur.** ZIP holen, oberste
-Verzeichnisebene bestimmen, nach `Interface/AddOns/<Ordner>` entpacken,
-`__MACOSX` ignorieren, `.toc` neu einlesen für `## Version` und `## Interface`.
-
-**Präfix-Erkennung.** Steam-Bibliotheken aus `libraryfolders.vdf` lesen, dann
-`<lib>/steamapps/compatdata/<appid>/pfx/drive_c/Program Files (x86)/World of Warcraft`
-prüfen und je Client-Ordner die `## Interface`-Nummer aus dem `.toc` als
-Versionsmaßstab nehmen.
-
-## Gemessene Umgebung (2026-10-30, dieser Rechner)
-
-Damit wird entwickelt und getestet — keine Attrappen:
-
-| Ort | Inhalt |
-|---|---|
-| `~/Faugus/battlenet` | UMU-Präfix von Faugus. Enthält `drive_c/` **und** `pfx/drive_c/` auf derselben Ebene — beide Formen muss der Scanner kennen |
-| `.../World of Warcraft/_classic_era_` | 11 Addons, 2,6 GB, Interface `11509 · 20506 · 16001` |
-| `.../_classic_beta_` | 1 Addon: `AggroMatrix` 1.9.0, `## X-Website: local` |
-| `.../_forever_` | `Interface/AddOns` vorhanden, leer |
-| `_retail_` | **nicht installiert** |
-| Steam | 1 Bibliothek, 6 `compatdata`-Präfixe, keins mit WoW |
-| Heroic | 2 Präfixe (Divinity OS 2, Satisfactory), kein WoW |
-| Lutris, Bottles, PortProton | nicht installiert |
-
-Zwei Dinge, die daraus folgen: `## Interface` ist **kein Einzelwert**, sondern kann eine
-Komma-Liste sein (`11509, 20506, 16001`) — der Vergleich mit dem Client muss also Menge gegen
-Menge prüfen. Und ein UMU-Präfix ist nicht immer `pfx/drive_c/...`; Faugus legt `drive_c`
-zusätzlich direkt in den Präfix-Ordner.
-
-## Entwurf
-
-`docs/design/entwurf-2026-10-30.html` — Fensterentwurf mit fünf Bildschirmen (Scan, Clients,
-Installiert, Katalog, Addon-Detail). Client-Daten darin stammen aus dem echten Präfix oben,
-Katalogwerte sind Platzhalter.
-
-## Risiko
-
-Der Fingerprint-Index gehört WowUp, nicht uns. Genau diese Abhängigkeit hat
-Ajour gekostet (archiviert 2024), nachdem Overwolf den CurseForge-Zugang
-gestrichen hat. Hexwerk muss ohne den Hub lauffähig bleiben: direkte
-Tukui- und WoWInterface-IDs aus dem `.toc`, GitHub-Repository aus dem
-`.toc`-Feld `X-Website` bzw. aus dem Release-ZIP, Hub nur als Beschleuniger.
-
-## Name
-
-`Hexwerk` — Hex (deutsch: Hexer, die WoW-Klasse) + Werk. Kommando `hexwerk`,
-Flatpak-Ziel `de.weppelmann.Hexwerk`. Frei auf crates.io, PyPI und npm.
+GPL-3.0-or-later, siehe [LICENSE](LICENSE).
