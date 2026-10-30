@@ -838,3 +838,18 @@ scrolledwindow,
 separator {
   border-radius: 0;
 }
+
+/* Fensterknoepfe oben rechts: Adwaita zeichnet sie als Kreis und schlaegt
+   damit jede allgemeine `button`-Regel. Deshalb hier ausdruecklich, mit
+   hoeherer Spezifitaet als die Vorlage. */
+windowcontrols > button,
+windowcontrols > button > image,
+windowcontrols button,
+button.titlebutton,
+headerbar button.titlebutton,
+.titlebar button.titlebutton {
+  border-radius: 0;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 2px;
+}

@@ -5,7 +5,7 @@
 //! und ein unbestimmter Balken waehrend des Laufs, danach eine Zeile je
 //! Herkunft mit dem, was der Kern tatsaechlich gemeldet hat.
 
-use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Duration;
 
 use adw::prelude::*;
@@ -21,7 +21,10 @@ pub struct ScanView {
     rescan: gtk::Button,
     /// Der Puls-Timer laeuft nur, solange gescannt wird. Ohne dieses Feld
     /// wuerde er nach dem Scan weiter alle 100 ms aufwachen.
-    pulse: RefCell<Option<glib::SourceId>>,
+    /// Laeuft der Pulsschlag? Ein Schalter statt einer Zeitgeber-Kennung:
+    /// eine bereits gelaufene Kennung zu entfernen laesst glib panisch
+    /// abbrechen, und der Abbruch trifft dann den ganzen Prozess.
+    pulse_running: Rc<std::cell::Cell<bool>>,
 }
 
 impl ScanView {
@@ -114,7 +117,7 @@ impl ScanView {
             bar,
             status,
             rescan,
-            pulse: RefCell::new(None),
+            pulse_running: Rc::new(std::cell::Cell::new(false)),
         }
     }
 
@@ -166,19 +169,25 @@ impl ScanView {
     }
 
     fn start_pulse(&self) {
-        self.stop_pulse();
+        if self.pulse_running.get() {
+            return;
+        }
+        self.pulse_running.set(true);
         let bar = self.bar.clone();
-        let id = glib::timeout_add_local(Duration::from_millis(110), move || {
+        let running = self.pulse_running.clone();
+        glib::timeout_add_local(Duration::from_millis(110), move || {
+            if !running.get() {
+                return glib::ControlFlow::Break;
+            }
             bar.pulse();
             glib::ControlFlow::Continue
         });
-        *self.pulse.borrow_mut() = Some(id);
     }
 
     fn stop_pulse(&self) {
-        if let Some(id) = self.pulse.borrow_mut().take() {
-            id.remove();
-        }
+        // Nur den Schalter loesen; der Zeitgeber endet beim naechsten Lauf
+        // selbst. Kein Entfernen einer Kennung, also kein Abbruchrisiko.
+        self.pulse_running.set(false);
     }
 }
 

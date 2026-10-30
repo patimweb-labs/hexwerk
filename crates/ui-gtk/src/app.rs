@@ -26,6 +26,7 @@ use crate::detail_view::{DetailTarget, DetailView, InstallChoice};
 use crate::format::iso_date;
 use crate::installed_view::{InstalledView, OpenRequest};
 use crate::scan_view::ScanView;
+use crate::sources_view::{SourceInfo, SourcesView};
 use crate::state::{ScanData, ScanMsg};
 use crate::theme::Theme;
 
@@ -33,11 +34,12 @@ pub const APP_ID: &str = "de.weppelmann.Hexwerk";
 
 /// Reihenfolge der Bildschirme: Name im Stack, Titel, Untertitel fuer den
 /// Kopfbereich. Eine Tabelle, damit Leiste und Kopf nicht auseinanderlaufen.
-const PAGES: [(&str, &str, &str); 5] = [
+const PAGES: [(&str, &str, &str); 6] = [
     ("scan", "Scan", "Herkünfte prüfen"),
     ("clients", "Clients", "Gefundene WoW-Installationen"),
     ("installed", "Installiert", "Addons je Client-Ordner"),
     ("catalog", "Katalog", "Suche im lokalen Index"),
+    ("sources", "Quellen", "Zustand, Verbindungstest, Schlüssel"),
     ("detail", "Addon-Detail", "Quellen, Versionen, Ziel"),
 ];
 
@@ -93,6 +95,10 @@ struct Ui {
     /// Brotkrumen in der Kopfleiste: Weg zurueck in den Katalog.
     crumb: gtk::Box,
     crumb_name: gtk::Label,
+    /// Bildschirm "Quellen": Zustand, Test, Schluessel.
+    sources: Rc<SourcesView>,
+    /// Testergebnisse dieser Sitzung, je Quelle.
+    source_tests: RefCell<std::collections::BTreeMap<hexwerk_sources::Source, SourceInfo>>,
 }
 
 pub fn run() -> glib::ExitCode {
@@ -129,11 +135,13 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let installed = InstalledView::new();
     let catalog = CatalogView::new();
     let detail = DetailView::new();
+    let sources = SourcesView::new();
 
     stack.add_named(scan.widget(), Some("scan"));
     stack.add_named(clients_view.widget(), Some("clients"));
     stack.add_named(installed.widget(), Some("installed"));
     stack.add_named(catalog.widget(), Some("catalog"));
+    stack.add_named(sources.widget(), Some("sources"));
     stack.add_named(detail.widget(), Some("detail"));
 
     // ---- Kopfbereich der Inhaltsspalte ----
@@ -221,29 +229,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         .build();
     rail_scroll.add_css_class("hw-rail");
 
-    let rail_header = adw::HeaderBar::new();
-    rail_header.add_css_class("hw-header");
-    rail_header.set_show_start_title_buttons(false);
-    rail_header.set_show_end_title_buttons(false);
-    let wordmark = gtk::Label::new(Some("HEXWERK"));
-    wordmark.add_css_class("hw-wordmark");
-    // Logo und Wortmarke zusammen: das Icon liegt eingebettet im Binary, damit
-    // das Fenster zur Laufzeit keine Datei braucht (im Flatpak waere das ein
-    // eigener Pfad, der stimmen muss).
-    // Linksbuendig statt zentriert: `set_title_widget` zentriert, und dann
-    // klebt das Logo in der Mitte der Leiste statt in der Ecke.
-    let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    brand_row.add_css_class("hw-brand");
-    brand_row.append(&brand_icon(26));
-    brand_row.append(&wordmark);
-    rail_header.pack_start(&brand_row);
-    // Ohne eigenen Titel zieht der HeaderBar den Seitentitel ("Hexwerk") und
-    // schreibt ihn neben die Wortmarke. Ein leerer Titel schaltet das ab.
-    let leerer_titel = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    rail_header.set_title_widget(Some(&leerer_titel));
-
     let sidebar_view = adw::ToolbarView::new();
-    sidebar_view.add_top_bar(&rail_header);
     sidebar_view.set_content(Some(&rail_scroll));
 
     let split = adw::NavigationSplitView::new();
@@ -284,6 +270,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         _theme: theme,
         crumb,
         crumb_name,
+        sources,
+        source_tests: RefCell::new(std::collections::BTreeMap::new()),
     });
 
     wire(&ui);
@@ -314,6 +302,23 @@ fn wire(ui: &Rc<Ui>) {
 
     // Scan-Knopf: voller Lauf, inklusive Quellen.
     let weak = Rc::downgrade(ui);
+    {
+        let weak = Rc::downgrade(ui);
+        ui.sources.set_on_test(move |source| {
+            if let Some(ui) = weak.upgrade() {
+                run_source_test(&ui, source);
+            }
+        });
+    }
+    {
+        let weak = Rc::downgrade(ui);
+        ui.sources.set_on_key(move |source| {
+            if let Some(ui) = weak.upgrade() {
+                ask_key(&ui, source);
+            }
+        });
+    }
+
     // Deinstallieren und Leeren: bestaetigen, in den Papierkorb, Bericht als
     // Toast mit Rueckgaengig.
     {
@@ -432,6 +437,153 @@ pub fn show_local_detail(detail: &crate::detail_view::LocalDetail) {
 
 /// Bildschirm zeigen und Leiste nachziehen. Idempotent, damit Aufrufe aus
 /// Rueckrufen und aus der Leiste sich nicht im Kreis drehen.
+// ---------------------------------------------------------------------------
+// Quellen
+// ---------------------------------------------------------------------------
+
+/// Baut die Uebersicht neu: Zahlen aus dem Index, Schluessel aus der Ablage,
+/// Testergebnisse aus dieser Sitzung.
+fn refresh_sources(ui: &Rc<Ui>) {
+    let keys = hexwerk_sources::keys::KeyProvider::default_provider();
+    let counts: std::collections::BTreeMap<&'static str, usize> =
+        with_index(ui, |index| index.source_counts()).unwrap_or_default();
+    let mut infos = ui.source_tests.borrow().clone();
+    for (source, entries) in &counts {
+        if let Some(source) = hexwerk_index::source_from_key(source) {
+            let info = infos.entry(source).or_default();
+            info.entries = *entries;
+        }
+    }
+    ui.sources.refresh(&counts, &keys, &infos);
+}
+
+/// Fuehrt einen Verbindungstest im Hintergrund aus. Netz im Hauptthread waere
+/// ein eingefrorenes Fenster bei jeder langsamen Quelle.
+fn run_source_test(ui: &Rc<Ui>, source: hexwerk_sources::Source) {
+    let (tx, rx) = async_channel::bounded(1);
+    std::thread::Builder::new()
+        .name("hexwerk-quellentest".to_string())
+        .spawn(move || {
+            let keys = hexwerk_sources::keys::KeyProvider::default_provider();
+            let http: std::sync::Arc<dyn hexwerk_sources::http::Http> =
+                std::sync::Arc::new(hexwerk_sources::http::UreqHttp::new());
+            let registry = hexwerk_sources::Registry::build(
+                &keys,
+                http,
+                hexwerk_sources::cache::Cache::open_default(),
+            );
+            let health = match registry.source(source) {
+                Some(s) => hexwerk_sources::AddonSource::probe(s),
+                None => hexwerk_sources::SourceHealth {
+                    source,
+                    ok: Some(false),
+                    detail: "nicht eingetragen, kein Schlüssel".to_string(),
+                },
+            };
+            let _ = tx.send_blocking(health);
+        })
+        .ok();
+
+    let weak = Rc::downgrade(ui);
+    glib::spawn_future_local(async move {
+        let Ok(health) = rx.recv().await else { return };
+        let Some(ui) = weak.upgrade() else { return };
+        let ok = health.ok.unwrap_or(false);
+        {
+            let mut tests = ui.source_tests.borrow_mut();
+            let info = tests.entry(health.source).or_default();
+            info.test = Some((ok, health.detail.clone()));
+        }
+        ui.sources.set_test(health.source, ok, &health.detail);
+        refresh_sources(&ui);
+        if ok {
+            toast(
+                &ui,
+                &format!("{}: {}", health.source.label(), health.detail),
+            );
+        } else {
+            toast_error(
+                &ui,
+                &format!("{}: {}", health.source.label(), health.detail),
+            );
+        }
+    });
+}
+
+/// Schluessel setzen oder entfernen. Der Wert wird nie angezeigt, nur die
+/// letzten vier Zeichen.
+fn ask_key(ui: &Rc<Ui>, source: hexwerk_sources::Source) {
+    use hexwerk_sources::keys::KeyProvider;
+    let keys = KeyProvider::default_provider();
+    let Some(window) = main_window(ui) else {
+        return;
+    };
+
+    if keys.key(source).is_some() {
+        let dialog = adw::AlertDialog::new(
+            Some(&format!("{}: Schlüssel entfernen?", source.label())),
+            Some("Ohne Schlüssel bleibt die Quelle abgeschaltet. Der Katalog behält, was schon im Index steht."),
+        );
+        dialog.add_response("cancel", "Abbrechen");
+        dialog.add_response("remove", "Entfernen");
+        dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(ui);
+        let src = source;
+        dialog.connect_response(None, move |_dialog, response| {
+            if response != "remove" {
+                return;
+            }
+            let Some(ui) = weak.upgrade() else { return };
+            match keys.remove(src) {
+                Ok(_) => {
+                    toast(&ui, &format!("{}: Schlüssel entfernt", src.label()));
+                    refresh_sources(&ui);
+                }
+                Err(err) => toast_error(&ui, &format!("Entfernen: {err}")),
+            }
+        });
+        dialog.present(Some(&window));
+        return;
+    }
+
+    let dialog = adw::AlertDialog::new(
+        Some(&format!("{}: Schlüssel setzen", source.label())),
+        Some("Der Schlüssel wird in ~/.config/hexwerk/keys.json abgelegt und nie vollständig angezeigt."),
+    );
+    let entry = gtk::Entry::new();
+    entry.set_placeholder_text(Some("Schlüssel oder Token"));
+    entry.set_visibility(false);
+    entry.add_css_class("hw-search");
+    dialog.set_extra_child(Some(&entry));
+    dialog.add_response("cancel", "Abbrechen");
+    dialog.add_response("save", "Speichern");
+    dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+    dialog.set_close_response("cancel");
+
+    let weak = Rc::downgrade(ui);
+    let src = source;
+    dialog.connect_response(None, move |_dialog, response| {
+        if response != "save" {
+            return;
+        }
+        let Some(ui) = weak.upgrade() else { return };
+        let value = entry.text().to_string();
+        if value.trim().is_empty() {
+            toast_error(&ui, "Leerer Schlüssel wird nicht gespeichert.");
+            return;
+        }
+        match keys.set(src, value.trim()) {
+            Ok(()) => {
+                toast(&ui, &format!("{}: Schlüssel gespeichert", src.label()));
+                refresh_sources(&ui);
+            }
+            Err(err) => toast_error(&ui, &format!("Speichern: {err}")),
+        }
+    });
+    dialog.present(Some(&window));
+}
+
 /// Brotkrumen setzen: der Weg zurueck in den Katalog nennt das offene Addon.
 fn set_crumb(ui: &Ui, name: &str) {
     ui.crumb_name.set_text(name);
@@ -456,6 +608,10 @@ fn show_page(ui: &Rc<Ui>, name: &str) {
             item.button
                 .update_state(&[gtk::accessible::State::Selected(Some(false))]);
         }
+    }
+    if name == "sources" {
+        ui.sources.show_overview();
+        refresh_sources(ui);
     }
     // Brotkrumen nur dort, wo es einen Rueckweg gibt.
     ui.crumb.set_visible(name == "detail");
@@ -1000,6 +1156,19 @@ fn toast_error(ui: &Rc<Ui>, text: &str) {
 fn build_rail() -> (gtk::Box, Vec<NavItem>, Counts, Vec<(Source, gtk::Label)>) {
     let rail = gtk::Box::new(gtk::Orientation::Vertical, 0);
     rail.set_margin_bottom(14);
+
+    // Marke oben in der Leiste. Kein eigener HeaderBar mehr: zwei Kopfleisten
+    // nebeneinander liessen die Trennlinie der SplitView mitten durch laufen.
+    let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    brand_row.add_css_class("hw-brand");
+    brand_row.set_margin_top(14);
+    brand_row.set_margin_bottom(12);
+    brand_row.set_margin_start(18);
+    brand_row.append(&brand_icon(34));
+    let wordmark = gtk::Label::new(Some("HEXWERK"));
+    wordmark.add_css_class("hw-wordmark");
+    brand_row.append(&wordmark);
+    rail.append(&brand_row);
 
     rail.append(&section("ANSICHT"));
 

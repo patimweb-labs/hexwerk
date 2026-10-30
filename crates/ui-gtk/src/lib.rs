@@ -14,6 +14,7 @@ pub mod detail_view;
 pub mod format;
 pub mod installed_view;
 pub mod scan_view;
+pub mod sources_view;
 pub mod state;
 pub mod theme;
 

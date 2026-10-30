@@ -226,7 +226,7 @@ def main() -> int:
     # Bedienleiste: jede Ansicht einmal oeffnen
     # Katalog zuletzt: danach wird gesucht und eine Karte geoeffnet, dafuer muss
     # die Katalogseite sichtbar sein.
-    for label in ["Clients", "Installiert", "Scan", "Katalog"]:
+    for label in ["Clients", "Installiert", "Quellen", "Scan", "Katalog"]:
         candidates = find(app, "page tab") + find(app, "link")
         for role_name in BUTTON_ROLES:
             candidates += find(app, role_name)

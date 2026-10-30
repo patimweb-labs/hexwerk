@@ -43,7 +43,10 @@ pub struct CatalogView {
     filters: RefCell<Filters>,
     on_search: RefCell<Option<SearchCallback>>,
     on_open: RefCell<Option<OpenCallback>>,
-    debounce: RefCell<Option<glib::SourceId>>,
+    /// Zaehler statt gespeicherter Timeout-Kennung: die Kennung einer bereits
+    /// gelaufenen Quelle zu entfernen laesst glib panisch abbrechen (gemessen:
+    /// „Failed to remove source“, danach Abbruch des Programms beim Tippen).
+    search_generation: std::cell::Cell<u64>,
 }
 
 impl CatalogView {
@@ -195,7 +198,7 @@ impl CatalogView {
             filters: RefCell::new(Filters::default()),
             on_search: RefCell::new(None),
             on_open: RefCell::new(None),
-            debounce: RefCell::new(None),
+            search_generation: std::cell::Cell::new(0),
         });
         view.build_chips();
         view.wire();
@@ -270,20 +273,23 @@ impl CatalogView {
     }
 
     fn request_search(self: &Rc<Self>, debounce: bool) {
-        if let Some(id) = self.debounce.borrow_mut().take() {
-            id.remove();
+        // Jeder Aufruf zaehlt hoch. Der Timeout vergleicht nur noch seine
+        // Nummer mit der aktuellen; eine Kennung wird nie entfernt, weil das
+        // bei bereits gelaufenen Quellen zum Abbruch fuehrt.
+        let generation = self.search_generation.get() + 1;
+        self.search_generation.set(generation);
+        if !debounce {
+            self.dispatch();
+            return;
         }
-        if debounce {
-            let weak = Rc::downgrade(self);
-            let id = glib::timeout_add_local_once(Duration::from_millis(220), move || {
-                if let Some(view) = weak.upgrade() {
+        let weak = Rc::downgrade(self);
+        glib::timeout_add_local_once(Duration::from_millis(220), move || {
+            if let Some(view) = weak.upgrade() {
+                if view.search_generation.get() == generation {
                     view.dispatch();
                 }
-            });
-            *self.debounce.borrow_mut() = Some(id);
-        } else {
-            self.dispatch();
-        }
+            }
+        });
     }
 
     fn dispatch(&self) {
