@@ -196,10 +196,10 @@ Verhalten:
 
 1. Ziel ist immer genau ein Client-Ordner (`_retail_`, `_classic_era_` und so weiter), nie
    das ganze Spielverzeichnis und nie alle Clients auf einmal.
-2. Vor dem Leeren entsteht eine Sicherung als ZIP unter `~/.local/share/hexwerk/backup` mit
-   Zeitstempel und Client-Namen. Danach wandern die Ordner in den Papierkorb
-   (`~/.local/share/hexwerk/trash`), nicht in die Tonne. Beides ist vorhanden
-   (`crates/install/backup.rs`, `crates/install/trash.rs`).
+2. Die Ordner wandern in den Papierkorb (`~/.local/share/hexwerk/trash`), nicht in die Tonne,
+   und lassen sich mit einem Klick zurückholen. Eine zusätzliche ZIP-Sicherung entfällt
+   bewusst: bei einem vollen Classic-Ordner sind das mehrere Gigabyte, eine Sicherung würde
+   den Platz verdoppeln. Verschieben auf demselben Datenträger kostet dagegen nichts.
 3. Bestätigung im Fenster verlangt das Eintippen des Client-Ordners (etwa `_classic_era_`).
    Ein Klick auf „Ja" ist zu billig für eine Aktion, die 2,6 GB Addons verschiebt.
 4. Ergebnis als Bericht: Anzahl Ordner, Größe, Pfad der Sicherung, Pfad des Papierkorbs.

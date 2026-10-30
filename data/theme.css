@@ -770,3 +770,15 @@ button.hw-crumb-link:hover {
   color: var(--hw-ink);
   font-size: 12px;
 }
+
+/* Destruktive Aktion: "Addons leeren…" muss man als gefaehrlich erkennen, ohne
+   dass es wie ein Verbotsschild wirkt. Kante und Text in Rot, Rest ruhig. */
+button.hw-btn.danger {
+  border-color: var(--hw-bad-line);
+  color: var(--hw-bad);
+  background: none;
+}
+
+button.hw-btn.danger:hover {
+  background-color: rgba(226, 101, 122, 0.08);
+}

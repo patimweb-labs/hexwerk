@@ -16,11 +16,13 @@
 //! der fertige ZIP-Inhalt an.
 
 pub mod backup;
+pub mod clear;
 pub mod plan;
 pub mod trash;
 pub mod zip_install;
 
 pub use backup::{backup_folder, list_backups, restore_backup};
+pub use clear::{clear_addons, restore_all, ClearOutcome};
 pub use plan::{apply, apply_with, InstallRequest, Installed};
 pub use trash::{list_trash, remove_trash_entry, restore_from_trash, trash_addon, TrashEntry};
 pub use zip_install::{inspect_zip, install_zip, ZipLayout};
@@ -174,6 +176,24 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 ///
 /// Ohne `rand`: Nanosekunden, Prozess-ID und ein Zaehler unterscheiden sich
 /// selbst bei parallelen Tests, und der Aufrufer versucht es ohnehin mehrfach.
+/// Belegte Bytes eines Ordners, rekursiv. Symbolische Verweise zählen nicht,
+/// sonst läuft ein Verweis auf sich selbst endlos.
+pub(crate) fn folder_size(path: &std::path::Path) -> u64 {
+    let mut total = 0;
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        match entry.metadata() {
+            Ok(md) if md.is_dir() => total += folder_size(&entry.path()),
+            Ok(md) if md.file_type().is_symlink() => {}
+            Ok(md) => total += md.len(),
+            Err(_) => {}
+        }
+    }
+    total
+}
+
 pub(crate) fn unique_token() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);

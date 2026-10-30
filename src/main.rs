@@ -33,6 +33,8 @@ fn main() -> ExitCode {
         "index" => index_cmd(&args),
         "search" => search_cmd(&args),
         "keys" => keys_cmd(&args),
+        "remove" => remove_cmd(&args),
+        "clear" => clear_cmd(&args),
         "help" | "--help" | "-h" => {
             usage();
             ExitCode::SUCCESS
@@ -64,6 +66,8 @@ fn usage() {
     );
     println!("  hexwerk keys remove QUELLE          Schluessel entfernen");
     println!("  hexwerk keys test                   jede Quelle mit einer Anfrage pruefen");
+    println!("  hexwerk remove ID FLAVOR ORDNER…    Addons in den Papierkorb verschieben");
+    println!("  hexwerk clear ID FLAVOR [--yes]     alle Addons eines Client-Ordners leeren");
     println!("  hexwerk help                        diese Hilfe");
     println!(
         "\nQUELLE ist eine von: wago, curseforge. Ohne ORDNER werden Steam, Faugus, Heroic,\n\
@@ -351,6 +355,106 @@ fn keys_cmd(args: &[String]) -> ExitCode {
         other => {
             eprintln!("unbekannter Unterbefehl: {other}");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// Sucht den Addon-Ordner zu Client-Kennung und Flavor-Ordner.
+fn addons_dir_for(client_id: &str, flavor: &str) -> Option<std::path::PathBuf> {
+    let discovery = discover(&[]);
+    let client = discovery.clients.iter().find(|c| c.id == client_id)?;
+    let dir = client
+        .flavors
+        .iter()
+        .find(|f| f.flavor.dir_name() == flavor)?;
+    Some(dir.addons_dir.clone())
+}
+
+fn remove_cmd(args: &[String]) -> ExitCode {
+    let Some((client_id, rest)) = args.split_first() else {
+        eprintln!("Aufruf: hexwerk remove ID FLAVOR ORDNER…");
+        return ExitCode::from(2);
+    };
+    let Some((flavor, folders)) = rest.split_first() else {
+        eprintln!("Aufruf: hexwerk remove ID FLAVOR ORDNER…");
+        return ExitCode::from(2);
+    };
+    if folders.is_empty() {
+        eprintln!("Aufruf: hexwerk remove ID FLAVOR ORDNER…");
+        return ExitCode::from(2);
+    }
+    let Some(addons_dir) = addons_dir_for(client_id, flavor) else {
+        eprintln!("kein Client {client_id} mit Ordner {flavor}");
+        return ExitCode::FAILURE;
+    };
+    let paths = hexwerk_install::Paths::system();
+    let mut done = 0;
+    for folder in folders {
+        match hexwerk_install::trash_addon(&addons_dir, folder, &paths) {
+            Ok(entry) => {
+                done += 1;
+                println!("verschoben: {} -> {}", folder, entry.path.display());
+            }
+            Err(err) => {
+                eprintln!("{folder}: {err}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    println!(
+        "{done} von {} verschoben, Papierkorb: {}",
+        folders.len(),
+        paths.trash_dir.display()
+    );
+    ExitCode::SUCCESS
+}
+
+fn clear_cmd(args: &[String]) -> ExitCode {
+    let params: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    let yes = args.iter().any(|a| a == "--yes");
+    let (Some(client_id), Some(flavor)) = (params.first(), params.get(1)) else {
+        eprintln!("Aufruf: hexwerk clear ID FLAVOR [--yes]");
+        return ExitCode::from(2);
+    };
+    let Some(addons_dir) = addons_dir_for(client_id, flavor) else {
+        eprintln!("kein Client {client_id} mit Ordner {flavor}");
+        return ExitCode::FAILURE;
+    };
+    let paths = hexwerk_install::Paths::system();
+
+    if !yes {
+        let count = hexwerk::scan_addons(&addons_dir).len();
+        println!(
+            "{} Addons in {} werden in den Papierkorb verschoben ({}).",
+            count,
+            addons_dir.display(),
+            paths.trash_dir.display()
+        );
+        print!("Weiter? [j/N] ");
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        let mut answer = String::new();
+        if std::io::stdin().read_line(&mut answer).is_err()
+            || !matches!(answer.trim(), "j" | "J" | "ja")
+        {
+            println!("abgebrochen, nichts veraendert");
+            return ExitCode::SUCCESS;
+        }
+    }
+
+    match hexwerk_install::clear_addons(&addons_dir, &paths, &[]) {
+        Ok(outcome) => {
+            println!(
+                "{} Addons verschoben ({}), Papierkorb: {}",
+                outcome.folders,
+                fmt_bytes(outcome.bytes),
+                paths.trash_dir.display()
+            );
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("Leeren: {err}");
+            ExitCode::FAILURE
         }
     }
 }

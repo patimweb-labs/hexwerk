@@ -308,6 +308,25 @@ fn wire(ui: &Rc<Ui>) {
 
     // Scan-Knopf: voller Lauf, inklusive Quellen.
     let weak = Rc::downgrade(ui);
+    // Deinstallieren und Leeren: bestaetigen, in den Papierkorb, Bericht als
+    // Toast mit Rueckgaengig.
+    {
+        let weak = Rc::downgrade(ui);
+        ui.installed.set_on_remove(move |folders| {
+            if let Some(ui) = weak.upgrade() {
+                confirm_remove(&ui, folders);
+            }
+        });
+    }
+    {
+        let weak = Rc::downgrade(ui);
+        ui.installed.set_on_clear(move || {
+            if let Some(ui) = weak.upgrade() {
+                confirm_clear(&ui);
+            }
+        });
+    }
+
     ui.scan.connect_rescan(move || {
         if let Some(ui) = weak.upgrade() {
             start_scan(&ui, true);
@@ -791,6 +810,181 @@ fn apply_scan(ui: &Rc<Ui>, data: ScanData, run_sources: bool) {
 // ---------------------------------------------------------------------------
 // Rueckmeldungen
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Deinstallieren und Leeren
+// ---------------------------------------------------------------------------
+
+/// Ziel-Client der Tabelle: Addon-Ordner und Beschriftung.
+fn current_addons_dir(ui: &Ui) -> Option<(std::path::PathBuf, String)> {
+    let (ci, fi) = ui.installed.current_target()?;
+    let data = ui.data.borrow().clone()?;
+    let client = data.clients.get(ci)?;
+    let flavor = client.flavors.get(fi)?;
+    Some((
+        flavor.addons_dir.clone(),
+        format!("{} · {}", client.label, flavor.dir_name),
+    ))
+}
+
+fn main_window(ui: &Ui) -> Option<gtk::Window> {
+    ui.installed
+        .widget()
+        .root()
+        .and_then(|r| r.downcast::<gtk::Window>().ok())
+}
+
+/// Fragt nach und verschiebt die markierten Ordner in den Papierkorb.
+///
+/// `adw::AlertDialog` statt `MessageDialog`: letzteres ist seit libadwaita 1.6
+/// abgekuendigt, und wir verlangen 1.6 (AdwSpinner).
+fn confirm_remove(ui: &Rc<Ui>, folders: Vec<String>) {
+    let Some((addons_dir, client_label)) = current_addons_dir(ui) else {
+        toast_error(ui, "Kein Ziel-Client gewählt.");
+        return;
+    };
+    let Some(window) = main_window(ui) else {
+        return;
+    };
+
+    let mut list = folders.clone();
+    list.sort();
+    let shown = list.iter().take(6).cloned().collect::<Vec<_>>().join(", ");
+    let more = if list.len() > 6 {
+        format!(" und {} weitere", list.len() - 6)
+    } else {
+        String::new()
+    };
+
+    let dialog = adw::AlertDialog::new(
+        Some(&format!("{} Addon(s) entfernen?", folders.len())),
+        Some(&format!(
+            "{shown}{more}\n\nZiel: {client_label}\nDie Ordner wandern in den Papierkorb, gelöscht wird nichts."
+        )),
+    );
+    dialog.add_response("cancel", "Abbrechen");
+    dialog.add_response("remove", "In den Papierkorb");
+    dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+
+    let weak = Rc::downgrade(ui);
+    dialog.connect_response(None, move |_dialog, response| {
+        if response != "remove" {
+            return;
+        }
+        let Some(ui) = weak.upgrade() else { return };
+        let paths = hexwerk_install::Paths::system();
+        let mut entries = Vec::new();
+        for folder in &folders {
+            match hexwerk_install::trash_addon(&addons_dir, folder, &paths) {
+                Ok(entry) => entries.push(entry),
+                Err(err) => {
+                    toast_error(&ui, &format!("{folder}: {err}"));
+                    return;
+                }
+            }
+        }
+        let count = entries.len();
+        show_undo_toast(&ui, &format!("{count} Addon(s) im Papierkorb"), entries);
+        start_scan(&ui, false);
+    });
+    dialog.present(Some(&window));
+}
+
+/// Fragt nach und leert den ganzen Addon-Ordner des Ziel-Clients.
+///
+/// Die Bestätigung verlangt den Ordnernamen im Klartext. Bei mehreren Gigabyte
+/// Addons ist ein Klick zu billig für ein Versehen.
+fn confirm_clear(ui: &Rc<Ui>) {
+    let Some((addons_dir, client_label)) = current_addons_dir(ui) else {
+        toast_error(ui, "Kein Ziel-Client gewählt.");
+        return;
+    };
+    let Some(window) = main_window(ui) else {
+        return;
+    };
+
+    let folder_name = addons_dir
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("AddOns")
+        .to_string();
+
+    let dialog = adw::AlertDialog::new(
+        Some("Addon-Ordner leeren?"),
+        Some(&format!(
+            "Alle Addons in {client_label} wandern in den Papierkorb. Der Ordner WTF bleibt unangetastet.\n\nZum Bestätigen den Ordnernamen eintippen: {folder_name}"
+        )),
+    );
+    let entry = gtk::Entry::new();
+    entry.set_placeholder_text(Some("Ordnername"));
+    entry.add_css_class("hw-search");
+    dialog.set_extra_child(Some(&entry));
+
+    dialog.add_response("cancel", "Abbrechen");
+    dialog.add_response("clear", "Leeren");
+    dialog.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
+    dialog.set_response_enabled("clear", false);
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+
+    {
+        let dialog = dialog.clone();
+        let wanted = folder_name.clone();
+        entry.connect_changed(move |e| {
+            dialog.set_response_enabled("clear", e.text().trim() == wanted);
+        });
+    }
+
+    let weak = Rc::downgrade(ui);
+    dialog.connect_response(None, move |_dialog, response| {
+        if response != "clear" {
+            return;
+        }
+        let Some(ui) = weak.upgrade() else { return };
+        let paths = hexwerk_install::Paths::system();
+        match hexwerk_install::clear_addons(&addons_dir, &paths, &[]) {
+            Ok(outcome) => {
+                let text = format!(
+                    "{} Addons verschoben ({})",
+                    outcome.folders,
+                    crate::format::human_size(outcome.bytes)
+                );
+                show_undo_toast(&ui, &text, outcome.trashed);
+                start_scan(&ui, false);
+            }
+            Err(err) => toast_error(&ui, &format!("Leeren: {err}")),
+        }
+    });
+    dialog.present(Some(&window));
+}
+
+/// Toast mit Rueckgaengig-Aktion. Die Eintraege werden mitgereicht, damit die
+/// Aktion auch dann funktioniert, wenn der Papierkorb inzwischen weitere
+/// Eintraege hat.
+fn show_undo_toast(ui: &Rc<Ui>, text: &str, entries: Vec<hexwerk_install::TrashEntry>) {
+    if entries.is_empty() {
+        toast(ui, text);
+        return;
+    }
+    let meldung = adw::Toast::new(text);
+    meldung.set_button_label(Some("Rückgängig"));
+    meldung.set_timeout(8);
+    let weak = Rc::downgrade(ui);
+    meldung.connect_button_clicked(move |_| {
+        let Some(ui) = weak.upgrade() else { return };
+        match hexwerk_install::clear::restore_all(&entries) {
+            Ok(_) => {
+                toast(&ui, "Zurückgeholt");
+                start_scan(&ui, false);
+            }
+            Err(err) => toast_error(&ui, &format!("Rückgängig: {err}")),
+        }
+    });
+    ui.toast.add_toast(meldung);
+}
 
 fn toast(ui: &Rc<Ui>, text: &str) {
     let toast = adw::Toast::new(text);

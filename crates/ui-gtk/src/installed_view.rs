@@ -139,6 +139,11 @@ pub struct OpenRequest {
 }
 
 type OpenCallback = Box<dyn Fn(OpenRequest)>;
+/// Wird mit den markierten Ordnernamen gerufen.
+type RemoveCallback = Box<dyn Fn(Vec<String>)>;
+/// Wird ohne Argumente gerufen: der Bildschirm kennt das Ziel, die Aktion
+/// nicht. So bleibt die Bestätigung dort, wo die Fenster sind.
+type ClearCallback = Box<dyn Fn()>;
 
 /// Ein waehlbarer Ziel-Client: Index in `ScanData.clients` und `flavors`.
 #[derive(Clone, Copy)]
@@ -160,6 +165,10 @@ pub struct InstalledView {
     targets: RefCell<Vec<Target>>,
     filter: Cell<Filter>,
     on_open: RefCell<Option<OpenCallback>>,
+    remove: gtk::Button,
+    clear: gtk::Button,
+    on_remove: RefCell<Option<RemoveCallback>>,
+    on_clear: RefCell<Option<ClearCallback>>,
 }
 
 impl InstalledView {
@@ -205,7 +214,15 @@ impl InstalledView {
         remove.add_css_class("ghost");
         remove.set_sensitive(false);
         remove.set_tooltip_text(Some(
-            "Kommt mit hexwerk-install: sichern, in den Papierkorb, rückgängig machen.",
+            "Markierte Addons in den Papierkorb verschieben. Rückgängig geht danach direkt.",
+        ));
+        let clear = gtk::Button::with_label("Addons leeren…");
+        crate::theme::pointer(&clear);
+        clear.add_css_class("hw-btn");
+        clear.add_css_class("danger");
+        clear.set_sensitive(false);
+        clear.set_tooltip_text(Some(
+            "Alle Addons dieses Client-Ordners in den Papierkorb. WTF bleibt unangetastet.",
         ));
 
         let update = gtk::Button::with_label("Aktualisieren…");
@@ -224,6 +241,7 @@ impl InstalledView {
         filter_bar.append(&gap);
         filter_bar.append(&count);
         filter_bar.append(&remove);
+        filter_bar.append(&clear);
         filter_bar.append(&update);
 
         let store = gtk::gio::ListStore::new::<AddonRow>();
@@ -308,6 +326,10 @@ impl InstalledView {
             targets: RefCell::new(Vec::new()),
             filter: Cell::new(Filter::All),
             on_open: RefCell::new(None),
+            remove,
+            clear,
+            on_remove: RefCell::new(None),
+            on_clear: RefCell::new(None),
         });
         view.wire();
         view
@@ -358,6 +380,35 @@ impl InstalledView {
         self.selection.connect_selection_changed(move |_, _, _| {
             if let Some(view) = weak.upgrade() {
                 view.update_count();
+            }
+        });
+
+        // Deinstallieren: die Auswahl wird eingesammelt und an die Anwendung
+        // gereicht. Bestätigt wird dort, wo ein Fenster für den Dialog da ist.
+        let weak = Rc::downgrade(self);
+        self.remove.connect_clicked(move |_| {
+            let Some(view) = weak.upgrade() else { return };
+            let folders = view.selected_folders();
+            if folders.is_empty() {
+                return;
+            }
+            // Den Rueckruf aus dem RefCell holen, bevor er laeuft: sonst haelt
+            // der Borrow ueber den Aufruf hinaus und der naechste Zugriff
+            // panic't.
+            let cb = view.on_remove.borrow_mut().take();
+            if let Some(cb) = cb {
+                cb(folders);
+                *view.on_remove.borrow_mut() = Some(cb);
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        self.clear.connect_clicked(move |_| {
+            let Some(view) = weak.upgrade() else { return };
+            let cb = view.on_clear.borrow_mut().take();
+            if let Some(cb) = cb {
+                cb();
+                *view.on_clear.borrow_mut() = Some(cb);
             }
         });
     }
@@ -467,6 +518,46 @@ impl InstalledView {
             format!("{shown} Zeilen")
         };
         self.count.set_text(&text);
+        // Loeschen braucht eine Auswahl, Leeren braucht einen Ziel-Client.
+        self.remove.set_sensitive(selected > 0);
+        self.clear.set_sensitive(shown > 0);
+    }
+
+    /// Ordnernamen der markierten Zeilen, in Tabellenreihenfolge.
+    pub fn selected_folders(&self) -> Vec<String> {
+        let selection = self.selection.selection();
+        let mut out = Vec::new();
+        for i in 0..selection.size() {
+            let position = selection.nth(i as u32);
+            if let Some(row) = self
+                .store
+                .item(position)
+                .and_then(|o| o.downcast::<AddonRow>().ok())
+            {
+                out.push(row.prop("folder"));
+            }
+        }
+        out
+    }
+
+    /// Ziel-Client der Tabelle als (Client-Index, Flavor-Index) in `ScanData`.
+    pub fn current_target(&self) -> Option<(usize, usize)> {
+        let selected = self.target.selected();
+        if selected == gtk::INVALID_LIST_POSITION {
+            return None;
+        }
+        self.targets
+            .borrow()
+            .get(selected as usize)
+            .map(|t| (t.client, t.flavor))
+    }
+
+    pub fn set_on_remove<F: Fn(Vec<String>) + 'static>(&self, f: F) {
+        *self.on_remove.borrow_mut() = Some(Box::new(f));
+    }
+
+    pub fn set_on_clear<F: Fn() + 'static>(&self, f: F) {
+        *self.on_clear.borrow_mut() = Some(Box::new(f));
     }
 
     /// Doppelklick auf eine Zeile: Detailansicht fuer dieses Addon bauen. Alles,
