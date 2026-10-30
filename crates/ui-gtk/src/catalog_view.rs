@@ -501,7 +501,11 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
         // Kurzform statt Ellipse: „GitHub 1.3.…“ war auf der Karte nicht zu
         // lesen. Die Quelle bekommt ein Kuerzel, die Version hoechstens zwoelf
         // Zeichen; der vollstaendige Text steht im Tooltip.
-        let text = format!("{} {}", short_source(release.source), short_version(&version));
+        let text = format!(
+            "{} {}",
+            short_source(release.source),
+            short_version(&version)
+        );
         let chip = gtk::Label::new(Some(&text));
         chip.add_css_class("hw-chip");
         chip.set_tooltip_text(Some(&if release.download_url.trim().is_empty() {
