@@ -316,6 +316,17 @@ impl Index {
         // Der Suchindex muss den neuen Bestand kennen; ein Fehler dabei ist
         // kein Grund, das Uebernehmen zu verwerfen: die Suche findet dann
         // weniger, die Zeilen sind aber da.
+        // Eintraege, die der neue Snapshot nicht mehr kennt, verschwinden mit.
+        // Sonst waechst der Katalog bei jedem Abgleich um Altlasten: die App
+        // legt zu und loescht nie. Was lokal installiert ist, bleibt stehen,
+        // damit die Detailseite weiter etwas anzeigen kann.
+        self.conn
+            .execute_batch(
+                "DELETE FROM addons
+                  WHERE key NOT IN (SELECT key FROM snap.addons)
+                    AND id NOT IN (SELECT addon_id FROM installed WHERE addon_id IS NOT NULL);",
+            )
+            .map_err(|err| format!("Altlasten entfernen: {err}"))?;
         if let Err(err) = self.rebuild_fts() {
             eprintln!("Suchindex nicht neu gebaut: {err}");
         }
