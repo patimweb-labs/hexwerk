@@ -85,6 +85,14 @@ struct Ui {
     /// Nummer des laufenden Indexaufbaus. Meldungen eines ueberholten Laufs
     /// werden verworfen, sonst ueberschreibt ein alter Lauf den neuen Zustand.
     pipeline: Cell<u64>,
+    /// Muss am Leben bleiben: der Umschalter haelt nur schwache Verweise auf
+    /// das Theme. Faellt der starke Verweis weg, reagiert das Menue nicht mehr.
+    /// Der Unterstrich sagt dem Compiler, dass hier absichtlich nichts gelesen
+    /// wird: der Wert existiert nur, um zu leben.
+    _theme: Rc<Theme>,
+    /// Brotkrumen in der Kopfleiste: Weg zurueck in den Katalog.
+    crumb: gtk::Box,
+    crumb_name: gtk::Label,
 }
 
 pub fn run() -> glib::ExitCode {
@@ -145,6 +153,31 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     back.set_visible(false);
     crate::theme::pointer(&back);
     header.pack_start(&back);
+
+    // Brotkrumen: auf der Detailseite steht hier der Weg zurueck in den
+    // Katalog. Die Detailseite ist keine eigene Ansicht in der Leiste mehr,
+    // deshalb braucht sie diesen Weg.
+    let crumb = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    crumb.add_css_class("hw-crumb");
+    crumb.set_visible(false);
+    let crumb_root = gtk::Button::with_label("Katalog");
+    crumb_root.add_css_class("hw-crumb-link");
+    crate::theme::pointer(&crumb_root);
+    let crumb_sep = gtk::Label::new(Some("›"));
+    crumb_sep.add_css_class("hw-dim2");
+    let crumb_name = gtk::Label::new(Some(""));
+    crumb_name.add_css_class("hw-crumb-here");
+    crumb.append(&crumb_root);
+    crumb.append(&crumb_sep);
+    crumb.append(&crumb_name);
+    // Der Rueckweg haengt am Thread-Platz, weil `ui` erst nach dem Aufbau des
+    // Fensters existiert; geklickt wird ohnehin spaeter.
+    crumb_root.connect_clicked(|_| {
+        if let Some(ui) = UI.with(|slot| slot.borrow().clone()) {
+            show_page(&ui, "catalog");
+        }
+    });
+    header.pack_start(&crumb);
 
     let switcher = theme.switcher();
     header.pack_end(&switcher);
@@ -242,6 +275,9 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         index: RefCell::new(None),
         index_sources: RefCell::new(Vec::new()),
         pipeline: Cell::new(0),
+        _theme: theme,
+        crumb,
+        crumb_name,
     });
 
     wire(&ui);
@@ -357,12 +393,26 @@ pub fn show_screen(name: &str) {
 pub fn show_local_detail(detail: &crate::detail_view::LocalDetail) {
     if let Some(ui) = UI.with(|slot| slot.borrow().clone()) {
         ui.detail.show_local(detail);
+        set_crumb(
+            &ui,
+            if detail.title.is_empty() {
+                &detail.folder
+            } else {
+                &detail.title
+            },
+        );
         show_page(&ui, "detail");
     }
 }
 
 /// Bildschirm zeigen und Leiste nachziehen. Idempotent, damit Aufrufe aus
 /// Rueckrufen und aus der Leiste sich nicht im Kreis drehen.
+/// Brotkrumen setzen: der Weg zurueck in den Katalog nennt das offene Addon.
+fn set_crumb(ui: &Ui, name: &str) {
+    ui.crumb_name.set_text(name);
+    ui.crumb.set_visible(true);
+}
+
 fn show_page(ui: &Rc<Ui>, name: &str) {
     if ui.stack.visible_child_name().as_deref() != Some(name) {
         ui.stack.set_visible_child_name(name);
@@ -382,6 +432,8 @@ fn show_page(ui: &Rc<Ui>, name: &str) {
                 .update_state(&[gtk::accessible::State::Selected(Some(false))]);
         }
     }
+    // Brotkrumen nur dort, wo es einen Rueckweg gibt.
+    ui.crumb.set_visible(name == "detail");
     ui.split.set_show_content(true);
 }
 
@@ -534,6 +586,7 @@ fn open_item(ui: &Rc<Ui>, id: i64) {
         Ok(Some(item)) => {
             let targets = detail_targets(ui, &item);
             ui.detail.show_item(&item, &targets);
+            set_crumb(ui, &item.name);
             show_page(ui, "detail");
         }
         Ok(None) => toast(ui, "Der Eintrag steht nicht mehr im Index."),
@@ -602,6 +655,14 @@ fn open_installed(ui: &Rc<Ui>, request: OpenRequest) {
         Some(id) => open_item(ui, id),
         None => {
             ui.detail.show_local(&request.local);
+            set_crumb(
+                ui,
+                if request.local.title.is_empty() {
+                    &request.local.folder
+                } else {
+                    &request.local.title
+                },
+            );
             show_page(ui, "detail");
         }
     }
@@ -775,6 +836,12 @@ fn build_rail() -> (gtk::Box, Vec<NavItem>, Counts, Vec<(Source, gtk::Label)>) {
     nav_catalog.set_xalign(1.0);
 
     for (name, title, _) in PAGES {
+        // Die Detailseite haengt an einer Auswahl, nicht an der Leiste: sie
+        // wird aus Katalog oder Installiert geoeffnet und ueber die Brotkrumen
+        // wieder verlassen.
+        if name == "detail" {
+            continue;
+        }
         let label = gtk::Label::new(Some(title));
         label.add_css_class("hw-nav-label");
         label.set_xalign(0.0);

@@ -744,3 +744,29 @@ window.hw-window .hw-header {
 .hw-brand {
   padding-left: 2px;
 }
+
+/* Brotkrumen in der Kopfleiste: "Katalog › Addon". Der erste Teil ist ein
+   Knopf, damit der Rueckweg sichtbar und mit der Tastatur erreichbar ist. */
+.hw-crumb {
+  margin-left: 4px;
+}
+
+button.hw-crumb-link {
+  background: none;
+  background-image: none;
+  border: 0;
+  box-shadow: none;
+  padding: 2px 4px;
+  color: var(--hw-dim);
+  font-size: 12px;
+}
+
+button.hw-crumb-link:hover {
+  color: var(--hw-signal);
+  background-color: transparent;
+}
+
+.hw-crumb-here {
+  color: var(--hw-ink);
+  font-size: 12px;
+}
