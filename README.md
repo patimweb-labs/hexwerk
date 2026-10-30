@@ -1,2 +1,65 @@
-# hexwerk
-WoW-Addon-Manager für Linux und Proton — alle Client-Versionen
+# Hexwerk
+
+Addon-Manager für **World of Warcraft unter Linux**, gebaut für Installationen in
+**Steam-Proton-Präfixen**. Alle Client-Versionen: `_retail_`, `_classic_`,
+`_classic_era_`, `_anniversary_` und die PTR-Varianten.
+
+Ziel: Addons finden, installieren, aktualisieren und aufräumen, ohne dass der
+Nutzer je eine Addon-ID einträgt und ohne dass irgendetwas im Wine-Präfix
+mitlaufen muss. Hexwerk arbeitet von außen auf dem Dateisystem des Präfixes.
+
+## Status
+
+Vorstufe. Bisher belegt: Quellenlage der etablierten Manager (siehe unten).
+Noch nicht entschieden: UI-Stack. Noch nicht gebaut: alles außer dieser Datei.
+
+## Quellen — gemessen am 2026-10-30
+
+| Quelle | Endpunkt | Ergebnis |
+|---|---|---|
+| WowUp Hub (Index) | `GET https://hub.wowup.io/addons/search?query=…` | `200`, JSON, unauthentifiziert, Feld `source` (u. a. `GitHub`) + `repository` |
+| WowUp Hub (Fingerprint) | `POST https://hub.wowup.io/addons/fingerprint` `{"fingerprints":[…]}` | `200` → `{"exactMatches":[]}` |
+| Tukui | `GET https://api.tukui.org/v1/addons` | `200`, 3.770 Byte Gesamtliste |
+| WoWInterface | `GET https://api.mmoui.com/v4/game/WOW/filelist.json` (Fallback `v3`) | `200`, 2.744.891 Byte, mit `UIMD5` und CDN-URL |
+| CurseForge | `GET https://api.curseforge.com/v1/games/1` | `403` ohne API-Key |
+| Wago | `https://addons.wago.io/api/...` | `302` auf die Website, ohne Token nicht nutzbar |
+
+Damit sind drei Quellen ohne Zugangsdaten nutzbar: **GitHub-Releases**,
+**Tukui**, **WoWInterface**. CurseForge scheidet aus, solange kein eigener
+API-Key vergeben wird (Keys sind an den einzelnen Entwickler gebunden und nicht
+übertragbar).
+
+## Verfahren, das übernommen wird
+
+**Erkennung statt Registrierung.** Installierte Addon-Ordner werden gehasht und
+über einen Fingerprint-Index einem Addon zugeordnet. Nur so funktionieren
+Updates für Addons, die der Nutzer nie explizit hinzugefügt hat. WowUp macht
+das in `wowup-lib/src/addon-providers/wowup-addon-provider.ts`
+(`getAddonIdsByFingerprints`) und `addon-fingerprint.service.ts`.
+
+**Externe IDs stehen im `.toc`.** `X-Curse-Project-ID`, `X-WoWI-ID`,
+`X-Tukui-Project-ID` — daraus leitet der Manager die Quelle ab, ohne den
+Addon-Namen zu raten. WowUp bildet das in `addon-install.service.ts` ab
+(`ADDON_PROVIDER_TOC_EXTERNAL_ID_MAP`).
+
+**Installation ist Entpacken mit Ordnerkorrektur.** ZIP holen, oberste
+Verzeichnisebene bestimmen, nach `Interface/AddOns/<Ordner>` entpacken,
+`__MACOSX` ignorieren, `.toc` neu einlesen für `## Version` und `## Interface`.
+
+**Präfix-Erkennung.** Steam-Bibliotheken aus `libraryfolders.vdf` lesen, dann
+`<lib>/steamapps/compatdata/<appid>/pfx/drive_c/Program Files (x86)/World of Warcraft`
+prüfen und je Client-Ordner die `## Interface`-Nummer aus dem `.toc` als
+Versionsmaßstab nehmen.
+
+## Risiko
+
+Der Fingerprint-Index gehört WowUp, nicht uns. Genau diese Abhängigkeit hat
+Ajour gekostet (archiviert 2024), nachdem Overwolf den CurseForge-Zugang
+gestrichen hat. Hexwerk muss ohne den Hub lauffähig bleiben: direkte
+Tukui- und WoWInterface-IDs aus dem `.toc`, GitHub-Repository aus dem
+`.toc`-Feld `X-Website` bzw. aus dem Release-ZIP, Hub nur als Beschleuniger.
+
+## Name
+
+`Hexwerk` — Hex (deutsch: Hexer, die WoW-Klasse) + Werk. Kommando `hexwerk`,
+Flatpak-Ziel `de.weppelmann.Hexwerk`. Frei auf crates.io, PyPI und npm.
