@@ -285,7 +285,7 @@ button.hw-nav-item.on .hw-nav-count {
   color: var(--hw-dim);
   font-size: 12px;
   padding: 1px 7px;
-  border-radius: 2px;
+  border-radius: 0;
   letter-spacing: 1px;
 }
 
@@ -329,7 +329,7 @@ button.hw-btn {
   font-size: 12px;
   letter-spacing: 1px;
   padding: 6px 12px;
-  border-radius: 2px;
+  border-radius: 0;
   min-height: 0;
 }
 
@@ -376,7 +376,7 @@ entry.hw-search button {
 menubutton.hw-choice,
 menubutton.hw-choice > button,
 dropdown.hw-drop > button {
-  border-radius: 2px;
+  border-radius: 0;
   box-shadow: none;
 }
 

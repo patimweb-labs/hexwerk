@@ -115,19 +115,56 @@ fn pipeline(discovery: &Discovery, run_sources: bool, tx: &async_channel::Sender
             Source::GitHub => GITHUB_SEED,
             _ => "",
         };
-        match source.search(query, 0) {
-            Ok(mut found) => {
-                runs.push(SourceRun {
-                    source: source.id(),
-                    ok: true,
-                    detail: format!("{} Einträge", found.len()),
-                });
-                entries.append(&mut found);
+        // Seitenweise lesen statt nur die erste: WoWInterface liefert 25 je
+        // Seite bei ueber 7.700 Eintraegen, Tukui 25 je Seite. Ohne die Schleife
+        // blieb der Katalog bei einer Handvoll Eintraegen stehen.
+        //
+        // GitHub bekommt wenige Seiten: ohne Token sind es 60 Anfragen je
+        // Stunde, und je Treffer kommt eine Release-Abfrage dazu.
+        let max_pages = match source.id() {
+            Source::GitHub => 3,
+            _ => 400,
+        };
+        let mut page = 0;
+        let mut total = 0;
+        let mut failure: Option<String> = None;
+        loop {
+            match source.search(query, page) {
+                Ok(mut found) => {
+                    let count = found.len();
+                    total += count;
+                    entries.append(&mut found);
+                    // Eine kuerzere Seite als die Seitengroesse heisst Ende.
+                    // 25 ist die kleinste Seitengroesse der Quellen; wer
+                    // weniger liefert, hat nichts mehr.
+                    if count == 0 || count < 25 || page + 1 >= max_pages {
+                        break;
+                    }
+                    page += 1;
+                }
+                Err(err) => {
+                    failure = Some(err.to_string());
+                    break;
+                }
             }
-            Err(err) => runs.push(SourceRun {
+        }
+        match failure {
+            // Ein Fehler nach einigen Seiten ist kein Totalausfall: was da ist,
+            // wird uebernommen, der Rest steht als Hinweis daneben.
+            Some(err) if total == 0 => runs.push(SourceRun {
                 source: source.id(),
                 ok: false,
-                detail: err.to_string(),
+                detail: err,
+            }),
+            Some(err) => runs.push(SourceRun {
+                source: source.id(),
+                ok: true,
+                detail: format!("{total} Einträge, dann abgebrochen: {err}"),
+            }),
+            None => runs.push(SourceRun {
+                source: source.id(),
+                ok: true,
+                detail: format!("{total} Einträge"),
             }),
         }
     }
