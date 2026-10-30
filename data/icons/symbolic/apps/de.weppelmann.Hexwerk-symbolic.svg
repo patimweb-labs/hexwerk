@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" version="1.1">
+  <!-- Hexwerk, Symbolstil (Tray, Fenstertitel, kleine Groessen). Nur Kontur und
+       H, einfarbig, damit der Themengenerator die Farbe setzen kann. Auf 16 px
+       geprueft: Sechseck 1.2 px, H 1.6 px Strichstaerke. -->
+  <title>Hexwerk</title>
+  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 1.55 L13.6 4.78 L13.6 11.22 L8 14.45 L2.4 11.22 L2.4 4.78 Z" stroke-width="1.2"/>
+    <path d="M6.05 5.35 V10.65 M9.95 5.35 V10.65 M6.05 8 H9.95" stroke-width="1.6"/>
+  </g>
+</svg>

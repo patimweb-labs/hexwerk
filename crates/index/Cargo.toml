@@ -8,3 +8,11 @@ description = "Hexwerk: lokaler Index (SQLite + FTS5) fuer Suche und Katalog"
 [dependencies]
 hexwerk = { package = "hexwerk-core", path = "../core" }
 hexwerk-sources = { path = "../sources" }
+# `bundled` bringt SQLite als C-Quelle mit und schaltet FTS5 mit ein: keine
+# Abhaengigkeit von der SQLite-Version der Distribution (Fedora, Flatpak).
+rusqlite = { version = "0.41", features = ["bundled"] }
+# Interface-Listen liegen als JSON im Index (PLAN §6 `interface_json`).
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3"

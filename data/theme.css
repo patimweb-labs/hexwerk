@@ -1,0 +1,617 @@
+/* Hexwerk — Farben, Formen, Raster.
+ *
+ * Aufbau: Die Farbwerte stehen als CSS-Variablen auf dem Fenster, einmal je
+ * Palette (.hw-dark / .hw-light). Jede Regel darunter existiert dadurch nur
+ * einmal, und die Umschaltung ist ein Klassenwechsel am Fenster - kein zweites
+ * Stylesheet, kein Neuladen. Warum Variablen und keine @define-color? Die sind
+ * global fuer den Provider und liessen sich nicht pro Fenster umschalten.
+ *
+ * Form: kantig. Keine Radien ausser 2px an Chips, keine Schatten auf Karten,
+ * Rahmen 1px. Das Raster im Hintergrund sind zwei Verlaeufe (senkrecht und
+ * waagerecht) mit 32px-Kachel, wie im Entwurf.
+ *
+ * Schrift: Monospace. Die Liste nennt zuerst JetBrains Mono (Entwurf), dann die
+ * beiden Schriften, die auf einem nackten Fedora/GNOME garantiert da sind.
+ */
+
+window.hw-window {
+  font-family: "JetBrains Mono", "Adwaita Mono", "DejaVu Sans Mono", monospace;
+  font-size: 13px;
+}
+
+/* ---- Palette dunkel (Entwurf) ---- */
+window.hw-dark {
+  --hw-bg: #060A12;
+  --hw-panel: #0A111C;
+  --hw-panel2: #0C1523;
+  --hw-line: #16233A;
+  --hw-ink: #DCE6F5;
+  --hw-dim: #7C8CA6;
+  --hw-dim2: #54637A;
+  --hw-signal: #39DD93;
+  --hw-signal-dim: #1E6B4C;
+  --hw-signal-wash: rgba(57, 221, 147, 0.08);
+  --hw-sel: rgba(57, 221, 147, 0.06);
+  --hw-warn: #F2B344;
+  --hw-warn-line: #5A4520;
+  --hw-bad: #E2657A;
+  --hw-bad-line: #5A2630;
+  --hw-blue: #4C8DFF;
+  --hw-blue-line: #20365A;
+  --hw-grid: rgba(57, 221, 147, 0.035);
+  --hw-rail: #070D16;
+  --hw-head: #080E18;
+  --hw-cell: #0C1626;
+  --hw-banner-glow: rgba(57, 221, 147, 0.16);
+}
+
+/* ---- Palette hell (gleiche Geometrie, andere Werte) ---- */
+window.hw-light {
+  --hw-bg: #F5F7FB;
+  --hw-panel: #FFFFFF;
+  --hw-panel2: #F0F3F8;
+  --hw-line: #D7DEE9;
+  --hw-ink: #0B1520;
+  --hw-dim: #55637A;
+  --hw-dim2: #8492A6;
+  --hw-signal: #0B7A52;
+  --hw-signal-dim: #8FC9B4;
+  --hw-signal-wash: rgba(11, 122, 82, 0.07);
+  --hw-sel: rgba(11, 122, 82, 0.07);
+  --hw-warn: #8A5A00;
+  --hw-warn-line: #D9B267;
+  --hw-bad: #A32238;
+  --hw-bad-line: #E0B4BC;
+  --hw-blue: #1F55B8;
+  --hw-blue-line: #B7C8E8;
+  --hw-grid: rgba(11, 122, 82, 0.055);
+  --hw-rail: #EEF1F7;
+  --hw-head: #FFFFFF;
+  --hw-cell: #E9EEF6;
+  /* Heller Grund braucht mehr Farbe, damit der Verlauf im Banner sichtbar
+     bleibt - 0.16 auf #F5F7FB waere praktisch unsichtbar. */
+  --hw-banner-glow: rgba(11, 122, 82, 0.18);
+}
+
+/* ---- Grundflaechen ---- */
+window.hw-window {
+  background-color: var(--hw-bg);
+  color: var(--hw-ink);
+}
+
+/* Das Raster liegt auf der Inhaltsflaeche, nicht auf dem Fenster: so bleibt
+   die Kopfleiste ruhig und die Leiste links davon frei. */
+.hw-pane {
+  background-color: var(--hw-bg);
+  background-image:
+    linear-gradient(var(--hw-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hw-grid) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+}
+
+headerbar.hw-header {
+  background-color: var(--hw-head);
+  background-image: none;
+  border-bottom: 1px solid var(--hw-line);
+  box-shadow: none;
+  min-height: 44px;
+}
+
+.hw-rail {
+  background-color: var(--hw-rail);
+  background-image: none;
+  border-right: 1px solid var(--hw-line);
+}
+
+.hw-footer {
+  background-color: var(--hw-head);
+  border-top: 1px solid var(--hw-line);
+  color: var(--hw-dim2);
+  font-size: 10px;
+  padding: 7px 14px;
+}
+
+.hw-footer .hw-footer-item {
+  padding: 0 12px;
+  border-right: 1px solid var(--hw-line);
+}
+
+/* ---- Wortmarke und Abschnitte ---- */
+.hw-wordmark {
+  color: var(--hw-signal);
+  font-size: 12px;
+  letter-spacing: 4px;
+  font-weight: 600;
+}
+
+.hw-section {
+  color: var(--hw-dim2);
+  font-size: 10px;
+  letter-spacing: 2px;
+  margin: 16px 16px 6px 16px;
+}
+
+/* ---- Navigation links ---- */
+.hw-nav {
+  background-color: transparent;
+  background-image: none;
+}
+
+.hw-nav row {
+  padding: 6px 14px 6px 12px;
+  border-left: 2px solid transparent;
+  background-color: transparent;
+}
+
+.hw-nav row:hover {
+  background-color: var(--hw-sel);
+}
+
+.hw-nav row:selected {
+  background-color: var(--hw-sel);
+  border-left-color: var(--hw-signal);
+}
+
+.hw-nav-label {
+  color: var(--hw-dim);
+  font-size: 12px;
+}
+
+.hw-nav row:selected .hw-nav-label {
+  color: var(--hw-ink);
+}
+
+.hw-nav-count {
+  color: var(--hw-dim2);
+  font-size: 11px;
+}
+
+.hw-nav row:selected .hw-nav-count {
+  color: var(--hw-signal);
+}
+
+/* Zeilen ohne Ziel (nur Bestandsanzeige) sehen aus wie Eintraege, reagieren
+   aber nicht - deshalb kein Hover und keine Auswahlfarbe. */
+.hw-info-row {
+  padding: 5px 16px;
+  color: var(--hw-dim);
+  font-size: 12px;
+}
+
+.hw-info-value {
+  color: var(--hw-dim2);
+  font-size: 11px;
+}
+
+/* ---- Kopf und Fliesstext einer Seite ---- */
+.hw-h1 {
+  color: var(--hw-ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.hw-sub {
+  color: var(--hw-dim);
+  font-size: 12px;
+}
+
+.hw-dim {
+  color: var(--hw-dim);
+}
+
+.hw-dim2 {
+  color: var(--hw-dim2);
+}
+
+.hw-lead {
+  color: var(--hw-dim);
+  font-size: 12px;
+}
+
+/* ---- Karten ---- */
+.hw-card {
+  background-color: var(--hw-panel);
+  background-image: none;
+  border: 1px solid var(--hw-line);
+  padding: 14px;
+}
+
+.hw-card-dashed {
+  background-color: transparent;
+  background-image: none;
+  border: 1px dashed var(--hw-line);
+  padding: 14px;
+}
+
+.hw-glyph {
+  border: 1px solid var(--hw-signal-dim);
+  color: var(--hw-signal);
+  font-size: 12px;
+  min-width: 26px;
+  min-height: 24px;
+}
+
+.hw-glyph-muted {
+  border: 1px dashed var(--hw-line);
+  color: var(--hw-dim2);
+  font-size: 12px;
+  min-width: 26px;
+  min-height: 24px;
+}
+
+.hw-card-title {
+  color: var(--hw-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.hw-badge {
+  color: var(--hw-dim2);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.hw-path {
+  color: var(--hw-dim2);
+  font-size: 11px;
+}
+
+/* ---- Flavor-Zeile im Client-Ordner ---- */
+.hw-flavor {
+  background-color: var(--hw-panel2);
+  border: 1px solid var(--hw-line);
+  padding: 8px 10px;
+}
+
+.hw-flavor-name {
+  color: var(--hw-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---- Chips ---- */
+.hw-chip {
+  border: 1px solid var(--hw-line);
+  color: var(--hw-dim);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 2px;
+  letter-spacing: 1px;
+}
+
+.hw-chip.sig {
+  border-color: var(--hw-signal-dim);
+  color: var(--hw-signal);
+}
+
+.hw-chip.warn {
+  border-color: var(--hw-warn-line);
+  color: var(--hw-warn);
+}
+
+.hw-chip.bad {
+  border-color: var(--hw-bad-line);
+  color: var(--hw-bad);
+}
+
+.hw-chip.blue {
+  border-color: var(--hw-blue-line);
+  color: var(--hw-blue);
+}
+
+.hw-chip.off {
+  border-style: dashed;
+  color: var(--hw-dim2);
+}
+
+.hw-chip.plain {
+  border-color: transparent;
+  color: var(--hw-dim2);
+}
+
+/* ---- Knoepfe ---- */
+button.hw-btn {
+  background-color: var(--hw-signal-wash);
+  background-image: none;
+  border: 1px solid var(--hw-signal-dim);
+  box-shadow: none;
+  color: var(--hw-signal);
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 6px 12px;
+  border-radius: 2px;
+  min-height: 0;
+}
+
+button.hw-btn:hover {
+  background-color: var(--hw-sel);
+}
+
+button.hw-btn.ghost {
+  background-color: transparent;
+  border-color: var(--hw-line);
+  color: var(--hw-dim);
+}
+
+button.hw-btn:disabled {
+  opacity: 0.45;
+}
+
+/* ---- Suche ---- */
+entry.hw-search {
+  background-color: var(--hw-head);
+  background-image: none;
+  border: 1px solid var(--hw-line);
+  border-radius: 0;
+  color: var(--hw-ink);
+  padding: 8px 10px;
+  min-height: 22px;
+  box-shadow: none;
+}
+
+entry.hw-search:focus-within {
+  border-color: var(--hw-signal-dim);
+}
+
+/* Adwaita rundet Eingaben und Knoepfe stark ab; fuer das Blueprint-Raster
+   sollen auch die inneren Knoten eckig bleiben. */
+entry.hw-search > text,
+entry.hw-search > image,
+entry.hw-search button {
+  border-radius: 0;
+  background-color: transparent;
+}
+
+/* Kopfleisten-Umschalter und Ziel-Auswahl eckig statt Pillenform. */
+menubutton.hw-choice,
+menubutton.hw-choice > button,
+dropdown.hw-drop > button {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+dropdown.hw-drop > button {
+  background-color: var(--hw-head);
+  background-image: none;
+  border: 1px solid var(--hw-line);
+  color: var(--hw-ink);
+  padding: 6px 10px;
+  min-height: 0;
+}
+
+/* Fortschrittsbalken im Scan: kein Innenabstand, damit die 2px stehen. */
+progressbar.hw-bar > trough > progress {
+  min-height: 2px;
+}
+
+/* ---- Tabelle (ColumnView) ---- */
+columnview.hw-table {
+  background-color: transparent;
+  background-image: none;
+}
+
+columnview.hw-table header {
+  background-color: transparent;
+  background-image: none;
+  border-bottom: 1px solid var(--hw-line);
+}
+
+columnview.hw-table header button {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--hw-dim2);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  padding: 7px 10px;
+  min-height: 0;
+}
+
+columnview.hw-table row {
+  background-color: transparent;
+  border-bottom: 1px solid var(--hw-line);
+}
+
+columnview.hw-table row:hover {
+  background-color: var(--hw-sel);
+}
+
+columnview.hw-table row:selected {
+  background-color: var(--hw-signal-wash);
+}
+
+.hw-cell {
+  color: var(--hw-ink);
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.hw-cell-dim {
+  color: var(--hw-dim);
+  font-size: 11px;
+  padding: 7px 10px;
+}
+
+/* ---- Fortschritt im Scan ---- */
+progressbar.hw-bar trough {
+  background-color: var(--hw-line);
+  border: 0;
+  border-radius: 0;
+  min-height: 2px;
+}
+
+progressbar.hw-bar progress {
+  background-color: var(--hw-signal);
+  background-image: none;
+  border-radius: 0;
+  min-height: 2px;
+}
+
+.hw-spinner {
+  color: var(--hw-signal);
+}
+
+/* ---- Detail: Banner, Kennzahlen, Galerie, Tabs ---- */
+.hw-banner {
+  background-image:
+    radial-gradient(circle at 22% 30%, var(--hw-banner-glow), transparent 58%),
+    linear-gradient(135deg, var(--hw-panel2), var(--hw-bg));
+  border: 1px solid var(--hw-line);
+  padding: 14px;
+  min-height: 128px;
+}
+
+.hw-banner-title {
+  color: var(--hw-ink);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.hw-banner-byline {
+  color: var(--hw-dim);
+  font-size: 11px;
+}
+
+.hw-stats {
+  border: 1px solid var(--hw-line);
+  border-top: 0;
+}
+
+.hw-stat {
+  padding: 9px 12px;
+  border-right: 1px solid var(--hw-line);
+}
+
+.hw-stat-value {
+  color: var(--hw-ink);
+  font-size: 13px;
+}
+
+.hw-stat-label {
+  color: var(--hw-dim2);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.hw-gal-cell {
+  background-image: linear-gradient(135deg, var(--hw-cell), var(--hw-bg));
+  border: 1px solid var(--hw-line);
+  color: var(--hw-dim2);
+  font-size: 10px;
+  letter-spacing: 1px;
+  min-height: 84px;
+}
+
+.hw-tabbar {
+  border-bottom: 1px solid var(--hw-line);
+}
+
+.hw-tab {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--hw-dim);
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 7px 13px;
+  min-height: 0;
+}
+
+.hw-tab:hover {
+  color: var(--hw-ink);
+}
+
+.hw-tab.on {
+  color: var(--hw-ink);
+  border-bottom-color: var(--hw-signal);
+}
+
+.hw-prose {
+  color: var(--hw-dim);
+  font-size: 12px;
+}
+
+.hw-prose-strong {
+  color: var(--hw-ink);
+  font-weight: 500;
+}
+
+/* ---- Rechte Seitenleiste im Detail ---- */
+.hw-side {
+  background-color: var(--hw-panel);
+  background-image: none;
+  border: 1px solid var(--hw-line);
+  padding: 14px;
+}
+
+.hw-side-title {
+  color: var(--hw-dim2);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.hw-srcrow {
+  border-bottom: 1px solid var(--hw-line);
+  padding: 6px 0;
+}
+
+.hw-srcrow-name {
+  color: var(--hw-dim);
+  font-size: 11px;
+}
+
+.hw-srcrow-value {
+  color: var(--hw-dim2);
+  font-size: 11px;
+}
+
+/* ---- Hinweiskaesten ---- */
+.hw-note {
+  border: 1px dashed var(--hw-line);
+  color: var(--hw-dim2);
+  font-size: 11px;
+  padding: 9px 11px;
+}
+
+.hw-note-title {
+  color: var(--hw-dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* ---- Auswahl im Theme-Menue ---- */
+popover.hw-popover {
+  background-color: var(--hw-panel);
+  border: 1px solid var(--hw-line);
+  border-radius: 0;
+  padding: 6px;
+}
+
+button.hw-choice {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--hw-dim);
+  font-size: 12px;
+  padding: 7px 10px;
+  min-height: 0;
+}
+
+button.hw-choice:hover {
+  background-color: var(--hw-sel);
+}
+
+button.hw-choice.on {
+  color: var(--hw-signal);
+}

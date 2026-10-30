@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1">
+  <!-- Hexwerk, App-Icon. Sechseckiger Rahmen mit Fase, darin ein gemeisseltes
+       H aus drei Balken mit abgeschraegten Kanten. Verlauf dunkles Blau-Schwarz
+       nach Signalgruen. Kein Text im Icon. Erzeugt aus derselben Geometrie wie
+       de.weppelmann.Hexwerk-symbolic.svg.
+       Der Kommentar steht ABSICHTLICH hinter dem <svg>-Tag: ein Kommentar
+       zwischen XML-Prolog und Wurzelelement laesst appstreamcli compose mit
+       "icon-file-read-error" scheitern. -->
+  <title>Hexwerk</title>
+  <defs>
+    <!-- Grundflaeche: Blueprint-Dunkel, in der Mitte leicht aufgehellt. -->
+    <radialGradient id="grund" cx="0.42" cy="0.34" r="0.78">
+      <stop offset="0" stop-color="#08111D"/>
+      <stop offset="0.62" stop-color="#050B14"/>
+      <stop offset="1" stop-color="#03060C"/>
+    </radialGradient>
+    <!-- Rahmenband: oben Signalgruen, nach unten in Blau-Schwarz auslaufend. -->
+    <linearGradient id="rahmen" x1="0.14" y1="0" x2="0.86" y2="1">
+      <stop offset="0" stop-color="#39DD93"/>
+      <stop offset="0.42" stop-color="#1E6B4C"/>
+      <stop offset="0.78" stop-color="#10283B"/>
+      <stop offset="1" stop-color="#0A1626"/>
+    </linearGradient>
+    <!-- Meisselflaeche des H: Blau-Schwarz oben links, Signalgruen unten rechts. -->
+    <linearGradient id="hFlaeche" x1="0.08" y1="0.02" x2="0.92" y2="0.98">
+      <stop offset="0" stop-color="#122A3E"/>
+      <stop offset="0.36" stop-color="#174C60"/>
+      <stop offset="0.70" stop-color="#1F8A63"/>
+      <stop offset="1" stop-color="#39DD93"/>
+    </linearGradient>
+    <!-- Kante des H: hell auf der Lichtseite, dunkel auf der Schattenseite. -->
+    <linearGradient id="hKante" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#A8FAD8"/>
+      <stop offset="0.36" stop-color="#39DD93"/>
+      <stop offset="0.72" stop-color="#0E2438"/>
+      <stop offset="1" stop-color="#060D16"/>
+    </linearGradient>
+    <clipPath id="hSchnitt">
+      <path d="M 184,134 L 226,134 L 226,218 L 234,226 L 278,226 L 286,218 L 286,134 L 328,134 L 344,150 L 344,366 L 328,382 L 286,382 L 286,298 L 278,290 L 234,290 L 226,298 L 226,382 L 184,382 L 168,366 L 168,150 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Rahmenband -->
+  <path d="M 478.00,258.00 L 367.00,450.26 L 145.00,450.26 L 34.00,258.00 L 145.00,65.74 L 367.00,65.74 Z" fill="url(#rahmen)"/>
+  <!-- Grundplatte -->
+  <path d="M 447.00,258.00 L 351.50,423.41 L 160.50,423.41 L 65.00,258.00 L 160.50,92.59 L 351.50,92.59 Z" fill="url(#grund)"/>
+  <!-- Fase zwischen Band und Platte: Schattenkante innen -->
+  <path d="M 447.00,258.00 L 351.50,423.41 L 160.50,423.41 L 65.00,258.00 L 160.50,92.59 L 351.50,92.59 Z" fill="none" stroke="#02060C" stroke-width="5" opacity="0.9"/>
+  <!-- zweite, feine Fase als Blueprint-Ring -->
+  <path d="M 430.00,258.00 L 343.00,408.69 L 169.00,408.69 L 82.00,258.00 L 169.00,107.31 L 343.00,107.31 Z" fill="none" stroke="#39DD93" stroke-width="1.6" opacity="0.26"/>
+
+  <!-- H: Schlagschatten, Meisselflaeche, Kante -->
+  <path d="M 184,134 L 226,134 L 226,218 L 234,226 L 278,226 L 286,218 L 286,134 L 328,134 L 344,150 L 344,366 L 328,382 L 286,382 L 286,298 L 278,290 L 234,290 L 226,298 L 226,382 L 184,382 L 168,366 L 168,150 Z" fill="#02060C" opacity="0.55" transform="translate(9 11)"/>
+  <path d="M 184,134 L 226,134 L 226,218 L 234,226 L 278,226 L 286,218 L 286,134 L 328,134 L 344,150 L 344,366 L 328,382 L 286,382 L 286,298 L 278,290 L 234,290 L 226,298 L 226,382 L 184,382 L 168,366 L 168,150 Z" fill="url(#hFlaeche)"/>
+  <g clip-path="url(#hSchnitt)">
+    <path d="M 184,134 L 226,134 L 226,218 L 234,226 L 278,226 L 286,218 L 286,134 L 328,134 L 344,150 L 344,366 L 328,382 L 286,382 L 286,298 L 278,290 L 234,290 L 226,298 L 226,382 L 184,382 L 168,366 L 168,150 Z" fill="none" stroke="url(#hKante)" stroke-width="12"/>
+  </g>
+
+  <!-- Aussenkante des Rahmens -->
+  <path d="M 478.00,258.00 L 367.00,450.26 L 145.00,450.26 L 34.00,258.00 L 145.00,65.74 L 367.00,65.74 Z" fill="none" stroke="#39DD93" stroke-width="2.6" opacity="0.55"/>
+</svg>

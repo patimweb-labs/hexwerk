@@ -8,3 +8,4 @@ description = "Hexwerk: Installation, Update, Sicherung und Papierkorb"
 [dependencies]
 hexwerk = { package = "hexwerk-core", path = "../core" }
 hexwerk-sources = { path = "../sources" }
+zip = { version = "9", default-features = false, features = ["deflate"] }

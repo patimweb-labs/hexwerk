@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Hexwerk
+GenericName=Addon-Manager
+Comment=Addons für World of Warcraft in Proton-Präfixen verwalten
+Exec=hexwerk-gtk
+Icon=de.weppelmann.Hexwerk
+Terminal=false
+Categories=Game;
+Keywords=wow;world of warcraft;addon;addons;proton;steam;lutris;heroic;bottles;tukui;
+StartupNotify=true
+StartupWMClass=de.weppelmann.Hexwerk

@@ -63,7 +63,7 @@ pub fn scan_addons(addons_dir: &Path) -> Vec<InstalledAddon> {
             path,
         });
     }
-    out.sort_by(|a, b| a.folder.to_lowercase().cmp(&b.folder.to_lowercase()));
+    out.sort_by_key(|a| a.folder.to_lowercase());
     out
 }
 
@@ -74,10 +74,18 @@ fn dir_size(path: &Path) -> u64 {
     };
     for entry in entries.flatten() {
         let p = entry.path();
-        match entry.metadata() {
-            Ok(md) if md.is_dir() => total += dir_size(&p),
-            Ok(md) => total += md.len(),
+        // Symlinks nicht verfolgen: ein Addon-Ordner mit Verweis auf sich
+        // selbst wuerde die Groessenmessung endlos laufen lassen. Der Preis
+        // ist, dass ueber Symlink eingebundene Dateien nicht mitzaehlen - fuer
+        // eine Groessenangabe in der Oberflaeche ist das vertretbar.
+        match entry.file_type() {
+            Ok(t) if t.is_symlink() => {}
             Err(_) => {}
+            Ok(_) => match entry.metadata() {
+                Ok(md) if md.is_dir() => total += dir_size(&p),
+                Ok(md) => total += md.len(),
+                Err(_) => {}
+            },
         }
     }
     total

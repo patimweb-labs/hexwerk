@@ -1,0 +1,27 @@
+{
+  "_note": "FORM NACH DOKUMENTATION, NICHT GEMESSEN: ohne CurseForge-Schluessel antwortet /v1/mods/search mit 403, es gibt daher keine echte Antwort zum Kuerzen. Felder: id, name, slug, summary, authors[].name, categories[].name, links.websiteUrl, latestFiles[] (id, displayName, fileName, fileDate, fileLength, downloadUrl|null).",
+  "pagination": { "index": 0, "pageSize": 25, "resultCount": 1, "totalCount": 1 },
+  "data": [
+    {
+      "id": 238222,
+      "gameId": 1,
+      "name": "ItemPriceTooltip",
+      "slug": "item-price-tooltip",
+      "summary": "Zeigt den Auktionshauspreis im Tooltip.",
+      "authors": [{ "id": 8123, "name": "Beispielautor" }],
+      "categories": [{ "id": 1, "name": "Auction House" }],
+      "links": { "websiteUrl": "https://www.curseforge.com/wow/addons/item-price-tooltip" },
+      "latestFiles": [
+        {
+          "id": 4567890,
+          "displayName": "ItemPriceTooltip 2.4.1",
+          "fileName": "ItemPriceTooltip-2.4.1.zip",
+          "releaseType": 1,
+          "fileDate": "2026-10-01T10:00:00Z",
+          "fileLength": 123456,
+          "downloadUrl": null
+        }
+      ]
+    }
+  ]
+}

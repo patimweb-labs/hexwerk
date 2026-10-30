@@ -9,6 +9,7 @@ pub mod cache;
 pub mod curseforge;
 pub mod fingerprint;
 pub mod github;
+pub mod http;
 pub mod keys;
 pub mod merge;
 pub mod registry;
@@ -16,6 +17,9 @@ pub mod tukui;
 pub mod wago;
 pub mod wowinterface;
 
+pub use cache::Cache;
+pub use http::{Http, HttpResponse, Request, UreqHttp};
+pub use keys::{KeyOrigin, KeyProvider, Secret};
 pub use merge::{merge, Entry, Release};
 pub use registry::Registry;
 
@@ -103,4 +107,36 @@ pub trait AddonSource: Send + Sync {
     fn search(&self, query: &str, page: u32) -> Result<Vec<merge::Entry>, SourceError>;
     /// Laedt das ZIP eines Releases.
     fn download(&self, release: &merge::Release) -> Result<Vec<u8>, SourceError>;
+
+    /// Ein einziger echter Testaufruf je Quelle — die Grundlage fuer
+    /// `hexwerk keys test` (PLAN.md §7: „prueft jede Quelle mit einer Anfrage und
+    /// meldet den HTTP-Code").
+    ///
+    /// WARUM als Vorgabe im Trait: jede Quelle kann ihre Suche als Probe
+    /// benutzen; nur wer eine billigere Anfrage hat, ueberschreibt das.
+    fn probe(&self) -> SourceHealth {
+        let source = self.id();
+        match self.search("", 0) {
+            Ok(entries) => SourceHealth {
+                source,
+                ok: Some(true),
+                detail: format!("HTTP 200, {} Einträge", entries.len()),
+            },
+            Err(SourceError::Disabled) => SourceHealth {
+                source,
+                ok: Some(false),
+                detail: "kein Schlüssel — abgeschaltet".to_string(),
+            },
+            Err(SourceError::RateLimited) => SourceHealth {
+                source,
+                ok: Some(false),
+                detail: "HTTP 429 — gedrosselt".to_string(),
+            },
+            Err(err) => SourceHealth {
+                source,
+                ok: Some(false),
+                detail: err.to_string(),
+            },
+        }
+    }
 }

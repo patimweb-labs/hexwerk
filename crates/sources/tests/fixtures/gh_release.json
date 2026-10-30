@@ -1,0 +1,25 @@
+{
+ "tag_name": "5.22.1",
+ "name": "5.22.1",
+ "published_at": "2026-10-10T17:21:31Z",
+ "prerelease": false,
+ "draft": false,
+ "zipball_url": "https://api.github.com/repos/WeakAuras/WeakAuras2/zipball/5.22.1",
+ "tarball_url": "https://api.github.com/repos/WeakAuras/WeakAuras2/tarball/5.22.1",
+ "html_url": "https://github.com/WeakAuras/WeakAuras2/releases/tag/5.22.1",
+ "assets": [
+  {
+   "name": "release.json",
+   "browser_download_url": "https://github.com/WeakAuras/WeakAuras2/releases/download/5.22.1/release.json",
+   "size": 300,
+   "content_type": "application/json"
+  },
+  {
+   "name": "WeakAuras-5.22.1.zip",
+   "browser_download_url": "https://github.com/WeakAuras/WeakAuras2/releases/download/5.22.1/WeakAuras-5.22.1.zip",
+   "size": 10557265,
+   "content_type": "application/zip"
+  }
+ ],
+ "body": "# [5.22.1](https://github.com/WeakAuras/WeakAuras2/tree/5.22.1) (2026-10-10)\r\n\r\n[Full Changelog](https://github.com/WeakAuras/WeakAuras2/compare/5.22.0...5.22.1)\r\n\r\n## Highlights\r\n\r\n\r\n\r\n## Commits\r\n\r\nInfusOnWoW (3):\r\n\r\n- Hardcore: Show a warning on the Options window about hardcore\r\n- Hardcore: Use "
+}

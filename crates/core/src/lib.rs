@@ -11,6 +11,8 @@ pub mod flavor;
 pub mod toc;
 
 pub use addon::{scan_addons, InstalledAddon};
-pub use clients::{discover, Client, Discovery, Note, NoteStatus, Origin};
+pub use clients::{
+    discover, discover_at, Client, Discovery, Note, NoteStatus, Origin, SearchRoots,
+};
 pub use flavor::{Flavor, FlavorDir};
 pub use toc::{parse_file, parse_str, Toc, TocSourceIds};

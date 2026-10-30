@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.weppelmann.Hexwerk</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Hexwerk</name>
+  <summary>Addon manager for World of Warcraft on Linux</summary>
+  <developer id="de.weppelmann">
+    <name>Patrick Weppelmann</name>
+  </developer>
+  <description>
+    <p>
+      Hexwerk finds World of Warcraft installations inside Wine prefixes — Steam
+      and Proton, Faugus and UMU, Heroic, Lutris, Bottles, PortProton or any
+      folder you point it at — and manages the addons in every client flavour
+      (retail, classic, classic era, anniversary and the PTR builds).
+    </p>
+    <p>
+      Sources are read without credentials: GitHub releases, Tukui and
+      WoWInterface. Addons are recognised by the identifiers in their .toc file
+      and by a fingerprint of the installed folder, so updates work even for
+      addons that were installed by hand. Wago and CurseForge need a key and
+      stay optional and off by default.
+    </p>
+    <p>
+      Installation is unpacking with folder correction, per client, with backup
+      and trash. Search runs against a local index, so the catalogue stays
+      usable while a scan is running.
+    </p>
+  </description>
+  <launchable type="desktop-id">de.weppelmann.Hexwerk.desktop</launchable>
+  <url type="homepage">https://github.com/Smotherer007/hexwerk</url>
+  <url type="bugtracker">https://github.com/Smotherer007/hexwerk/issues</url>
+  <categories>
+    <category>Game</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-30">
+      <description>
+        <p>Erste Fassung: Präfix-Erkennung, Katalog-Merge, Installation je Client.</p>
+      </description>
+    </release>
+  </releases>
+</component>

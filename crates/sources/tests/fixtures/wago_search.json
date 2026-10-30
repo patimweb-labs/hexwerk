@@ -1,0 +1,16 @@
+{
+  "_note": "FORM NACH DOKUMENTATION, NICHT GEMESSEN: ohne Token leitet addons.wago.io auf die Website um (302), eine echte Antwort gibt es hier nicht. Gelesen werden slug/id, name, author, summary, latestRelease{label, createdAt, downloadUri}.",
+  "data": [
+    {
+      "slug": "example-wago-addon",
+      "name": "Example Wago Addon",
+      "author": "Beispielautor",
+      "summary": "Ein Beispiel aus der Wago-Dokumentation.",
+      "latestRelease": {
+        "label": "1.4.0",
+        "createdAt": "2026-10-02T08:30:00Z",
+        "downloadUri": "https://addons.wago.io/downloads/example-wago-addon/1.4.0.zip"
+      }
+    }
+  ]
+}

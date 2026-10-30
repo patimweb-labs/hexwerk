@@ -1,0 +1,215 @@
+name: Release
+
+# Ablauf wie im Nachbarprojekt Crosspoint: Conventional Commits auf main,
+# release-please haelt einen Release-PR aktuell; dessen Merge erzeugt Tag und
+# Release, dieser Workflow baut die Pakete und haengt sie an.
+#
+# Getrennte Jobs, weil die Umgebungen sich ausschliessen:
+#   tarball  braucht apt und die Rust-Toolchain auf einem normalen Runner
+#   flatpak  braucht den GNOME-Container (flatpak-builder, Runtime) und kein Rust
+# In einem Job scheitert beides: im Container gibt es kein apt, auf dem Runner
+# kein vorinstalliertes flatpak-builder.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Vorhandener Tag, z. B. v0.1.1
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-please:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  prepare:
+    needs: release-please
+    if: >-
+      always() && (
+        needs.release-please.outputs.created == 'true' ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+      version: ${{ steps.t.outputs.version }}
+    steps:
+      - id: t
+        env:
+          RP_TAG: ${{ needs.release-please.outputs.tag }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$RP_TAG" ]; then TAG="$RP_TAG"
+          elif [ -n "$INPUT_TAG" ]; then TAG="$INPUT_TAG"
+          else TAG="$GITHUB_REF_NAME"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Release anlegen, falls nicht vorhanden
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.t.outputs.tag }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
+
+  # Wie in der CI: ohne eingefrorene Cargo-Quellenliste wird das Flatpak
+  # uebersprungen statt rot - der Tarball erscheint trotzdem.
+  flatpak-voraussetzungen:
+    name: Flatpak-Voraussetzungen
+    needs: prepare
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      quellen: ${{ steps.pruefen.outputs.quellen }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - id: pruefen
+        run: |
+          if [ -f flatpak/new-sources.json ]; then
+            echo "quellen=true" >> "$GITHUB_OUTPUT"
+            echo "new-sources.json vorhanden - Flatpak wird gebaut"
+          else
+            echo "quellen=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::flatpak/new-sources.json fehlt; das Flatpak fehlt in diesem Release. Erzeugen: siehe flatpak/README.md"
+          fi
+
+  tarball:
+    needs: prepare
+    if: always() && needs.prepare.result == 'success'
+    name: Tarball
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: GTK-Entwicklungspakete
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-4-dev libadwaita-1-dev pkg-config
+      - name: Kommandozeile bauen
+        run: cargo build --release --locked --bin hexwerk
+      - name: Fenster bauen
+        run: cargo build --release --locked --features ui --bin hexwerk-gtk
+      - name: Paket schnüren
+        run: |
+          mkdir -p dist
+          cp target/release/hexwerk target/release/hexwerk-gtk dist/
+          cp data/de.weppelmann.Hexwerk.desktop dist/
+          cp packaging/linux/de.weppelmann.Hexwerk.metainfo.xml dist/
+          cp LICENSE dist/
+          cp -r data/icons dist/icons
+          # Pruefen, dass der Tarball nicht ohne Icon und Eintrag entsteht.
+          test -f dist/icons/hicolor/512x512/apps/de.weppelmann.Hexwerk.png
+          test -f dist/de.weppelmann.Hexwerk.desktop
+          tar -C dist -czf "hexwerk-${VERSION}-linux-x86_64.tar.gz" .
+          tar -tzf "hexwerk-${VERSION}-linux-x86_64.tar.gz" | head -20
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexwerk
+          path: target/release/hexwerk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexwerk-gtk
+          path: target/release/hexwerk-gtk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: hexwerk-*.tar.gz
+          if-no-files-found: error
+
+  flatpak:
+    needs: [prepare, tarball, flatpak-voraussetzungen]
+    if: >-
+      always() &&
+      needs.prepare.result == 'success' &&
+      needs.tarball.result == 'success' &&
+      needs.flatpak-voraussetzungen.outputs.quellen == 'true'
+    name: Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      # Beide Binaries kommen fertig gebaut aus dem Tarball-Job - im
+      # Flatpak-Build gibt es kein cargo.
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexwerk
+          path: prebuilt
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexwerk-gtk
+          path: prebuilt
+      - name: Ausführbar machen
+        run: |
+          chmod +x prebuilt/hexwerk prebuilt/hexwerk-gtk
+          ls -l prebuilt
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: hexwerk-${{ needs.prepare.outputs.version }}-x86_64.flatpak
+          manifest-path: flatpak/de.weppelmann.Hexwerk.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: true
+
+  attach:
+    # Wartet auf beide Paket-Jobs. Faellt einer aus (etwa weil die Quellenliste
+    # noch fehlt), wird trotzdem veroeffentlicht, was da ist.
+    needs: [prepare, tarball, flatpak]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: pakete
+          merge-multiple: true
+      - name: Pakete prüfen
+        run: |
+          find pakete -type f -printf '%p %s Bytes\n'
+          anzahl=$(find pakete -type f \( -name '*.tar.gz' -o -name '*.flatpak' \) | wc -l)
+          echo "Pakete gefunden: $anzahl"
+          if [ "$anzahl" -eq 0 ]; then
+            echo "Keine Pakete im Artefakt - Abbruch statt stillem Erfolg"; exit 1
+          fi
+          find pakete -type f -name '*.flatpak' | grep -q . ||
+            echo "::warning::Flatpak-Bundle fehlt in diesem Lauf - nur der Tarball wird veroeffentlicht"
+      - name: Release sicherstellen, veröffentlichen, Pakete anhängen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
+          find pakete -type f \( -name '*.tar.gz' -o -name '*.flatpak' \) -print0 |
+            xargs -0 gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false

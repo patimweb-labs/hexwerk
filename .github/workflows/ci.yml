@@ -1,0 +1,202 @@
+name: CI
+
+# Aufbau wie im Nachbarprojekt Crosspoint: kleine, getrennte Jobs, damit ein
+# Fehler dort gemeldet wird, wo er entsteht (Format, Clippy, Test, Bau,
+# Metadaten, Flatpak). Der Flatpak-Job laeuft nur, wenn die eingefrorene
+# Cargo-Quellenliste existiert - sonst erscheint er als "skipped" und nicht
+# als Fehler.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      # Die Oberflaeche ist ein eigenes Paket mit eigener [workspace]-Tabelle
+      # und wird von `--all` nicht erfasst; deshalb der zweite Aufruf.
+      - name: Workspace
+        run: cargo fmt --all --check
+      - name: Oberflaeche
+        run: cargo fmt --manifest-path crates/ui-gtk/Cargo.toml --all --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Nur echte Fehler blockieren; Stilhinweise bleiben sichtbar, halten den
+      # Bau aber nicht auf.
+      - run: cargo clippy --all-targets --locked --workspace -- -D clippy::correctness
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Tests
+        run: RUST_BACKTRACE=1 cargo test --locked --workspace
+
+  build:
+    name: Release-Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin hexwerk
+      # Der Flatpak-Job baut im Container ohne Rust und bekommt das Binary
+      # hier fertig gebaut.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexwerk
+          path: target/release/hexwerk
+          if-no-files-found: error
+
+  gtk:
+    name: Oberfläche (GTK4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/ui-gtk
+      - name: GTK-Entwicklungspakete
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-4-dev libadwaita-1-dev pkg-config
+      # Gebaut wird ueber das Wurzelpaket mit Feature `ui` ([[bin]] hexwerk-gtk
+      # mit required-features), nicht ueber die eigene [workspace]-Wurzel von
+      # crates/ui-gtk: nur so gilt Cargo.lock der Wurzel und das Artefakt liegt
+      # dort, wo das Flatpak-Manifest es erwartet.
+      - name: Clippy der Oberfläche
+        run: cargo clippy --locked --features ui --all-targets -- -D clippy::correctness
+      # Das Fenster wird hier gebaut, nicht im Flatpak: dort gibt es kein cargo.
+      - name: Fenster bauen
+        run: cargo build --release --locked --features ui --bin hexwerk-gtk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexwerk-gtk
+          path: target/release/hexwerk-gtk
+          if-no-files-found: error
+
+  metadaten:
+    name: Paket-Metadaten
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Werkzeuge
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq desktop-file-utils appstream
+      - name: Desktop-Eintrag
+        run: desktop-file-validate data/*.desktop packaging/linux/*.desktop
+      - name: AppStream-Metainfo
+        run: appstreamcli validate --no-net packaging/linux/*.metainfo.xml
+      # data/ ist die massgebliche Fassung (das Flatpak baut sie ein), die Kopie
+      # in packaging/linux/ geht in den Tarball. Beide muessen gleich sein.
+      - name: Kein Auseinanderlaufen der Kopien
+        run: diff -u data/de.weppelmann.Hexwerk.desktop packaging/linux/de.weppelmann.Hexwerk.desktop
+      - name: Icons vollständig und richtig skaliert
+        run: |
+          python3 - <<'PY'
+          import pathlib, struct, sys
+          fehler = []
+          for n in (16, 32, 48, 64, 128, 256, 512):
+              p = pathlib.Path(f"data/icons/hicolor/{n}x{n}/apps/de.weppelmann.Hexwerk.png")
+              if not p.is_file():
+                  fehler.append(f"fehlt: {p}")
+                  continue
+              b = p.read_bytes()
+              if b[:8] != b"\x89PNG\r\n\x1a\n":
+                  fehler.append(f"kein PNG: {p}")
+                  continue
+              w, h = struct.unpack(">II", b[16:24])
+              if (w, h) != (n, n):
+                  fehler.append(f"{p}: {w}x{h} statt {n}x{n}")
+              else:
+                  print(f"{p}: {w}x{h}, {len(b)} Bytes")
+          for p in ("data/icons/hicolor/scalable/apps/de.weppelmann.Hexwerk.svg",
+                    "data/icons/symbolic/apps/de.weppelmann.Hexwerk-symbolic.svg"):
+              if not pathlib.Path(p).is_file():
+                  fehler.append(f"fehlt: {p}")
+              else:
+                  print(f"{p}: vorhanden")
+          for f in fehler:
+              print(f"::error::{f}")
+          sys.exit(1 if fehler else 0)
+          PY
+
+  # Eigener kleiner Job, damit der Flatpak-Job eine echte Bedingung hat: er darf
+  # nicht scheitern, solange die eingefrorene Quellenliste noch fehlt (siehe
+  # flatpak/README.md). Job-Bedingungen sehen Dateien erst nach dem Checkout,
+  # deshalb wird das Ergebnis hier als Output weitergereicht.
+  flatpak-voraussetzungen:
+    name: Flatpak-Voraussetzungen
+    runs-on: ubuntu-latest
+    outputs:
+      quellen: ${{ steps.pruefen.outputs.quellen }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pruefen
+        run: |
+          if [ -f flatpak/new-sources.json ]; then
+            echo "quellen=true" >> "$GITHUB_OUTPUT"
+            echo "new-sources.json vorhanden - Flatpak wird gebaut"
+          else
+            echo "quellen=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::flatpak/new-sources.json fehlt; Flatpak-Job wird uebersprungen. Erzeugen: siehe flatpak/README.md"
+          fi
+
+  flatpak:
+    name: Flatpak bauen
+    needs: [build, gtk, flatpak-voraussetzungen]
+    if: needs.flatpak-voraussetzungen.outputs.quellen == 'true'
+    runs-on: ubuntu-latest
+    # Container mit fertigem flatpak-builder und GNOME-Runtime; ohne ihn
+    # scheitert der Schritt schon beim Setup (Image/Action-Paar).
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexwerk
+          path: prebuilt
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexwerk-gtk
+          path: prebuilt
+      - name: Ausführbar machen
+        run: |
+          chmod +x prebuilt/hexwerk prebuilt/hexwerk-gtk
+          ls -l prebuilt
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: hexwerk-ci.flatpak
+          manifest-path: flatpak/de.weppelmann.Hexwerk.yml

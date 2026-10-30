@@ -10,8 +10,38 @@ mitlaufen muss. Hexwerk arbeitet von außen auf dem Dateisystem des Präfixes.
 
 ## Status
 
-Vorstufe. Bisher belegt: Quellenlage der etablierten Manager (siehe unten).
-Noch nicht entschieden: UI-Stack. Noch nicht gebaut: alles außer dieser Datei.
+Lauffähig als Kommandozeile; die Oberfläche steht und wird gerade an Index und
+Quellen angeschlossen. Gebaut und getestet:
+
+| Teil | Stand |
+|---|---|
+| Präfix-Erkennung (`crates/core`) | Steam, Faugus/UMU, Heroic, Lutris, Bottles, PortProton, manuelle Ordner — 48 Tests |
+| Quellen (`crates/sources`) | GitHub, Tukui, WoWInterface ohne Schlüssel; Wago, CurseForge mit Schlüssel — 50 Tests, echter Netztest über `examples/probe` |
+| Index (`crates/index`) | SQLite + FTS5 für Clients, Katalog, installierte Addons, Update-Erkennung — 37 Tests |
+| Installation (`crates/install`) | ZIP mit Ordnerkorrektur, Sicherung, Papierkorb, Zip-Slip-Schutz — 30 Tests |
+| Oberfläche (`crates/ui-gtk`) | fünf Bildschirme, Dunkel/Hell, Scan im Hintergrund; baut gegen GTK 4.22.5 / libadwaita 1.9.4 |
+| Marke und Pakete | Logo, Icons 16–512, symbolisches Tray-Icon, Desktop-Eintrag, AppStream-Metainfo, Flatpak-Manifest, CI |
+
+## Bauen und starten
+
+```bash
+cargo build --release                        # Kommandozeile
+./target/release/hexwerk scan                # Installationen finden
+./target/release/hexwerk index               # lokalen Index bauen (ohne Netz)
+./target/release/hexwerk index --net bags    # Quellen befragen, Katalog füllen
+./target/release/hexwerk search weakauras
+./target/release/hexwerk keys test           # Quellen mit Schlüssel prüfen
+./target/release/hexwerk keys set curseforge <key>
+```
+
+Die Oberfläche braucht GTK4- und libadwaita-Header, die auf Bazzite fehlen.
+Gebaut wird deshalb im Container (Image mit `gtk4-devel`, `libadwaita-devel`):
+
+```bash
+podman run -d --name hexwerk-build -v "$PWD":/work:z localhost/hexwerk-buildenv:1 sleep infinity
+podman exec -w /work hexwerk-build sh -lc 'cd crates/ui-gtk && cargo build'
+```
+
 
 ## Quellen — gemessen am 2026-10-30
 

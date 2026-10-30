@@ -110,9 +110,18 @@ mod tests {
 
     #[test]
     fn interface_ist_eine_liste() {
+        // Reihenfolge ist Teil der Zusage nicht: `## Interface` ist eine Menge
+        // (PLAN.md §4), der Parser sortiert und entdoppelt. Frueher stand hier
+        // die Reihenfolge der Datei, was nur zufaellig gleich war.
         let t = parse_str("## Interface: 11509, 20506, 16001\n## Version: 3.5.1\n");
-        assert_eq!(t.interface_numbers, vec![11509, 20506, 16001]);
+        assert_eq!(t.interface_numbers, vec![11509, 16001, 20506]);
         assert_eq!(t.version.as_deref(), Some("3.5.1"));
+    }
+
+    #[test]
+    fn interface_wird_entdoppelt() {
+        let t = parse_str("## Interface: 11509, 11509, 20506\n");
+        assert_eq!(t.interface_numbers, vec![11509, 20506]);
     }
 
     #[test]

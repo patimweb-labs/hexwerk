@@ -1,0 +1,59 @@
+{
+ "total_count": 260,
+ "incomplete_results": false,
+ "items": [
+  {
+   "name": "WeakAuras2",
+   "full_name": "WeakAuras/WeakAuras2",
+   "description": "World of Warcraft addon that provides a powerful framework to display customizable graphics on your screen.",
+   "html_url": "https://github.com/WeakAuras/WeakAuras2",
+   "topics": [
+    "addon",
+    "custom-textures",
+    "discord",
+    "extension",
+    "flexible-framework",
+    "framework",
+    "lua",
+    "scripting",
+    "trigger",
+    "warcraft-addon",
+    "weakauras",
+    "world-of-warcraft",
+    "wow-addon"
+   ],
+   "archived": false,
+   "default_branch": "main",
+   "pushed_at": "2026-10-26T21:04:12Z",
+   "stargazers_count": 1446,
+   "owner": {
+    "login": "WeakAuras"
+   }
+  },
+  {
+   "name": "WeakAuras-Companion",
+   "full_name": "WeakAuras/WeakAuras-Companion",
+   "description": "A cross-platform application built to provide the missing link between Wago.io and World of Warcraft",
+   "html_url": "https://github.com/WeakAuras/WeakAuras-Companion",
+   "topics": [
+    "electron",
+    "electron-app",
+    "electron-vue",
+    "vite",
+    "vue",
+    "wago",
+    "warcraft",
+    "weakauras",
+    "weakauras-companion",
+    "world-of-warcraft"
+   ],
+   "archived": false,
+   "default_branch": "main",
+   "pushed_at": "2026-10-29T05:34:51Z",
+   "stargazers_count": 171,
+   "owner": {
+    "login": "WeakAuras"
+   }
+  }
+ ]
+}

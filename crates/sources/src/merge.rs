@@ -41,6 +41,61 @@ impl Entry {
     }
 }
 
+/// Normalisiert einen Text zu einem Schlüsselteil: klein, ASCII, ein `-` je
+/// Trenner. Umlaute und Akzente werden umgeschrieben, damit derselbe Addon-Name
+/// aus zwei Quellen denselben Schlüssel ergibt.
+pub fn slug(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut last_dash = true;
+    for ch in text.chars() {
+        let mapped: Option<char> = match ch {
+            'ä' | 'Ä' => Some('a'),
+            'ö' | 'Ö' => Some('o'),
+            'ü' | 'Ü' => Some('u'),
+            'ß' => Some('s'),
+            'é' | 'è' | 'ê' | 'É' => Some('e'),
+            'á' | 'à' | 'â' | 'Á' => Some('a'),
+            'í' | 'ì' | 'î' => Some('i'),
+            'ó' | 'ò' | 'ô' => Some('o'),
+            'ú' | 'ù' | 'û' => Some('u'),
+            'ç' => Some('c'),
+            _ => None,
+        };
+        let ch = mapped.unwrap_or(ch);
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+            last_dash = false;
+        } else if !last_dash {
+            out.push('-');
+            last_dash = true;
+        }
+    }
+    out.trim_matches('-').to_string()
+}
+
+/// Schlüssel aus einer externen Projekt-ID (PLAN.md §5, erster Fall).
+///
+/// WARUM mit Quellenpräfix: `X-Curse-Project-ID: 1` und `X-WoWI-ID: 1` sind
+/// verschiedene Addons; ohne Präfix kollidierten sie zu einem Eintrag.
+pub fn id_key(source: Source, external_id: &str) -> String {
+    format!("{}:{}", slug(source.label()), external_id.trim())
+}
+
+/// Schlüssel ohne externe ID (PLAN.md §5, zweiter Fall).
+///
+/// Autor ist Teil des Schlüssels, weil zwei gleichnamige Addons verschiedener
+/// Autoren sonst verschmölzen — der Preis ist, dass derselbe Autor in zwei
+/// Quellen unterschiedlich geschrieben sein muss, um zu treffen.
+pub fn name_key(name: &str, author: &str) -> String {
+    let name = slug(name);
+    let author = slug(author);
+    if author.is_empty() {
+        name
+    } else {
+        format!("{name}-{author}")
+    }
+}
+
 /// Fasst Eintraege zusammen. Regel: gleicher `key` = gleiches Addon.
 pub fn merge(entries: impl IntoIterator<Item = Entry>) -> Vec<Entry> {
     let mut map: BTreeMap<String, Entry> = BTreeMap::new();
@@ -73,7 +128,7 @@ pub fn merge(entries: impl IntoIterator<Item = Entry>) -> Vec<Entry> {
         e.releases
             .sort_by(|a, b| a.source.cmp(&b.source).then(b.version.cmp(&a.version)));
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     out
 }
 
