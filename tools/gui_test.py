@@ -180,6 +180,26 @@ def main() -> int:
     else:
         erg.hinweis("keine Umschaltknöpfe gefunden (Quellenfilter)")
 
+    # Clients: ein Client-Ordner muss nach "Installiert" fuehren.
+    for knopf in [n for n in find(app, "push button") if "clients" in name_of(n).lower()]:
+        click(knopf)
+        time.sleep(0.8)
+        break
+    ordner = [n for n in find(app, "push button") if "öffnen" in name_of(n).lower()]
+    if ordner:
+        click(ordner[0])
+        time.sleep(1.0)
+        aktuell = " ".join(texte(app))
+        erg.pruefe(
+            "Installiert" in aktuell,
+            "Client-Ordner springt nach Installiert",
+            name_of(ordner[0]),
+        )
+        shot(f"{outdir}/test-sprung-installiert.png")
+    else:
+        namen = sorted({name_of(n) for n in find(app, "push button")})
+        erg.hinweis("kein klickbarer Client-Ordner gefunden: " + " | ".join(namen)[:400])
+
     # Installiert: nur ein Bild. Ob die Loeschknoepfe da sind und ob sie mit
     # einer Auswahl aktiv werden, haengt an der Auswahl in einer GtkColumnView,
     # die ueber AT-SPI nicht zuverlaessig sichtbar ist; eine Pruefung darauf

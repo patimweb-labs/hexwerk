@@ -303,6 +303,18 @@ fn wire(ui: &Rc<Ui>) {
     // Scan-Knopf: voller Lauf, inklusive Quellen.
     let weak = Rc::downgrade(ui);
     {
+        // Klick auf einen Client-Ordner: nach "Installiert" springen und genau
+        // diesen Ordner auswaehlen.
+        let weak = Rc::downgrade(ui);
+        ui.clients_view.set_on_open_flavor(move |client, flavor| {
+            if let Some(ui) = weak.upgrade() {
+                ui.installed.select_target(client, flavor);
+                show_page(&ui, "installed");
+            }
+        });
+    }
+
+    {
         let weak = Rc::downgrade(ui);
         ui.sources.set_on_test(move |source| {
             if let Some(ui) = weak.upgrade() {

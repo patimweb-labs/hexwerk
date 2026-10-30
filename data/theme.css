@@ -853,3 +853,22 @@ headerbar button.titlebutton,
   min-height: 26px;
   padding: 2px;
 }
+
+/* Die Client-Ordner-Zeile ist ein Knopf: gleiche Optik wie die Box vorher,
+   aber mit Zeigefinger, Fokusrahmen und Tastaturbedienung. */
+button.hw-flavor-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  background-image: none;
+  box-shadow: none;
+}
+
+button.hw-flavor-button:hover .hw-flavor-name {
+  color: var(--hw-signal);
+}
+
+button.hw-flavor-button:focus-visible {
+  outline: 2px solid var(--hw-signal);
+  outline-offset: 1px;
+}

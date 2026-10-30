@@ -10,10 +10,16 @@ use adw::prelude::*;
 use crate::format::{human_size, initial, interface_list, shorten_home};
 use crate::state::{ClientData, FlavorData, ScanData};
 
+type OpenFlavor = Box<dyn Fn(usize, usize)>;
+
 pub struct ClientsView {
     root: gtk::ScrolledWindow,
     grid: gtk::Grid,
     empty: gtk::Box,
+    /// Wird mit (Client-Index, Flavor-Index) gerufen, wenn eine Zeile
+    /// angeklickt wird. In einem Rc, damit der Aufbau der Karten ihn teilen
+    /// kann, ohne die Ansicht selbst zu kennen.
+    on_open_flavor: std::rc::Rc<std::cell::RefCell<Option<OpenFlavor>>>,
 }
 
 impl ClientsView {
@@ -61,11 +67,20 @@ impl ClientsView {
             .build();
         root.add_css_class("hw-pane");
 
-        Self { root, grid, empty }
+        Self {
+            root,
+            grid,
+            empty,
+            on_open_flavor: std::rc::Rc::new(std::cell::RefCell::new(None)),
+        }
     }
 
     pub fn widget(&self) -> &gtk::Widget {
         self.root.upcast_ref()
+    }
+
+    pub fn set_on_open_flavor<F: Fn(usize, usize) + 'static>(&self, f: F) {
+        *self.on_open_flavor.borrow_mut() = Some(Box::new(f));
     }
 
     pub fn set_data(&self, data: &ScanData) {
@@ -76,7 +91,7 @@ impl ClientsView {
         for (index, client) in data.clients.iter().enumerate() {
             let column = (index % 2) as i32;
             let row = (index / 2) as i32;
-            let card = card(client);
+            let card = card(client, index, &self.on_open_flavor);
             card.set_hexpand(true);
             self.grid.attach(&card, column, row, 1, 1);
         }
@@ -110,7 +125,11 @@ fn empty_state() -> gtk::Box {
     box_
 }
 
-fn card(client: &ClientData) -> gtk::Box {
+fn card(
+    client: &ClientData,
+    client_index: usize,
+    on_open: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(usize, usize)>>>>,
+) -> gtk::Box {
     let card = gtk::Box::new(gtk::Orientation::Vertical, 10);
     card.add_css_class("hw-card");
     card.set_valign(gtk::Align::Start);
@@ -148,8 +167,8 @@ fn card(client: &ClientData) -> gtk::Box {
 
     let flavors = gtk::Box::new(gtk::Orientation::Vertical, 6);
     flavors.set_margin_top(2);
-    for flavor in &client.flavors {
-        flavors.append(&flavor_row(flavor));
+    for (flavor_index, flavor) in client.flavors.iter().enumerate() {
+        flavors.append(&flavor_row(flavor, client_index, flavor_index, on_open));
     }
     if client.flavors.is_empty() {
         let none = gtk::Label::new(Some(
@@ -164,9 +183,34 @@ fn card(client: &ClientData) -> gtk::Box {
     card
 }
 
-fn flavor_row(flavor: &FlavorData) -> gtk::Box {
+fn flavor_row(
+    flavor: &FlavorData,
+    client_index: usize,
+    flavor_index: usize,
+    on_open: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(usize, usize)>>>>,
+) -> gtk::Widget {
+    // Ein Knopf statt einer Box: klickbar, mit der Tastatur erreichbar und mit
+    // Zeigefinger. Der Klick springt in die Ansicht "Installiert" und waehlt
+    // genau diesen Client-Ordner aus.
+    let button = gtk::Button::new();
+    button.add_css_class("hw-flavor");
+    button.add_css_class("hw-flavor-button");
+    crate::theme::pointer(&button);
+    button.update_property(&[gtk::accessible::Property::Label(&format!(
+        "{} mit {} Addons öffnen",
+        flavor.dir_name,
+        flavor.addon_count()
+    ))]);
+    {
+        let on_open = on_open.clone();
+        button.connect_clicked(move |_| {
+            if let Some(cb) = on_open.borrow().as_ref() {
+                cb(client_index, flavor_index);
+            }
+        });
+    }
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    row.add_css_class("hw-flavor");
+    row.set_halign(gtk::Align::Fill);
     row.set_tooltip_text(Some(&shorten_home(&flavor.addons_dir)));
 
     let left = gtk::Box::new(gtk::Orientation::Vertical, 2);
@@ -202,7 +246,8 @@ fn flavor_row(flavor: &FlavorData) -> gtk::Box {
     row.append(&left);
     row.append(&count_label);
     row.append(&size);
-    row
+    button.set_child(Some(&row));
+    button.upcast()
 }
 
 /// Fussnote zu den Herkuenften, die keine eigene Karte bekommen haben, weil

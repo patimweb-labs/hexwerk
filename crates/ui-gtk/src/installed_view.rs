@@ -413,6 +413,21 @@ impl InstalledView {
         });
     }
 
+    /// Waehlt den Ziel-Client aus, ohne die Ansicht zu wechseln. Der Aufrufer
+    /// entscheidet, ob er danach auf "Installiert" springt.
+    pub fn select_target(&self, client: usize, flavor: usize) {
+        let position = self
+            .targets
+            .borrow()
+            .iter()
+            .position(|t| t.client == client && t.flavor == flavor);
+        if let Some(position) = position {
+            self.target.set_selected(position as u32);
+            self.rebuild();
+            self.update_count();
+        }
+    }
+
     pub fn set_data(&self, data: Rc<ScanData>) {
         let mut targets = Vec::new();
         let mut labels = Vec::new();
