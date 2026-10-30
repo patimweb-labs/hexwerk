@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hexwerk — Fensterentwurf 2026-10-30</title>
+<style>
+  :root{
+    --bg:#060A12; --panel:#0A111C; --panel2:#0C1523; --line:#16233A;
+    --ink:#DCE6F5; --dim:#7C8CA6; --dim2:#54637A;
+    --signal:#39DD93; --signal-dim:#1E6B4C;
+    --warn:#F2B344; --bad:#E2657A; --blue:#4C8DFF;
+    --mono:ui-monospace,"JetBrains Mono","SFMono-Regular",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px}
+  body{
+    background-image:
+      linear-gradient(rgba(57,221,147,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(57,221,147,.035) 1px,transparent 1px);
+    background-size:32px 32px,32px 32px;
+    padding:22px;
+  }
+  .frame{max-width:1400px;margin:0 auto;border:1px solid var(--line);background:linear-gradient(180deg,#070C15,#060A12);box-shadow:0 24px 80px rgba(0,0,0,.6)}
+  /* Fensterleiste */
+  .titlebar{display:flex;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid var(--line);background:#080E18}
+  .dot{width:9px;height:9px;border-radius:50%;border:1px solid var(--dim2)}
+  .wordmark{letter-spacing:.42em;font-size:12px;color:var(--signal);text-transform:uppercase}
+  .wordmark b{color:var(--ink);font-weight:600}
+  .tb-meta{margin-left:auto;color:var(--dim2);font-size:11px;letter-spacing:.06em}
+  /* Tabs */
+  .tabs{display:flex;gap:0;border-bottom:1px solid var(--line);background:#080D16}
+  .tab{padding:10px 16px;color:var(--dim);cursor:pointer;border-right:1px solid var(--line);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;user-select:none}
+  .tab small{display:block;letter-spacing:.04em;text-transform:none;color:var(--dim2);font-size:10.5px;margin-top:2px}
+  .tab.on{color:var(--ink);background:var(--panel);box-shadow:inset 0 -2px 0 var(--signal)}
+  .tab:hover{color:var(--ink)}
+  .screen{display:none}
+  .screen.on{display:block}
+  /* Layout */
+  .body{display:grid;grid-template-columns:212px 1fr;min-height:620px}
+  .rail{border-right:1px solid var(--line);padding:14px 0;background:#070D16}
+  .rail h6{margin:16px 16px 8px;font-size:10px;letter-spacing:.2em;color:var(--dim2);text-transform:uppercase;font-weight:500}
+  .nav{display:flex;justify-content:space-between;padding:7px 16px;color:var(--dim);font-size:12px;border-left:2px solid transparent}
+  .nav.on{color:var(--ink);border-left-color:var(--signal);background:rgba(57,221,147,.05)}
+  .nav span:last-child{color:var(--dim2)}
+  .pane{padding:22px 24px}
+  h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 4px;font-weight:600}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 20px}
+  .card{border:1px solid var(--line);background:var(--panel);padding:16px}
+  .card+.card{margin-top:14px}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;font-size:12px}
+  .kv .k{color:var(--dim2);letter-spacing:.06em}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);padding:2px 8px;font-size:11px;color:var(--dim);border-radius:2px}
+  .chip.sig{border-color:var(--signal-dim);color:var(--signal)}
+  .chip.warn{border-color:#5A4520;color:var(--warn)}
+  .chip.blue{border-color:#20365A;color:var(--blue)}
+  .chip.off{color:var(--dim2);border-style:dashed}
+  .btn{border:1px solid var(--signal-dim);background:rgba(57,221,147,.08);color:var(--signal);padding:7px 13px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;cursor:pointer;border-radius:2px}
+  .btn.ghost{border-color:var(--line);background:transparent;color:var(--dim)}
+  .btn:hover{filter:brightness(1.25)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--dim2);font-weight:500;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid rgba(22,35,58,.6);vertical-align:middle}
+  tr:hover td{background:rgba(57,221,147,.03)}
+  .mono-dim{color:var(--dim);font-variant-numeric:tabular-nums}
+  .foot{border-top:1px solid var(--line);padding:9px 14px;color:var(--dim2);font-size:10.5px;letter-spacing:.05em;display:flex;gap:18px}
+  /* Scan */
+  .scan{padding:56px 24px;max-width:720px;margin:0 auto}
+  .radar{width:74px;height:74px;border:1px solid var(--signal-dim);border-radius:50%;position:relative;margin:0 auto 22px}
+  .radar:before{content:"";position:absolute;inset:14px;border:1px solid var(--signal-dim);border-radius:50%;opacity:.5}
+  .radar:after{content:"";position:absolute;left:50%;top:50%;width:2px;height:33px;background:linear-gradient(var(--signal),transparent);transform-origin:bottom;animation:spin 1.6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .scan h2{text-align:center;font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 6px}
+  .scan p.lead{text-align:center;color:var(--dim);margin:0 0 26px;font-size:12px}
+  .prog{list-style:none;margin:0;padding:0}
+  .prog li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px solid rgba(22,35,58,.6);align-items:baseline}
+  .mark{color:var(--signal)}
+  .mark.dim{color:var(--dim2)}
+  .prog .name{color:var(--ink)}
+  .prog .pnote{color:var(--dim2);font-size:11px;border:0;padding:0;margin:0;text-align:right}
+  .bar{height:2px;background:var(--line);margin-top:22px;position:relative;overflow:hidden}
+  .bar i{position:absolute;inset:0;width:62%;background:var(--signal);opacity:.7}
+  /* Client-Karten */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  .client-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .glyph{width:26px;height:26px;border:1px solid var(--signal-dim);display:grid;place-items:center;color:var(--signal);font-size:12px}
+  .client-head b{font-weight:600;letter-spacing:.04em}
+  .src-badge{margin-left:auto;font-size:10px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
+  .flavors{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+  .flavor{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;border:1px solid var(--line);padding:9px 10px;background:var(--panel2)}
+  .flavor b{font-weight:500}
+  .path{color:var(--dim2);font-size:10.5px;word-break:break-all;margin-top:3px}
+  /* Katalog */
+  .searchbar{display:flex;gap:10px;margin-bottom:16px}
+  .search{flex:1;border:1px solid var(--line);background:#080E18;color:var(--ink);font-family:var(--mono);font-size:12px;padding:10px 12px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .results{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .res{border:1px solid var(--line);background:var(--panel);padding:14px;display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start}
+  .thumb{width:52px;height:52px;border:1px solid var(--line);background:linear-gradient(135deg,#0E1A2B,#0A1220);display:grid;place-items:center;color:var(--signal-dim);font-size:16px}
+  .res h4{margin:0 0 3px;font-size:12.5px;font-weight:600;letter-spacing:.02em}
+  .res .by{color:var(--dim2);font-size:10.5px;margin-bottom:7px}
+  .res .desc{color:var(--dim);font-size:11.5px;line-height:1.5;margin-bottom:9px}
+  .res .srcs{display:flex;gap:6px;flex-wrap:wrap}
+  /* Detail */
+  .detail{display:grid;grid-template-columns:1fr 302px;gap:18px}
+  .banner{height:132px;border:1px solid var(--line);background:
+     radial-gradient(circle at 22% 30%,rgba(57,221,147,.16),transparent 55%),
+     linear-gradient(135deg,#0B1524,#070D17);display:flex;align-items:flex-end;padding:14px}
+  .detail h2{margin:0;font-size:17px;letter-spacing:.05em}
+  .detail .byline{color:var(--dim);font-size:11.5px;margin-top:4px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:0}
+  .stat{padding:10px 12px;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:0}
+  .stat .v{font-size:13px}
+  .stat .l{color:var(--dim2);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-top:3px}
+  .gal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+  .gal div{aspect-ratio:16/10;border:1px solid var(--line);background:linear-gradient(135deg,#0C1626,#080F19);display:grid;place-items:center;color:var(--dim2);font-size:10px;letter-spacing:.1em}
+  .dtabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin-top:6px}
+  .dtab{padding:8px 14px;color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border-bottom:2px solid transparent}
+  .dtab.on{color:var(--ink);border-bottom-color:var(--signal)}
+  .prose{color:var(--dim);font-size:12px;line-height:1.65;padding-top:14px;max-width:64ch}
+  .prose strong{color:var(--ink);font-weight:500}
+  .side{border:1px solid var(--line);background:var(--panel);padding:14px}
+  .side h5{margin:0 0 10px;font-size:10px;letter-spacing:.18em;color:var(--dim2);text-transform:uppercase;font-weight:500}
+  .sel{width:100%;border:1px solid var(--line);background:#080E18;color:var(--ink);font-family:var(--mono);font-size:11.5px;padding:8px;margin-bottom:10px}
+  .srcrow{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(22,35,58,.6);font-size:11.5px}
+  .srcrow .n{color:var(--dim)}
+  .srcrow .v{color:var(--dim2)}
+  .note{border:1px dashed var(--line);padding:10px 12px;color:var(--dim2);font-size:11px;line-height:1.5;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="titlebar">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <div class="wordmark"><b>Hex</b>werk</div>
+    <div class="tb-meta">3 CLIENTS · 12 ADDONS · 4 QUELLEN · 2026-10-30</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab on" data-s="s1">Scannen<small>Startbildschirm</small></div>
+    <div class="tab" data-s="s2">Clients<small>gefunden &amp; manuell</small></div>
+    <div class="tab" data-s="s3">Installiert<small>12 Addons</small></div>
+    <div class="tab" data-s="s4">Katalog<small>4 Quellen, gemergt</small></div>
+    <div class="tab" data-s="s5">Addon-Detail<small>Nexus-Ansicht</small></div>
+  </div>
+
+  <div class="body">
+    <div class="rail">
+      <h6>Bestand</h6>
+      <div class="nav"><span>Clients</span><span>3</span></div>
+      <div class="nav"><span>Addons</span><span>12</span></div>
+      <div class="nav"><span>Updates</span><span>3</span></div>
+      <h6>Quellen</h6>
+      <div class="nav"><span>GitHub</span><span>312</span></div>
+      <div class="nav"><span>Tukui</span><span>24</span></div>
+      <div class="nav"><span>WoWInterface</span><span>1204</span></div>
+      <div class="nav"><span>Wago</span><span>88</span></div>
+      <div class="nav"><span>CurseForge</span><span>—</span></div>
+      <h6>Aufgaben</h6>
+      <div class="nav"><span>Sicherung</span><span>0</span></div>
+      <div class="nav"><span>Profil „Raid“</span><span>8</span></div>
+    </div>
+
+    <div class="pane">
+
+      <!-- 1 SCAN -->
+      <div class="screen on" id="s1">
+        <div class="scan">
+          <div class="radar"></div>
+          <h2>Suche nach Clients</h2>
+          <p class="lead">Hexwerk liest Wine-Präfixe von Steam, Faugus, Heroic, Lutris und Bottles. Nichts wird gestartet, nichts geschrieben.</p>
+          <ul class="prog">
+            <li><span class="mark">✓</span><span class="name">Steam-Bibliotheken</span><span class="pnote">1 Bibliothek · 0 Präfixe mit WoW</span></li>
+            <li><span class="mark">✓</span><span class="name">Faugus · UMU</span><span class="pnote">~/Faugus/battlenet → 3 Client-Ordner</span></li>
+            <li><span class="mark">✓</span><span class="name">Heroic Games Launcher</span><span class="pnote">2 Präfixe · kein WoW</span></li>
+            <li><span class="mark dim">○</span><span class="name">Lutris</span><span class="pnote">nicht gefunden</span></li>
+            <li><span class="mark dim">○</span><span class="name">Bottles</span><span class="pnote">nicht installiert</span></li>
+            <li><span class="mark dim">○</span><span class="name">PortProton · UMU-Standard</span><span class="pnote">nicht gefunden</span></li>
+            <li><span class="mark" style="color:var(--signal)">›</span><span class="name">Addons in <code>_classic_era_</code> zählen</span><span class="pnote">11 von 11</span></li>
+          </ul>
+          <div class="bar"><i></i></div>
+          <div style="display:flex;justify-content:space-between;margin-top:14px">
+            <span class="chip off">Präfix manuell hinzufügen…</span>
+            <span class="mono-dim" style="font-size:11px">4 von 6 Quellen geprüft</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 CLIENTS -->
+      <div class="screen" id="s2">
+        <h1>Clients</h1>
+        <p class="sub">Gefundene WoW-Installationen. Der Pfad gilt für alle Addon-Aktionen; ein Client wird nur gelesen, solange du ihn nicht bearbeitest.</p>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="client-head"><div class="glyph">F</div><b>Faugus · Battle.net</b><span class="src-badge">UMU · Proton</span></div>
+            <div class="path">~/Faugus/battlenet/drive_c/Program Files (x86)/World of Warcraft</div>
+            <div class="flavors">
+              <div class="flavor"><div><b>_classic_era_</b><div class="path">Interface 11509 · 20506 · 16001</div></div><span class="chip sig">11 Addons</span><span class="chip">2,6 GB</span></div>
+              <div class="flavor"><div><b>_classic_beta_</b><div class="path">Interface 16001</div></div><span class="chip sig">1 Addon</span><span class="chip">lokal</span></div>
+              <div class="flavor"><div><b>_forever_</b><div class="path">Interface-Ordner vorhanden, leer</div></div><span class="chip off">0 Addons</span><span class="chip">—</span></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <div class="client-head"><div class="glyph">S</div><b>Steam</b><span class="src-badge">compatdata</span></div>
+              <div class="path">~/.local/share/Steam/steamapps/compatdata</div>
+              <div class="kv" style="margin-top:12px">
+                <span class="k">Bibliotheken</span><span>1</span>
+                <span class="k">Präfixe</span><span>6 (Helldivers 2, Wanderburg, Encased …)</span>
+                <span class="k">mit WoW</span><span style="color:var(--warn)">keins — Battle.net ist hier nicht als Shortcut angelegt</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="client-head"><div class="glyph">H</div><b>Heroic</b><span class="src-badge">Flatpak</span></div>
+              <div class="path">~/Games/Heroic/Prefixes</div>
+              <div class="kv" style="margin-top:12px">
+                <span class="k">Präfixe</span><span>Divinity OS 2, Satisfactory</span>
+                <span class="k">mit WoW</span><span class="mono-dim">keins</span>
+              </div>
+            </div>
+            <div class="card" style="border-style:dashed">
+              <div class="client-head"><div class="glyph" style="border-color:var(--line);color:var(--dim2)">+</div><b style="color:var(--dim)">Weitere Quelle</b></div>
+              <div class="path">Lutris · Bottles · PortProton · beliebiger Ordner mit <code>_retail_</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 INSTALLIERT -->
+      <div class="screen" id="s3">
+        <h1>Installiert · _classic_era_</h1>
+        <p class="sub">Client wählbar oben rechts. Alle Zeilen kommen aus den <code>.toc</code>-Dateien im Addon-Ordner, nicht aus einer eigenen Datenbank.</p>
+
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <span class="chip sig">Alle 11</span><span class="chip warn">Update 3</span><span class="chip">Unbekannt 0</span><span class="chip">Lokal 0</span>
+          <span style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn ghost">Deinstallieren…</button><button class="btn">3 aktualisieren</button>
+          </span>
+        </div>
+
+        <table>
+          <thead><tr><th style="width:26px"></th><th>Addon</th><th>Version</th><th>Interface</th><th>Quelle</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><input type="checkbox" checked></td><td>Spoken</td><td class="mono-dim">3.5.1</td><td class="mono-dim">100007, 16001</td><td><span class="chip">GitHub</span></td><td><span class="chip warn">3.6.0</span></td></tr>
+            <tr><td><input type="checkbox" checked></td><td>Spoken_Quests</td><td class="mono-dim">3.5.1</td><td class="mono-dim">20506</td><td><span class="chip">GitHub</span></td><td><span class="chip warn">3.6.0</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenBooksAudio_deDE</td><td class="mono-dim">2.1.1</td><td class="mono-dim">11509, 20506, 16001</td><td><span class="chip">GitHub</span></td><td><span class="chip sig">aktuell</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenContributions</td><td class="mono-dim">3.5.1</td><td class="mono-dim">11509, 20506, 30403 …</td><td><span class="chip">GitHub</span></td><td><span class="chip sig">aktuell</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>Spoken_Places</td><td class="mono-dim">3.5.1</td><td class="mono-dim">11509, 20506, 16001</td><td><span class="chip">GitHub</span></td><td><span class="chip sig">aktuell</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>Spoken_Readables</td><td class="mono-dim">3.5.1</td><td class="mono-dim">11509, 20506, 16001</td><td><span class="chip">GitHub</span></td><td><span class="chip sig">aktuell</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenQuestsAudioAlliance_deDE</td><td class="mono-dim">1.0.1</td><td class="mono-dim">100007, 11509 …</td><td><span class="chip">GitHub</span></td><td><span class="chip">unbekannt</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenQuestsAudioHorde_deDE</td><td class="mono-dim">1.0.1</td><td class="mono-dim">100007, 11509 …</td><td><span class="chip">GitHub</span></td><td><span class="chip">unbekannt</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenQuestsAudioGossip_deDE</td><td class="mono-dim">1.0.1</td><td class="mono-dim">100007, 11509 …</td><td><span class="chip">GitHub</span></td><td><span class="chip">unbekannt</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenZonesAudio_deDE</td><td class="mono-dim">2.1.1</td><td class="mono-dim">11509, 20506, 16001</td><td><span class="chip">GitHub</span></td><td><span class="chip warn">2.2.0</span></td></tr>
+            <tr><td><input type="checkbox"></td><td>SpokenQuestsAudioShared_deDE</td><td class="mono-dim">1.0.1</td><td class="mono-dim">100007, 11509 …</td><td><span class="chip">GitHub</span></td><td><span class="chip">unbekannt</span></td></tr>
+          </tbody>
+        </table>
+        <div class="note">„unbekannt“ heißt: keine Quelle in der <code>.toc</code> vermerkt und im Fingerprint-Index kein Treffer. Solche Ordner bleiben unangetastet — Hexwerk löscht nichts, was es nicht sicher zuordnen kann.</div>
+      </div>
+
+      <!-- 4 KATALOG -->
+      <div class="screen" id="s4">
+        <h1>Katalog</h1>
+        <p class="sub">Dasselbe Addon aus mehreren Märkten ist <b>ein</b> Eintrag. Die Quellen stehen im Eintrag, die Versionen werden gegenübergestellt.</p>
+
+        <div class="searchbar">
+          <input class="search" placeholder="Suche: Name, Autor, Beschreibung …">
+          <select class="sel" style="width:190px;margin:0"><option>Ziel: _classic_era_</option><option>_classic_beta_</option><option>_forever_</option></select>
+        </div>
+        <div class="filters">
+          <span class="chip blue">GitHub 312</span><span class="chip">Tukui 24</span><span class="chip">WoWInterface 1204</span><span class="chip">Wago 88</span><span class="chip off">CurseForge — kein API-Key</span>
+          <span class="chip">Classic Era</span><span class="chip">Retail</span><span class="chip">nur mit Update</span>
+        </div>
+
+        <div class="results">
+          <div class="res">
+            <div class="thumb">WA</div>
+            <div>
+              <h4>WeakAuras</h4>
+              <div class="by">WeakAuras · 4 Quellen gemergt</div>
+              <div class="desc">Anzeigen für Auren, Cooldowns und Ereignisse. Dieselbe Projekt-ID auf GitHub, Tukui, WoWInterface und Wago — hier ein Eintrag.</div>
+              <div class="srcs"><span class="chip blue">GitHub 5.19.2</span><span class="chip">Tukui 5.19.2</span><span class="chip">WoWInterface 5.18.0</span><span class="chip sig">empfohlen: GitHub</span></div>
+            </div>
+          </div>
+          <div class="res">
+            <div class="thumb">EU</div>
+            <div>
+              <h4>ElvUI</h4>
+              <div class="by">Tukui · 1 Quelle</div>
+              <div class="desc">Vollständige Oberflächenerneuerung. Wird vom Autor ausschließlich über Tukui verteilt.</div>
+              <div class="srcs"><span class="chip">Tukui 13.88</span></div>
+            </div>
+          </div>
+          <div class="res">
+            <div class="thumb">SP</div>
+            <div>
+              <h4>Spoken</h4>
+              <div class="by">GitHub · lokal erkannt</div>
+              <div class="desc">Quest- und Gesprächsdialoge vorgelesen. Familien-Paket mit 11 Ordnern; Hexwerk behandelt sie als eine Installation.</div>
+              <div class="srcs"><span class="chip blue">GitHub 3.6.0</span><span class="chip warn">installiert 3.5.1</span></div>
+            </div>
+          </div>
+          <div class="res">
+            <div class="thumb">AM</div>
+            <div>
+              <h4>AggroMatrix</h4>
+              <div class="by">lokal · X-Website: local</div>
+              <div class="desc">Bedrohungs-Matrix für den Kampf. Nicht im Katalog — nur im Client <code>_classic_beta_</code> vorhanden.</div>
+              <div class="srcs"><span class="chip">lokal 1.9.0</span><span class="chip off">keine Quelle</span></div>
+            </div>
+          </div>
+          <div class="res">
+            <div class="thumb">BT</div>
+            <div>
+              <h4>BetterBags</h4>
+              <div class="by">GitHub · Fork erkannt</div>
+              <div class="desc">Taschen-Ersatz. Zwei Quellen melden unterschiedliche Projekt-URLs; Hexwerk zeigt beide und lässt dich wählen.</div>
+              <div class="srcs"><span class="chip blue">GitHub CIdra 1.2</span><span class="chip">GitHub Fork 1.1</span></div>
+            </div>
+          </div>
+          <div class="res">
+            <div class="thumb">+</div>
+            <div>
+              <h4>Aus ZIP installieren</h4>
+              <div class="by">ohne Katalog</div>
+              <div class="desc">Lokale ZIP oder Ordner einlesen; die <code>.toc</code> entscheidet über Ziel-Client und Ordnername.</div>
+              <div class="srcs"><span class="chip">ZIP</span><span class="chip">Ordner</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 DETAIL -->
+      <div class="screen" id="s5">
+        <div class="detail">
+          <div>
+            <div class="banner"><div><h2>WeakAuras</h2><div class="byline">WeakAuras · MIT · github.com/WeakAuras/WeakAuras2</div></div></div>
+            <div class="stats">
+              <div class="stat"><div class="v">5.19.2</div><div class="l">Version</div></div>
+              <div class="stat"><div class="v">12,4 M</div><div class="l">Downloads</div></div>
+              <div class="stat"><div class="v">2026-10-27</div><div class="l">Aktualisiert</div></div>
+              <div class="stat"><div class="v">4,8 MB</div><div class="l">ZIP-Größe</div></div>
+            </div>
+            <div class="gal">
+              <div>SCREEN 01</div><div>SCREEN 02</div><div>SCREEN 03</div><div>+ 6</div>
+            </div>
+            <div class="dtabs">
+              <div class="dtab on">Beschreibung</div><div class="dtab">Screenshots</div><div class="dtab">Changelog</div><div class="dtab">Dateien</div><div class="dtab">Quellen</div>
+            </div>
+            <div class="prose">
+              <p><strong>Anzeigen für alles, was im Kampf zählt.</strong> WeakAuras baut Anzeigen aus Triggern, nicht aus Code: Auren, Cooldowns, Ressourcen, Ereignisse, Heilungen. Die Anzeigen liegen als Austausch-Daten vor, nicht als Lua-Dateien.</p>
+              <p>Hexwerk zeigt die Beschreibung in der Sprache, die das Addon mitbringt — hier <strong>deDE</strong> aus den <code>## Notes-deDE</code>-Feldern der <code>.toc</code>, nicht maschinenübersetzt. Fehlt die Sprache, steht das Original daneben.</p>
+              <p><strong>Vier Quellen, eine Installation.</strong> GitHub, Tukui, WoWInterface und Wago führen dasselbe Projekt unter einer ID. Hexwerk nimmt die höchste Version und vermerkt, woher sie stammt.</p>
+            </div>
+          </div>
+
+          <div>
+            <div class="side">
+              <h5>Installationsziel</h5>
+              <select class="sel"><option>_classic_era_ · Faugus</option><option>_classic_beta_ · Faugus</option><option>_forever_ · Faugus</option></select>
+              <select class="sel"><option>5.19.2 · GitHub</option><option>5.19.2 · Tukui</option><option>5.18.0 · WoWInterface</option></select>
+              <button class="btn" style="width:100%">Installieren</button>
+              <div style="margin-top:10px;font-size:11px;color:var(--dim2)">Ziel: <code>Interface/AddOns/WeakAuras</code></div>
+
+              <h5 style="margin-top:18px">Quellen</h5>
+              <div class="srcrow"><span class="n">GitHub</span><span class="v">5.19.2</span></div>
+              <div class="srcrow"><span class="n">Tukui</span><span class="v">5.19.2</span></div>
+              <div class="srcrow"><span class="n">WoWInterface</span><span class="v">5.18.0</span></div>
+              <div class="srcrow" style="border:0"><span class="n">Wago</span><span class="v">5.19.2</span></div>
+
+              <h5 style="margin-top:18px">Lokal</h5>
+              <div class="srcrow" style="border:0"><span class="n">installiert</span><span class="v" style="color:var(--warn)">5.18.0</span></div>
+
+              <h5 style="margin-top:18px">Kennung</h5>
+              <div class="srcrow"><span class="n">Fingerprint</span><span class="v">9f3c…a71</span></div>
+              <div class="srcrow" style="border:0"><span class="n">Interface</span><span class="v">20506, 11509</span></div>
+            </div>
+            <div class="note">Beispieldaten. Echte Zahlen kommen aus den Quell-APIs; der Fingerprint aus dem lokalen Ordner.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>HEXWERK · Fensterentwurf</span>
+    <span>Stand 2026-10-30</span>
+    <span>Client-Daten aus dem echten Faugus-Präfix · Katalogwerte und Download-Zahlen sind Platzhalter</span>
+  </div>
+</div>
+
+<script>
+  const tabs=[...document.querySelectorAll('.tab')];
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+    t.classList.add('on');
+    document.getElementById(t.dataset.s).classList.add('on');
+  }));
+</script>
+</body>
+</html>

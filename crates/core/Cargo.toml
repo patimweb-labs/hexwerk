@@ -1,0 +1,10 @@
+[package]
+name = "hexwerk-core"
+version = "0.1.0"
+edition = "2021"
+description = "Hexwerk: Kern - Praefixe finden, TOC lesen, Addons zaehlen"
+
+# Keine externen Crates. Die Steam-Bibliotheksdatei ist ein KeyValues-Text,
+# den ein handgeschriebener Parser in `vdf.rs` liest; ZIP und HTTP kommen
+# spaeter nur in eigene Crates, wenn sie wirklich gebraucht werden.
+[dependencies]

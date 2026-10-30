@@ -51,6 +51,32 @@ Verzeichnisebene bestimmen, nach `Interface/AddOns/<Ordner>` entpacken,
 prüfen und je Client-Ordner die `## Interface`-Nummer aus dem `.toc` als
 Versionsmaßstab nehmen.
 
+## Gemessene Umgebung (2026-10-30, dieser Rechner)
+
+Damit wird entwickelt und getestet — keine Attrappen:
+
+| Ort | Inhalt |
+|---|---|
+| `~/Faugus/battlenet` | UMU-Präfix von Faugus. Enthält `drive_c/` **und** `pfx/drive_c/` auf derselben Ebene — beide Formen muss der Scanner kennen |
+| `.../World of Warcraft/_classic_era_` | 11 Addons, 2,6 GB, Interface `11509 · 20506 · 16001` |
+| `.../_classic_beta_` | 1 Addon: `AggroMatrix` 1.9.0, `## X-Website: local` |
+| `.../_forever_` | `Interface/AddOns` vorhanden, leer |
+| `_retail_` | **nicht installiert** |
+| Steam | 1 Bibliothek, 6 `compatdata`-Präfixe, keins mit WoW |
+| Heroic | 2 Präfixe (Divinity OS 2, Satisfactory), kein WoW |
+| Lutris, Bottles, PortProton | nicht installiert |
+
+Zwei Dinge, die daraus folgen: `## Interface` ist **kein Einzelwert**, sondern kann eine
+Komma-Liste sein (`11509, 20506, 16001`) — der Vergleich mit dem Client muss also Menge gegen
+Menge prüfen. Und ein UMU-Präfix ist nicht immer `pfx/drive_c/...`; Faugus legt `drive_c`
+zusätzlich direkt in den Präfix-Ordner.
+
+## Entwurf
+
+`docs/design/entwurf-2026-10-30.html` — Fensterentwurf mit fünf Bildschirmen (Scan, Clients,
+Installiert, Katalog, Addon-Detail). Client-Daten darin stammen aus dem echten Präfix oben,
+Katalogwerte sind Platzhalter.
+
 ## Risiko
 
 Der Fingerprint-Index gehört WowUp, nicht uns. Genau diese Abhängigkeit hat
