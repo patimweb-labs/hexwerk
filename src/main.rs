@@ -294,13 +294,26 @@ fn keys_cmd(args: &[String]) -> ExitCode {
         "set" => {
             let (Some(name), Some(value)) = (args.get(1), args.get(2)) else {
                 eprintln!("Aufruf: hexwerk keys set QUELLE SCHLUESSEL");
+                eprintln!("Der Schluessel steht damit in der Prozessliste. Sicherer: '-' und aus stdin lesen.");
                 return ExitCode::from(2);
             };
             let Some(source) = parse_source(name) else {
                 eprintln!("unbekannte Quelle: {name} (wago, curseforge)");
                 return ExitCode::from(2);
             };
-            match provider.set(source, value) {
+            // "-" liest aus stdin: der Schluessel soll nicht in der
+            // Prozessliste stehen, wo ihn jeder mitlesen kann.
+            let value = if value == "-" {
+                let mut text = String::new();
+                if std::io::stdin().read_line(&mut text).is_err() {
+                    eprintln!("stdin nicht lesbar");
+                    return ExitCode::from(2);
+                }
+                text.trim().to_string()
+            } else {
+                value.clone()
+            };
+            match provider.set(source, &value) {
                 Ok(()) => {
                     println!(
                         "{} gespeichert in {}",
