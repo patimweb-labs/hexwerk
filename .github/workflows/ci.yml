@@ -174,29 +174,33 @@ jobs:
 
   flatpak:
     name: Flatpak bauen
-    needs: [build, gtk, flatpak-voraussetzungen]
+    # Kein Warten auf build/gtk: Rust wird im Sandkasten gebaut, die fertigen
+    # Binaries der anderen Jobs werden hier nicht gebraucht.
+    needs: [flatpak-voraussetzungen]
     if: needs.flatpak-voraussetzungen.outputs.quellen == 'true'
     runs-on: ubuntu-latest
-    # Container mit fertigem flatpak-builder und GNOME-Runtime; ohne ihn
+    # Container mit fertigem flatpak-builder und Flathub-Gegenstelle; ohne ihn
     # scheitert der Schritt schon beim Setup (Image/Action-Paar).
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: hexwerk
-          path: prebuilt
-      - uses: actions/download-artifact@v4
-        with:
-          name: hexwerk-gtk
-          path: prebuilt
-      - name: Ausführbar machen
-        run: |
-          chmod +x prebuilt/hexwerk prebuilt/hexwerk-gtk
-          ls -l prebuilt
+      # Die Action liest Runtime, SDK und sdk-extensions aus dem Manifest und
+      # installiert sie aus Flathub; gebaut wird danach im Sandkasten.
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: hexwerk-ci.flatpak
           manifest-path: flatpak/de.weppelmann.Hexwerk.yml
+          # Ohne Cache, weil der Bau die eingefrorenen Quellen ohnehin aus dem
+          # Repo nimmt und der Cache sonst veraltete Crates konserviert.
+          cache-key: flatpak-build-${{ github.sha }}
+      - name: Bundle prüfen
+        run: |
+          ls -lh hexwerk-ci.flatpak
+          flatpak install --user --noninteractive --no-deps -y hexwerk-ci.flatpak
+          flatpak run --command=hexwerk de.weppelmann.Hexwerk --help | head -5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: hexwerk-ci.flatpak

@@ -1,97 +1,106 @@
 # Flatpak für Hexwerk
 
 `de.weppelmann.Hexwerk.yml` baut Hexwerk gegen `org.gnome.Platform//51` und
-`org.gnome.Sdk//51`. Im Sandkasten wird **kein** Rust gebaut: die Binaries
-`hexwerk` und `hexwerk-gtk` entstehen in der CI und werden als Datei-Quellen aus
-`prebuilt/` eingesetzt. Die Cargo-Abhängigkeiten aus `Cargo.lock` liegen trotzdem
-eingefroren in `new-sources.json`, als Prüfsummenkontrolle, damit eine veraltete
-Liste auffällt und ein fehlendes Paket den Bau abbricht.
+`org.gnome.Sdk//51`. Gebaut wird **im Sandkasten**, so wie im Nachbarprojekt
+wledambilight: das Rust-Werkzeug kommt aus der freedesktop-Erweiterung, die
+Cargo-Quellen liegen eingefrorenen in `new-sources.json`.
+
+Im Sandkasten gemessen (`flatpak run --build-only` mit einem Sondierungsmodul):
+
+| Werkzeug | Version | Herkunft |
+|---|---|---|
+| cargo | 1.98.0 | `org.freedesktop.Sdk.Extension.rust-stable`, eingebunden über `sdk-extensions` |
+| GTK | 4.24.1 | `org.gnome.Sdk//51` |
+| libadwaita | 1.10.0 | `org.gnome.Sdk//51` |
+
+Weitere Module braucht das Manifest deshalb nicht, auch kein
+`org.gnome.Sdk.Extension.rust-stable` (das gibt es auf Flathub nicht, geprüft:
+`flatpak install flathub org.gnome.Sdk.Extension.rust-stable//51` endet mit
+„Kein Treffer").
 
 ## new-sources.json erzeugen
 
-Das Werkzeug kommt aus `flatpak-builder-tools`. Es braucht Python mit `aiohttp`,
-`toml` und (in der aktuellen Fassung) `tomlkit`; ein eigenes venv hält das aus dem
-System-Python heraus:
-
-```
-python3 -m venv /tmp/venv-fpcg
-/tmp/venv-fpcg/bin/pip install aiohttp toml tomlkit
-curl -sSfL -o /tmp/flatpak-cargo-generator.py \
-    https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+```bash
+bash flatpak/update-sources.sh
 ```
 
-Dann im Wurzelverzeichnis des Repos, direkt neben `Cargo.lock`:
+Das Skript legt sich sein venv an (`/tmp/venv-fpcg`, überschreibbar über
+`HEXWERK_VENV`), lädt `flatpak-cargo-generator.py` aus `flatpak-builder-tools`
+und schreibt `flatpak/new-sources.json` aus `Cargo.lock`. Die Gegenprobe steht
+am Ende der Ausgabe:
 
 ```
-/tmp/venv-fpcg/bin/python /tmp/flatpak-cargo-generator.py \
-    Cargo.lock -o flatpak/new-sources.json
+new-sources.json: 156 Archive, Cargo.lock: 162 Pakete (Differenz sind die eigenen Crates)
 ```
-
-Ergebnis prüfen: je eingefrorenem Paket ein Archiv und eine Prüfsummen-Datei:
-
-```
-grep -c '"type": "archive"' flatpak/new-sources.json
-```
-
-Stand 2026-10-30: 313 Einträge, davon 156 Archive (`cargo/vendor/<name>-<version>`).
-Das Skript legt keine Hilfsdateien im Repo ab; es muss nicht mitversioniert werden.
 
 ## Wann neu erzeugen
 
-Immer wenn sich `Cargo.lock` ändert, also nach jedem `cargo update`, jedem neuen Paket
-und jedem Versionssprung in einem der Crates. Der Zählschritt im Modul
-`cargo-quellen` vergleicht die Zahl der eingefrorenen Archive mit den entpackten
-Verzeichnissen und bricht bei Abweichung ab.
+Immer wenn sich `Cargo.lock` ändert, also nach jedem `cargo update`, jedem neuen
+Paket und jedem Versionssprung. Fehlt ein Paket im eingefrorenen Satz, bricht
+`cargo --offline` im Sandkasten mit einer klaren Meldung ab; der Bau läuft nicht
+mit einer halben Abhängigkeitsliste durch.
 
-`crates/ui-gtk/Cargo.lock` wird **nicht** eingefroren: die Oberfläche kommt als
-fertiges Binary, nicht als Bau im Sandkasten.
+`crates/ui-gtk/Cargo.lock` wird nicht eigens eingefroren. Die Oberfläche ist ein
+eigenes Paket mit eigener `[workspace]`-Tabelle, ihre Abhängigkeiten sind aber
+dieselben wie die der Wurzel und liegen damit im selben Quellensatz. Deshalb
+baut der zweite `cargo`-Aufruf im Manifest ohne `--locked`.
 
 ## Bauen
 
-```
-mkdir -p prebuilt
-cp target/release/hexwerk target/release/hexwerk-gtk prebuilt/
-flatpak-builder --force-clean --user --install-deps-from=flathub \
+Ohne `flatpak-builder` im System geht der Bau über die Builder-App:
+
+```bash
+flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse \
     build-dir flatpak/de.weppelmann.Hexwerk.yml
 ```
 
-Ohne `flatpak-builder` im System geht derselbe Bau über die Builder-App:
+Mit `flatpak-builder` im System:
 
-```
-flatpak run org.flatpak.Builder --force-clean --user --disable-rofiles-fuse \
+```bash
+flatpak-builder --user --install --force-clean \
     build-dir flatpak/de.weppelmann.Hexwerk.yml
 ```
+
+Der Bau dauert beim ersten Mal einige Minuten, weil GTK-Bindings und SQLite im
+Sandkasten kompiliert werden. Danach liegt die App als
+`de.weppelmann.Hexwerk` bereit.
+
+## Ergebnis prüfen
+
+```bash
+flatpak run --command=hexwerk de.weppelmann.Hexwerk scan
+flatpak run --command=sh de.weppelmann.Hexwerk -c 'ldd /app/bin/hexwerk-gtk | grep -c "not found"'
+```
+
+Erwartet: der Scan findet die echten Wine-Präfixe (dafür steht
+`--filesystem=home` im Manifest), und `ldd` meldet `0` fehlende Bibliotheken.
 
 ## Ohne new-sources.json
 
-Fehlt die Datei, läuft der Bau **nicht** stillschweigend durch. `flatpak-builder`
-selbst meldet eine fehlende Quellenliste nicht als Fehler. Deshalb prüft das
-Modul `cargo-quellen` die Datei ausdrücklich und bricht mit Hinweis ab:
+Fehlt die Datei, bricht `flatpak-builder` beim Auflösen der Quellenliste ab
+(„No such file or directory"). In der CI ist der Flatpak-Job zusätzlich an die
+Existenz der Datei gebunden: fehlt sie, erscheint er als „skipped" und nicht als
+Fehler (Job `flatpak-voraussetzungen`). Im Release fehlt dann das Bundle, der
+Tarball wird trotzdem veröffentlicht.
 
-```
-FEHLER: flatpak/new-sources.json fehlt.
-Erzeugen mit flatpak-cargo-generator.py aus Cargo.lock - siehe flatpak/README.md.
-Error: module cargo-quellen: Der Kindprozess wurde mit Status 1 beendet
-```
+## Stolpersteine, die schon Zeit gekostet haben
 
-In der CI ist der Flatpak-Job deshalb an die Existenz der Datei gebunden: fehlt
-sie, erscheint er als „skipped" und nicht als Fehler (Job
-`flatpak-voraussetzungen`). Im Release fehlt dann das Flatpak-Bundle, der Tarball
-wird trotzdem veröffentlicht.
+**Cargo findet die eingefrorenen Quellen nicht von selbst.** Das Manifest
+schreibt deshalb im Bauverzeichnis eine `.cargo/config.toml` mit
+`replace-with = "vendored-sources"` und `directory = "cargo/vendor"`. Die Datei
+darf **nicht** ins Repo wandern: auf dem Host gibt es kein `cargo/vendor`, der
+normale Bau würde brechen.
 
-## Stolperstein: Kommentare vor dem Wurzelelement
+**Der Flatpak-Sandkasten sieht `/tmp` nicht.** Ein Manifest, das unter `/tmp`
+liegt, wird mit „Datei nicht gefunden" abgelehnt, obwohl es existiert. Bauen
+deshalb immer aus dem Repo unter `$HOME`.
 
-`appstreamcli compose` (läuft in `flatpak-builder` beim Finish-Schritt) liest das
-skalierbare Icon und scheitert an einem XML-Kommentar **zwischen** XML-Prolog und
-`<svg>`:
+**`appstreamcli compose` scheitert an einem Kommentar vor dem Wurzelelement.**
+Ein XML-Kommentar zwischen XML-Prolog und `<svg>` führt beim Finish-Schritt zu
+`E: icon-file-read-error` und `E: filters-but-no-output`. Der Kommentar gehört
+hinter das öffnende `<svg>`-Tag.
 
-```
-de.weppelmann.Hexwerk
-  E: icon-file-read-error
-general
-  E: filters-but-no-output
-Error: ERROR: appstreamcli compose failed
-```
-
-Der Kommentar gehört deshalb hinter das öffnende `<svg>`-Tag. Ein SVG ohne
-führenden Kommentar, aber sonst identisch, wird anstandslos verarbeitet.
+**Mehrzeilige Einzelwerte in `build-commands` ohne `|` falten den Zeilenumbruch**
+zu einem Leerzeichen und lassen den Backslash stehen; `install` legt dann ein
+Verzeichnis namens „ " an, und der Eintrag fehlt im App, ohne dass der Bau
+scheitert. Mehrzeilige Blöcke deshalb immer als `- |` schreiben.

@@ -5,3 +5,10 @@
 /.flatpak-builder
 .flatpak-*.log
 *.rs.bk
+
+# Python-Reste des Prüfwerkzeugs
+__pycache__/
+*.pyc
+
+# Heruntergeladenes Werkzeug (flatpak/update-sources.sh laedt es bei Bedarf)
+flatpak/.flatpak-cargo-generator.py

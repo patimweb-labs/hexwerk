@@ -128,8 +128,58 @@ def type_text(text: str) -> None:
 
 
 def shot(path: str) -> bool:
+    """Bildschirmfoto, aufgenommen vom Fenster selbst.
+
+    Frueher wurde der ganze Xvfb-Bildschirm fotografiert und danach per
+    Rechteck beschnitten. Das schnitt den Fensterrand mit ab, weil die
+    gemeldeten Masse die Zeichenflaeche meinen und nicht den Rand. `import`
+    kann das Fenster direkt ueber seine X-Kennung aufnehmen, dann stimmt der
+    Ausschnitt ohne Nachrechnen.
+    """
+    wid = window_id()
+    if wid:
+        r = subprocess.run([SCREENSHOT_TOOL, "-window", wid, path], check=False)
+        if r.returncode == 0:
+            return True
+    # Rueckfall: ganzer Bildschirm, zugeschnitten auf das gemeldete Rechteck.
     r = subprocess.run([SCREENSHOT_TOOL, "-window", "root", path], check=False)
-    return r.returncode == 0
+    if r.returncode != 0:
+        return False
+    rect = window_rect()
+    if rect:
+        x, y, w, h = rect
+        subprocess.run(
+            [SCREENSHOT_TOOL, path, "-crop", f"{w}x{h}+{x}+{y}", "+repage", path],
+            check=False,
+        )
+    return True
+
+
+def window_id():
+    """X-Kennung des sichtbaren Hexwerk-Fensters, sonst None."""
+    try:
+        out = subprocess.run(
+            ["xdotool", "search", "--onlyvisible", "--class", "Hexwerk"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.split()
+        return out[-1] if out else None
+    except FileNotFoundError:
+        return None
+
+
+def window_rect():
+    """Rechteck des Hauptfensters in Bildschirmkoordinaten, einmal je Aufruf."""
+    app = desktop_app()
+    if app is None:
+        return None
+    for node, _ in walk(app):
+        if role(node) == "frame":
+            box = extents(node)
+            if box and box[2] > 200 and box[3] > 200:
+                return box
+    return None
 
 
 def find(app, role_name: str, text: str | None = None):

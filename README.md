@@ -39,7 +39,8 @@ Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
 ## Installation
 
 Ein Flatpak ist vorbereitet (`flatpak/de.weppelmann.Hexwerk.yml`, Runtime
-`org.gnome.Platform//51`), aber noch nicht veröffentlicht.
+`org.gnome.Platform//51`) und baut im Sandkasten, ist aber noch nicht
+veröffentlicht. Bauanleitung: [`flatpak/README.md`](flatpak/README.md).
 
 Aus dem Quelltext, Kommandozeile:
 
@@ -119,7 +120,7 @@ Daten aus den Quellen.
 | Index | fertig, 37 Tests |
 | Installation | fertig, 30 Tests |
 | Oberfläche | fünf Bildschirme, Dunkel und Hell, Katalog und Detail aus dem Index |
-| Flatpak | Manifest und CI vorhanden, Bau lokal mit Attrappen-Binaries geprüft |
+| Flatpak | baut im Sandkasten (GNOME 51 plus Rust-Erweiterung), lokal installiert und gegen das echte Präfix geprüft |
 
 Offen:
 

@@ -1,130 +1,99 @@
-# Hexwerk als Flatpak.
+# Flatpak für Hexwerk.
 #
-# Kein Rust im Sandkasten. Die beiden Binaries entstehen im CI-Job "Release-Build"
-# bzw. "Oberflaeche (GTK4)" und liegen hier als Datei-Quellen aus prebuilt/.
-# Rust im GNOME-SDK nachzuinstallieren waere ein eigener Fehlerherd, und die
-# GNOME-Runtime bringt keine rust-stable-Extension mit.
+# Bauart wie im Nachbarprojekt wledambilight: Rust wird IM Sandkasten gebaut,
+# nicht als fertiges Binary hereingereicht. Die Cargo-Quellen liegen eingefroren
+# in `new-sources.json` (erzeugt aus `Cargo.lock`, siehe `flatpak/README.md`),
+# damit der Bau offline und mit geprüften Prüfsummen läuft.
 #
-# Die Cargo-Abhaengigkeiten stehen trotzdem eingefroren: das erste Modul laedt
-# flatpak/new-sources.json (erzeugt aus Cargo.lock, siehe flatpak/README.md) als
-# Quellenliste. Fehlt die Datei, scheitert der Bau hier ausdruecklich - das
-# Manifest laeuft ohne sie nicht stillschweigend durch. Die CI ueberspringt den
-# Flatpak-Job stattdessen, solange die Datei fehlt.
-app-id: de.weppelmann.Hexwerk
+#   bash flatpak/update-sources.sh
+#   flatpak run org.flatpak.Builder --user --install --force-clean \
+#       build-dir flatpak/de.weppelmann.Hexwerk.yml
+#
+# Das Rust-Werkzeug kommt aus der freedesktop-Erweiterung; sie lässt sich mit dem
+# GNOME-SDK 51 kombinieren. Geprüft im Sandkasten: cargo 1.98.0 unter
+# /usr/lib/sdk/rust-stable/bin, GTK 4.24.1 und libadwaita 1.10.0 aus dem
+# GNOME-SDK. Weitere Module braucht es deshalb nicht.
+id: de.weppelmann.Hexwerk
 runtime: org.gnome.Platform
 runtime-version: '51'
 sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
 command: hexwerk-gtk
 
 finish-args:
-  # Die Praefixe liegen im Home: Steam, Faugus/UMU, Heroic, Lutris, Bottles,
-  # PortProton und beliebige Ordner. Ohne diesen Zugriff findet der Scanner
-  # nichts, was er verwalten koennte.
-  - --filesystem=home
-  # Quellen (GitHub, Tukui, WoWInterface) und der Hub-Abgleich.
-  - --share=network
-  # Fenster: Wayland bevorzugt, X11 als Rueckfall; dri fuer die Darstellung.
+  # Fenster: Wayland bevorzugt, X11 als Rückfall, GPU für die Darstellung.
   - --socket=wayland
   - --socket=fallback-x11
+  - --share=ipc
   - --device=dri
-  # Schluesselbund fuer die optionalen Quellen (Wago, CurseForge).
+  # Quellen abfragen (GitHub, Tukui, WoWInterface).
+  - --share=network
+  # Die Wine-Präfixe liegen im Home des Nutzers, dort liegen auch die Addons.
+  # Ohne diesen Zugriff findet Hexwerk im Sandkasten keine Installation.
+  - --filesystem=home
+  # Schlüsselbund für die optionalen Quellen Wago und CurseForge.
   - --talk-name=org.freedesktop.secrets
-  # Konfiguration und Index (~/.config/hexwerk) darf angelegt werden. Steht
-  # zusaetzlich zu --filesystem=home, damit der Pfad auch dann schreibbar
-  # bleibt, wenn der Home-Zugriff spaeter enger gefasst wird.
+  # Eigene Konfiguration (~/.config/hexwerk) anlegen dürfen.
   - --filesystem=xdg-config/hexwerk:create
 
-modules:
-  # Eingefrorene Cargo-Quellen: nur Pruefsummenkontrolle, es wird nichts
-  # installiert und nichts gebaut. Der Zaehlschritt macht sichtbar, ob
-  # new-sources.json noch zu Cargo.lock passt.
-  - name: cargo-quellen
-    buildsystem: simple
-    build-commands:
-      - |
-        # `set -e`: ein fehlendes Paket muss den Bau abbrechen, nicht nur eine
-        # Zeile im Log hinterlassen.
-        set -eu
-        # Ohne diese Liste laeuft der Bau nicht durch: flatpak-builder selbst
-        # meldet die fehlende Quellenliste nicht als Fehler, sondern baut
-        # weiter. Deshalb hier eine ausdrueckliche Pruefung mit Hinweis.
-        if [ ! -f new-sources.json ]; then
-          echo "FEHLER: flatpak/new-sources.json fehlt." >&2
-          echo "Erzeugen mit flatpak-cargo-generator.py aus Cargo.lock - siehe flatpak/README.md." >&2
-          exit 1
-        fi
-        # Je Paket stehen zwei Eintraege in der Liste (Archiv und Pruefsummen-
-        # Datei); gezaehlt werden die Archive, eins je Verzeichnis.
-        anzahl=$(grep -c '"type": "archive"' new-sources.json)
-        gefunden=$(ls -d cargo/vendor/*/ | wc -l)
-        echo "Cargo-Quellen: $gefunden von $anzahl eingefrorenen Paketen entpackt"
-        test "$anzahl" -gt 0
-        test "$gefunden" -eq "$anzahl"
-    sources:
-      # Als Quellenliste: flatpak-builder laedt jede Datei, prueft die
-      # Pruefsumme und entpackt sie nach cargo/vendor/<name>-<version>.
-      - new-sources.json
-      # Zusaetzlich als Datei, damit der Zaehlschritt die Liste selbst lesen
-      # kann (eine Quellenliste wird nicht in das Bauverzeichnis kopiert).
-      - type: file
-        path: new-sources.json
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/hexwerk/cargo
+    CARGO_NET_OFFLINE: 'true'
 
+modules:
   - name: hexwerk
     buildsystem: simple
-    # Alle Schritte in EINEM Block mit `|`: ein mehrzeiliger Einzelwert (ohne
-    # `|`) faltet den Zeilenumbruch zu einem Leerzeichen und laesst den
-    # Backslash stehen - dann legt `install` ein Verzeichnis namens " " an und
-    # der Eintrag fehlt im App, ohne dass der Bau scheitert.
     build-commands:
+      # Cargo muss die eingefrorenen Quellen als Verzeichnis-Quelle kennen. Die
+      # Datei entsteht hier und nicht im Repo: auf dem Host würde sie den
+      # normalen Bau brechen, weil es dort kein cargo/vendor gibt.
       - |
         set -eu
-        # Kommandozeile und Fenster; der Desktop-Eintrag startet das Fenster.
-        install -Dm755 hexwerk /app/bin/hexwerk
-        install -Dm755 hexwerk-gtk /app/bin/hexwerk-gtk
-        # Der Eintrag zeigt mit Exec=hexwerk-gtk auf das Binary im Sandkasten und
-        # braucht keine Umleitung.
-        install -Dm644 data/de.weppelmann.Hexwerk.desktop \
-          /app/share/applications/de.weppelmann.Hexwerk.desktop
-        install -Dm644 packaging/linux/de.weppelmann.Hexwerk.metainfo.xml \
-          /app/share/metainfo/de.weppelmann.Hexwerk.metainfo.xml
-        install -Dm644 data/icons/hicolor/scalable/apps/de.weppelmann.Hexwerk.svg \
-          /app/share/icons/hicolor/scalable/apps/de.weppelmann.Hexwerk.svg
-        install -Dm644 data/icons/symbolic/apps/de.weppelmann.Hexwerk-symbolic.svg \
-          /app/share/icons/hicolor/symbolic/apps/de.weppelmann.Hexwerk-symbolic.svg
-        # Gerasterte Groessen.
-        for n in 16 32 48 64 128 256 512; do
-          install -Dm644 "data/icons/hicolor/${n}x${n}/apps/de.weppelmann.Hexwerk.png" \
-            "/app/share/icons/hicolor/${n}x${n}/apps/de.weppelmann.Hexwerk.png"
+        mkdir -p .cargo
+        printf '%s\n' \
+          '[source.crates-io]' \
+          'replace-with = "vendored-sources"' \
+          '' \
+          '[source.vendored-sources]' \
+          'directory = "cargo/vendor"' > .cargo/config.toml
+        cat .cargo/config.toml
+      - cargo --offline fetch --locked
+      - cargo --offline build --release --locked
+      # Die Oberfläche ist ein eigenes Paket mit eigener [workspace]-Tabelle,
+      # deshalb ein eigener Aufruf. Ohne --locked, weil ihr Cargo.lock nicht aus
+      # derselben Auflösung stammt wie das der Wurzel; die Versionen sind
+      # trotzdem im eingefrorenen Quellensatz enthalten.
+      - cargo --offline build --release --manifest-path crates/ui-gtk/Cargo.toml
+      - install -Dm755 target/release/hexwerk ${FLATPAK_DEST}/bin/hexwerk
+      - install -Dm755 crates/ui-gtk/target/release/hexwerk-gtk ${FLATPAK_DEST}/bin/hexwerk-gtk
+      - install -Dm644 data/de.weppelmann.Hexwerk.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm644 packaging/linux/de.weppelmann.Hexwerk.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - install -Dm644 data/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+      - install -Dm644 data/icons/symbolic/apps/${FLATPAK_ID}-symbolic.svg ${FLATPAK_DEST}/share/icons/hicolor/symbolic/apps/${FLATPAK_ID}-symbolic.svg
+      - |
+        set -eu
+        for s in 16 32 48 64 128 256 512; do
+          install -Dm644 "data/icons/hicolor/${s}x${s}/apps/${FLATPAK_ID}.png" \
+            "${FLATPAK_DEST}/share/icons/hicolor/${s}x${s}/apps/${FLATPAK_ID}.png"
         done
-
-        # Nachweis im Bau: fehlt etwas, bricht der Bau hier ab und nicht erst
-        # beim Nutzer.
-        for f in /app/bin/hexwerk /app/bin/hexwerk-gtk \
-                 /app/share/applications/de.weppelmann.Hexwerk.desktop \
-                 /app/share/metainfo/de.weppelmann.Hexwerk.metainfo.xml \
-                 /app/share/icons/hicolor/scalable/apps/de.weppelmann.Hexwerk.svg \
-                 /app/share/icons/hicolor/symbolic/apps/de.weppelmann.Hexwerk-symbolic.svg; do
-          test -f "$f"
-        done
-        pngs=$(ls /app/share/icons/hicolor/*/apps/de.weppelmann.Hexwerk.png | wc -l)
+        # Nachweis statt Hoffnung: fehlt eine Größe, bricht der Bau hier ab und
+        # nicht erst beim Nutzer.
+        pngs=$(ls -1 "${FLATPAK_DEST}/share/icons/hicolor"/*/apps/${FLATPAK_ID}.png | wc -l)
         test "$pngs" -eq 7
-        echo "Installiert: 2 Binaries, Desktop-Eintrag, Metainfo, 2 SVGs, ${pngs} PNG-Groessen"
+        test -x "${FLATPAK_DEST}/bin/hexwerk"
+        test -x "${FLATPAK_DEST}/bin/hexwerk-gtk"
+        echo "Installiert: 2 Binaries, Desktop-Eintrag, Metainfo, 2 SVGs, ${pngs} PNG-Größen"
     sources:
-      - type: file
-        path: ../prebuilt/hexwerk
-      - type: file
-        path: ../prebuilt/hexwerk-gtk
-      # Der Rest des Repos (Desktop-Eintrag, Metainfo, Icons). Das eigene
-      # Verzeichnis und alle Bauergebnisse werden uebersprungen.
       - type: dir
         path: ..
         skip:
-          - prebuilt
-          - .git
-          - .github
           - target
           - build-dir
-          - build-dir2
           - .flatpak-builder
-          - flatpak
+          - .flatpak-build
           - crates/ui-gtk/target
+          - .git
+      - new-sources.json
