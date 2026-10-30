@@ -180,6 +180,16 @@ def main() -> int:
     else:
         erg.hinweis("keine Umschaltknöpfe gefunden (Quellenfilter)")
 
+    # Installiert: nur ein Bild. Ob die Loeschknoepfe da sind und ob sie mit
+    # einer Auswahl aktiv werden, haengt an der Auswahl in einer GtkColumnView,
+    # die ueber AT-SPI nicht zuverlaessig sichtbar ist; eine Pruefung darauf
+    # waere ein Muenzwurf und damit schlimmer als keine.
+    for knopf in [n for n in find(app, "push button") if "installiert" in name_of(n).lower()]:
+        click(knopf)
+        time.sleep(0.8)
+        shot(f"{outdir}/test-installiert.png")
+        break
+
     # Trefferflächen
     kleine = []
     for node, _ in walk(app):

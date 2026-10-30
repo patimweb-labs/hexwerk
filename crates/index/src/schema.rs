@@ -189,16 +189,10 @@ impl Index {
     /// Vorgabepfad im Betrieb: `$XDG_DATA_HOME/hexwerk/index.db`, sonst
     /// `~/.local/share/hexwerk/index.db` (PLAN §6).
     pub fn default_path() -> PathBuf {
-        let base = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .filter(|p| !p.as_os_str().is_empty())
-            .or_else(|| {
-                std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share"))
-            })
-            // Ohne HOME bleibt nur das Arbeitsverzeichnis; besser als ein
-            // Panik-Pfad, und der Aufrufer sieht den Pfad ueber `path()`.
-            .unwrap_or_else(|| PathBuf::from("."));
-        base.join("hexwerk").join("index.db")
+        // Eine Regel fuer alle: Kern, Index und Papierkorb muessen denselben
+        // Ort benutzen, sonst findet die Kommandozeile auf dem Host nicht, was
+        // die App im Flatpak abgelegt hat (siehe `hexwerk::data_root`).
+        hexwerk::data_root().join("index.db")
     }
 
     /// Datei hinter diesem Index, `None` bei [`Index::open_in_memory`].

@@ -82,11 +82,12 @@ window.hw-window {
 /* Das Raster liegt auf der Inhaltsflaeche, nicht auf dem Fenster: so bleibt
    die Kopfleiste ruhig und die Leiste links davon frei. */
 .hw-pane {
+  /* Vorher lag hier ein 32px-Raster aus zwei Verlaeufen. Auf dem Bildschirm
+     sah das nach Millimeterpapier aus und konkurrierte mit dem Inhalt; die
+     Flaeche bleibt jetzt ruhig. Die Variablen --hw-grid bleiben stehen, damit
+     ein spaeterer Entwurf sie wieder aufnehmen kann. */
   background-color: var(--hw-bg);
-  background-image:
-    linear-gradient(var(--hw-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--hw-grid) 1px, transparent 1px);
-  background-size: 32px 32px, 32px 32px;
+  background-image: none;
 }
 
 headerbar.hw-header {
@@ -781,4 +782,59 @@ button.hw-btn.danger {
 
 button.hw-btn.danger:hover {
   background-color: rgba(226, 101, 122, 0.08);
+}
+
+/* Die Trennlinie der NavigationSplitView laeuft ueber die volle Hoehe und
+   schneidet damit durch die Kopfleiste. Sie wird hier ausgeblendet; die
+   Abgrenzung uebernimmt der Rahmen der Leiste selbst. */
+navigation-split-view > separator,
+navigation-split-view separator {
+  min-width: 0;
+  min-height: 0;
+  background: none;
+  background-image: none;
+  border: 0;
+  opacity: 0;
+}
+
+.hw-brand {
+  padding-left: 0;
+  margin-left: 0;
+}
+
+/* Keine runden Ecken, nirgends. Adwaita rundet Knoepfe, Eingabefelder,
+   Popover und Dialoge vor; das passt nicht zur kantigen Blueprint-Optik.
+   Eine Regel ganz am Ende schlaegt alle Vorlagen davor. */
+button,
+togglebutton,
+menubutton,
+dropdown > button,
+entry,
+spinbutton,
+checkbutton check,
+radiobutton radio,
+switch,
+slider,
+listbox > row,
+columnview,
+columnview row,
+popover,
+popover > contents,
+popover.menu,
+modelbutton,
+window,
+window.csd,
+window.csd > decoration,
+.dialog,
+messagedialog,
+alertdialog,
+headerbar,
+tooltip,
+toast,
+toast > widget,
+.card,
+frame,
+scrolledwindow,
+separator {
+  border-radius: 0;
 }

@@ -100,7 +100,7 @@ impl Paths {
     /// Vorgabe aus der Umgebung: `$XDG_DATA_HOME/hexwerk` bzw.
     /// `~/.local/share/hexwerk`.
     pub fn system() -> Self {
-        Self::at(data_root())
+        Self::at(hexwerk::data_root())
     }
 
     /// Feste Datenwurzel, z. B. fuer Tests.

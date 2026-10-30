@@ -230,11 +230,17 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // Logo und Wortmarke zusammen: das Icon liegt eingebettet im Binary, damit
     // das Fenster zur Laufzeit keine Datei braucht (im Flatpak waere das ein
     // eigener Pfad, der stimmen muss).
-    let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    // Linksbuendig statt zentriert: `set_title_widget` zentriert, und dann
+    // klebt das Logo in der Mitte der Leiste statt in der Ecke.
+    let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     brand_row.add_css_class("hw-brand");
-    brand_row.append(&brand_icon(22));
+    brand_row.append(&brand_icon(26));
     brand_row.append(&wordmark);
-    rail_header.set_title_widget(Some(&brand_row));
+    rail_header.pack_start(&brand_row);
+    // Ohne eigenen Titel zieht der HeaderBar den Seitentitel ("Hexwerk") und
+    // schreibt ihn neben die Wortmarke. Ein leerer Titel schaltet das ab.
+    let leerer_titel = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    rail_header.set_title_widget(Some(&leerer_titel));
 
     let sidebar_view = adw::ToolbarView::new();
     sidebar_view.add_top_bar(&rail_header);
@@ -905,38 +911,22 @@ fn confirm_clear(ui: &Rc<Ui>) {
         return;
     };
 
-    let folder_name = addons_dir
-        .parent()
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .unwrap_or("AddOns")
-        .to_string();
+    // Wie viele Addons betroffen sind, gehoert in die Rueckfrage: eine Zahl
+    // sagt mehr als das Wort "alle".
+    let count = hexwerk::scan_addons(&addons_dir).len();
 
     let dialog = adw::AlertDialog::new(
         Some("Addon-Ordner leeren?"),
         Some(&format!(
-            "Alle Addons in {client_label} wandern in den Papierkorb. Der Ordner WTF bleibt unangetastet.\n\nZum Bestätigen den Ordnernamen eintippen: {folder_name}"
+            "{count} Addons in {client_label} wandern in den Papierkorb und lassen sich danach zurückholen. Der Ordner WTF bleibt unangetastet."
         )),
     );
-    let entry = gtk::Entry::new();
-    entry.set_placeholder_text(Some("Ordnername"));
-    entry.add_css_class("hw-search");
-    dialog.set_extra_child(Some(&entry));
 
     dialog.add_response("cancel", "Abbrechen");
     dialog.add_response("clear", "Leeren");
     dialog.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
-    dialog.set_response_enabled("clear", false);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");
-
-    {
-        let dialog = dialog.clone();
-        let wanted = folder_name.clone();
-        entry.connect_changed(move |e| {
-            dialog.set_response_enabled("clear", e.text().trim() == wanted);
-        });
-    }
 
     let weak = Rc::downgrade(ui);
     dialog.connect_response(None, move |_dialog, response| {
