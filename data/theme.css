@@ -165,6 +165,13 @@ headerbar.hw-header {
   color: var(--hw-signal);
 }
 
+/* Werte rechts in einer Zeile (etwa Version im Programm-Abschnitt). */
+.hw-cell-value {
+  color: var(--hw-ink);
+  font-family: monospace;
+  font-size: 12px;
+}
+
 .hw-wordmark {
   color: var(--hw-signal);
   font-size: 13px;
@@ -986,6 +993,35 @@ toast > widget,
 frame,
 scrolledwindow,
 separator {
+  border-radius: 0;
+}
+
+/* Aufklapplisten (etwa die Ziel-Auswahl): Adwaita rundet hier die Zeilen und
+   die Flaeche des Popovers, obwohl `popover` oben schon kantig gestellt ist.
+   Die Zeilen kommen aus einer ListView und haben eigene Regeln, deshalb
+   ausdruecklich fuer `row` und `listview`. */
+popover.menu > contents,
+popover.menu listview,
+popover.menu listview > row,
+popover listview,
+popover listview > row,
+popover row:hover,
+popover row:selected,
+popover row:focus,
+dropdown popover > contents,
+dropdown popover listview,
+dropdown popover listview > row,
+dropdown popover row:hover,
+dropdown popover row:selected {
+  border-radius: 0;
+}
+
+/* Letzte Konsequenz: in einem Popover bekommt **nichts** eine Rundung. Die
+   Aufklappliste der Ziel-Auswahl zeichnet ihre Auswahl auf einer Zeile, die
+   aus der ListView kommt; deren Regeln sind spezifischer als eine Liste von
+   Selektoren oben. Hausregel ist kantig, deshalb hier ohne Ausnahme. */
+popover,
+popover * {
   border-radius: 0;
 }
 

@@ -216,6 +216,9 @@ impl InstalledView {
 
         let target = gtk::DropDown::from_strings(&["—"]);
         target.set_sensitive(false);
+        // Zeigefinger auch auf der Auswahl: ohne ihn sieht man nicht, dass
+        // sich hier etwas aufklappen laesst.
+        crate::theme::pointer(&target);
         target.add_css_class("hw-drop");
         target.set_tooltip_text(Some("Client-Ordner, dessen Addons die Tabelle zeigt"));
 

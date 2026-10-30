@@ -642,11 +642,11 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hexwerk-core"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "hexwerk-index"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "hex",
  "hexwerk-core",
@@ -661,7 +661,7 @@ dependencies = [
 
 [[package]]
 name = "hexwerk-install"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "hexwerk-core",
  "hexwerk-sources",
@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "hexwerk-sources"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "hexwerk-core",
  "serde",
@@ -681,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "hexwerk-ui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-channel",
  "glib",

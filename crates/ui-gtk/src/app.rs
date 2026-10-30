@@ -624,6 +624,7 @@ fn wire(ui: &Rc<Ui>) {
     let weak = Rc::downgrade(ui);
     glib::idle_add_local_once(move || {
         if let Some(ui) = weak.upgrade() {
+            refresh_about(&ui);
             show_page(&ui, "scan");
             // Nur Ordner lesen: den Katalog liefert der Dienst. Ein eigener
             // Quellenlauf wuerde ihn mit denselben Addons aus zweiter Hand
@@ -1212,6 +1213,21 @@ fn load_images(ui: &Rc<Ui>, generation: u64, urls: Vec<String>) {
 /// Die Zahlen kommen aus dem Index (`Stats::per_source`), die Schluesselherkunft
 /// aus `KeyProvider` — dieselbe Quelle wie im Quellenbildschirm, nur als Zeile
 /// statt als Karte.
+/// Traegt den Katalogstand in die Einstellungen ein.
+fn refresh_about(ui: &Ui) {
+    let text = match Index::open(&Index::default_path()) {
+        Ok(index) => index
+            .meta("catalog_version")
+            .ok()
+            .flatten()
+            .and_then(|value| value.parse::<i64>().ok())
+            .map(crate::format::date_from_epoch)
+            .unwrap_or_else(|| "—".to_string()),
+        Err(_) => "—".to_string(),
+    };
+    ui.settings_view.set_catalog_date(&text);
+}
+
 fn refresh_settings_sources(ui: &Rc<Ui>) {
     let lang = ui.settings_view.settings().language;
     let (stats, keys) = (
@@ -1621,6 +1637,7 @@ fn start_catalog_sync(ui: &Rc<Ui>) {
         let lang = ui_lang(&ui);
         match result {
             Ok((entries, changed)) => {
+                refresh_about(&ui);
                 if let Err(err) = refresh_catalogue(&ui) {
                     eprintln!("Katalog nach dem Abruf nicht lesbar: {err}");
                 }

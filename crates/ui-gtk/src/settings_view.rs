@@ -246,6 +246,8 @@ pub struct SettingsView {
     nav_switch: gtk::Switch,
     status: gtk::Label,
     path_label: gtk::Label,
+    /// Katalogstand aus dem Index; wird von der App nach dem Abgleich gesetzt.
+    catalog_value: gtk::Label,
     settings: RefCell<Settings>,
     on_change: RefCell<Option<ChangeCallback>>,
     /// Wird nach jedem gespeicherten Schritt mit einer Meldung gerufen
@@ -318,10 +320,46 @@ impl SettingsView {
         path_label.set_selectable(true);
         path_label.set_wrap(true);
 
+        // Programm und Katalogstand: die Frage „welche Fassung laeuft hier?"
+        // soll man ohne Kommandozeile beantworten koennen.
+        let about_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        about_box.add_css_class("hw-card");
+        about_box.set_margin_bottom(16);
+
+        let version_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let version_label = gtk::Label::new(Some(crate::lang::t(&lang, "set.version")));
+        version_label.add_css_class("hw-cell");
+        version_label.set_xalign(0.0);
+        version_label.set_width_chars(12);
+        let version_value = gtk::Label::new(Some(env!("CARGO_PKG_VERSION")));
+        version_value.add_css_class("hw-cell-value");
+        version_value.set_xalign(1.0);
+        version_value.set_hexpand(true);
+        version_value.set_selectable(true);
+        version_row.append(&version_label);
+        version_row.append(&version_value);
+
+        let catalog_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let catalog_label = gtk::Label::new(Some(crate::lang::t(&lang, "set.version.catalog")));
+        catalog_label.add_css_class("hw-cell");
+        catalog_label.set_xalign(0.0);
+        catalog_label.set_width_chars(12);
+        let catalog_value = gtk::Label::new(Some("—"));
+        catalog_value.add_css_class("hw-cell-value");
+        catalog_value.set_xalign(1.0);
+        catalog_value.set_hexpand(true);
+        catalog_row.append(&catalog_label);
+        catalog_row.append(&catalog_value);
+
+        about_box.append(&version_row);
+        about_box.append(&catalog_row);
+
         let mut tracked: Vec<(gtk::Label, &'static str)> = Vec::new();
         tracked.push((title.clone(), "set.title"));
         tracked.push((sub.clone(), "set.hint.priority"));
         tracked.push((nav_label.clone(), "set.nav.compact"));
+        tracked.push((version_label.clone(), "set.version"));
+        tracked.push((catalog_label.clone(), "set.version.catalog"));
 
         let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
         body.set_margin_top(20);
@@ -332,12 +370,13 @@ impl SettingsView {
         body.append(&sub);
         // Die Quellen sind aus der Oberflaeche verschwunden: der Katalog kommt
         // fertig vom Dienst, die Herkunft ist fuer die Bedienung ohne Belang.
-        for key in ["set.language", "set.appearance", "set.file"] {
+        for key in ["set.language", "set.appearance", "set.file", "set.about"] {
             let label = section(crate::lang::t(&lang, key));
             tracked.push((label.clone(), key));
             body.append(&label);
             match key {
                 "set.language" => body.append(&language_box),
+                "set.about" => body.append(&about_box),
                 "set.appearance" => {
                     body.append(&appearance_slot);
                     body.append(&nav_row);
@@ -363,6 +402,7 @@ impl SettingsView {
             nav_switch,
             status,
             path_label,
+            catalog_value,
             settings: RefCell::new(settings),
             on_change: RefCell::new(None),
             on_saved: RefCell::new(None),
@@ -390,6 +430,11 @@ impl SettingsView {
             });
         }
         view
+    }
+
+    /// Zeigt an, vom wann der uebernommene Katalog stammt.
+    pub fn set_catalog_date(&self, text: &str) {
+        self.catalog_value.set_text(text);
     }
 
     pub fn widget(&self) -> &gtk::Widget {
