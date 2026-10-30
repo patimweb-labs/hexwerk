@@ -10,11 +10,9 @@ use std::sync::Arc;
 
 use crate::cache::Cache;
 use crate::curseforge::CurseForgeSource;
-use crate::github::GitHubSource;
 use crate::http::Http;
 use crate::keys::{KeyProvider, Secret};
 use crate::merge::{Entry, Release};
-use crate::tukui::TukuiSource;
 use crate::wago::WagoSource;
 use crate::wowinterface::WowInterfaceSource;
 use crate::{AddonSource, Source, SourceError, SourceHealth};
@@ -53,12 +51,11 @@ impl Registry {
     ) -> Self {
         let mut sources: Vec<Box<dyn AddonSource>> = Vec::new();
 
-        let mut github = GitHubSource::new(Arc::clone(&http), cache.clone());
-        if let Some(token) = github_token {
-            github = github.with_token(token);
-        }
-        sources.push(Box::new(github));
-        sources.push(Box::new(TukuiSource::new(Arc::clone(&http), cache.clone())));
+        // GitHub und Tukui sind entfernt: GitHub ist ohne Token auf 60 Anfragen
+        // je Stunde gedrosselt und liefert kaum WoW-Addons, Tukui fuehrt nur
+        // seine eigenen. Die Module bleiben liegen, werden aber nicht mehr
+        // eingebunden; alte Indexzeilen bleiben lesbar.
+        let _ = github_token;
         sources.push(Box::new(WowInterfaceSource::new(
             Arc::clone(&http),
             cache.clone(),
@@ -115,16 +112,12 @@ impl Registry {
     /// Quellen, die der Katalog kennt, die aber nicht laufen — für die Anzeige
     /// „CurseForge: kein Schlüssel".
     pub fn absent(&self) -> Vec<Source> {
-        [
-            Source::GitHub,
-            Source::Tukui,
-            Source::WowInterface,
-            Source::Wago,
-            Source::CurseForge,
-        ]
-        .into_iter()
-        .filter(|s| self.source(*s).is_none())
-        .collect()
+        // GitHub und Tukui fehlen hier bewusst: sie sind entfernt, nicht
+        // „noch nicht abgefragt" — ein Hinweis darauf waere eine Luege.
+        [Source::WowInterface, Source::Wago, Source::CurseForge]
+            .into_iter()
+            .filter(|s| self.source(*s).is_none())
+            .collect()
     }
 
     /// Suche über alle Quellen, Fehler je Quelle gesammelt statt abgebrochen.
@@ -151,6 +144,21 @@ impl Registry {
             None => Err(SourceError::Disabled),
         }
     }
+
+    /// Wie [`Registry::download`], meldet aber zwischendurch den Fortschritt.
+    ///
+    /// `progress(gelesene_bytes, gesamt_bytes_falls_bekannt)` — die Grundlage
+    /// fuer den Fortschrittsbalken beim Installieren.
+    pub fn download_with(
+        &self,
+        release: &Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
+        match self.source(release.source) {
+            Some(source) => source.download_with(release, progress),
+            None => Err(SourceError::Disabled),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -158,7 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ohne_schluessel_laufen_drei_quellen() {
+    fn ohne_schluessel_laeuft_nur_wowinterface() {
         let dir = std::env::temp_dir().join(format!("hexwerk-reg-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let keys = KeyProvider::new(&dir).without_env().without_keyring();
@@ -166,12 +174,10 @@ mod tests {
         // Kein Request: `build` ist reine Konstruktion.
         let registry = Registry::build(&keys, http, Cache::new(dir.join("cache")));
         let ids: Vec<Source> = registry.sources().iter().map(|s| s.id()).collect();
-        assert_eq!(
-            ids,
-            vec![Source::GitHub, Source::Tukui, Source::WowInterface]
-        );
+        // GitHub und Tukui sind entfernt; ohne Schluessel bleibt WoWInterface.
+        assert_eq!(ids, vec![Source::WowInterface]);
         assert_eq!(registry.absent(), vec![Source::Wago, Source::CurseForge]);
         let health = registry.health();
-        assert_eq!(health.len(), 3);
+        assert_eq!(health.len(), 1);
     }
 }

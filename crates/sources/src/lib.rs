@@ -7,6 +7,7 @@
 
 pub mod cache;
 pub mod curseforge;
+pub mod endpoints;
 pub mod fingerprint;
 pub mod github;
 pub mod http;
@@ -22,6 +23,24 @@ pub use http::{Http, HttpResponse, Request, UreqHttp};
 pub use keys::{KeyOrigin, KeyProvider, Secret};
 pub use merge::{merge, Entry, Release};
 pub use registry::Registry;
+
+/// Gemeinsamer Download-Weg fuer Quellen, die ihr ZIP direkt per HTTP holen.
+///
+/// WARUM eine Funktion und nicht fuenfmal derselbe Ablauf: die Fehlerabbildung
+/// (`response.error`) und das Fortschritts-Weiterreichen sind in allen Quellen
+/// identisch; nur der Request davor unterscheidet sich (Header, CDN-Adresse).
+pub(crate) fn download_via_http(
+    http: &dyn Http,
+    request: &Request,
+    url: &str,
+    progress: &mut dyn FnMut(u64, Option<u64>),
+) -> Result<Vec<u8>, SourceError> {
+    let response = http.download(request, progress)?;
+    if let Some(err) = response.error(url) {
+        return Err(err);
+    }
+    Ok(response.body)
+}
 
 /// Kennung einer Quelle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -107,6 +126,22 @@ pub trait AddonSource: Send + Sync {
     fn search(&self, query: &str, page: u32) -> Result<Vec<merge::Entry>, SourceError>;
     /// Laedt das ZIP eines Releases.
     fn download(&self, release: &merge::Release) -> Result<Vec<u8>, SourceError>;
+
+    /// Wie [`AddonSource::download`], meldet aber zwischendurch den Fortschritt.
+    ///
+    /// `progress(gelesene_bytes, gesamt_bytes_falls_bekannt)`. Die Vorgabe ruft
+    /// [`AddonSource::download`] und meldet einmal am Ende - Quellen, die
+    /// direkt ueber [`http::Http`] laden, ueberschreiben das mit einem
+    /// stueckweisen Lesen, damit der Balken mitlaeuft.
+    fn download_with(
+        &self,
+        release: &merge::Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
+        let bytes = self.download(release)?;
+        progress(bytes.len() as u64, Some(bytes.len() as u64));
+        Ok(bytes)
+    }
 
     /// Ein einziger echter Testaufruf je Quelle — die Grundlage fuer
     /// `hexwerk keys test` (PLAN.md §7: „prueft jede Quelle mit einer Anfrage und

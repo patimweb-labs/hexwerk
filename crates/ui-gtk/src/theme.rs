@@ -10,10 +10,10 @@
 //!   Nutzer „System" gewaehlt hat.
 //!
 //! Beides zusammen ergibt: Adwaita-Teile und eigene Teile kippen gemeinsam um,
-//! und die Wahl ueberlebt den Neustart in `~/.config/hexwerk/ui.json`.
+//! und die Wahl ueberlebt den Neustart in `~/.config/hexwerk/settings.json`
+//! (zusammen mit Rangfolge, Sprache, Leistenform, Schluesseln und Adressen).
 
 use std::cell::{Cell, RefCell};
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -51,6 +51,11 @@ impl Palette {
         }
     }
 
+    /// Rueckweg von [`Palette::key`]; unbekannte Werte ergeben `None`.
+    pub fn from_key(value: &str) -> Option<Self> {
+        Self::parse(value.trim())
+    }
+
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "system" => Some(Palette::System),
@@ -72,6 +77,15 @@ impl Palette {
 /// „klickbar“ ueberall gleich aussieht.
 pub fn pointer(widget: &impl IsA<gtk::Widget>) {
     widget.set_cursor_from_name(Some("pointer"));
+}
+
+/// Sonne bei hellem, Mond bei dunklem Schema.
+fn icon_for(dark: bool) -> &'static str {
+    if dark {
+        "weather-clear-night-symbolic"
+    } else {
+        "weather-clear-symbolic"
+    }
 }
 
 /// Provider einmal pro Anzeige registrieren. Prioritaet APPLICATION: das
@@ -98,6 +112,12 @@ pub struct Theme {
     menu_label: RefCell<Option<glib::WeakRef<gtk::Label>>>,
     popover: RefCell<Option<glib::WeakRef<gtk::Popover>>>,
     choices: RefCell<Vec<(Palette, glib::WeakRef<gtk::Button>)>>,
+    /// Alle Sonne/Mond-Knoepfe: sie muessen den Zustand mitziehen, egal wo
+    /// umgeschaltet wurde (Kopfzeile oder Einstellungen).
+    toggles: RefCell<Vec<glib::WeakRef<gtk::ToggleButton>>>,
+    /// Die Schalter aus den Einstellungen: sie muessen ebenfalls mitziehen,
+    /// wenn in der Kopfzeile umgeschaltet wird.
+    switches: RefCell<Vec<glib::WeakRef<gtk::Switch>>>,
 }
 
 impl Theme {
@@ -108,6 +128,8 @@ impl Theme {
             menu_label: RefCell::new(None),
             popover: RefCell::new(None),
             choices: RefCell::new(Vec::new()),
+            toggles: RefCell::new(Vec::new()),
+            switches: RefCell::new(Vec::new()),
         });
 
         // Wechselt das System (oder der Nutzer in den GNOME-Einstellungen), muss
@@ -130,7 +152,93 @@ impl Theme {
         self.palette.get()
     }
 
-    /// Auswahl aus dem Menue: merken, anwenden, Datei schreiben.
+    /// Sonne/Mond als ein Knopf: Klick wechselt zwischen hell und dunkel.
+    ///
+    /// Warum kein Menue mehr: drei Eintraege (System, dunkel, hell) fuer eine
+    /// Entscheidung, die fast immer „das andere von jetzt" heisst. Das Icon
+    /// zeigt den **aktuellen** Zustand (Sonne = hell, Mond = dunkel), der
+    /// Tooltip sagt, was der Klick bewirkt.
+    pub fn dark_toggle(self: &Rc<Self>) -> gtk::ToggleButton {
+        let button = gtk::ToggleButton::new();
+        button.add_css_class("hw-choice");
+        button.set_active(self.is_dark());
+        button.set_tooltip_text(Some(if self.is_dark() {
+            "Dunkel — Klick schaltet auf hell"
+        } else {
+            "Hell — Klick schaltet auf dunkel"
+        }));
+
+        let icon = gtk::Image::from_icon_name(icon_for(self.is_dark()));
+        button.set_child(Some(&icon));
+        pointer(&button);
+
+        let weak = Rc::downgrade(self);
+        let icon_click = icon.clone();
+        button.connect_toggled(move |button| {
+            let Some(theme) = weak.upgrade() else {
+                return;
+            };
+            let wanted = if button.is_active() {
+                Palette::Dark
+            } else {
+                Palette::Light
+            };
+            icon_click.set_icon_name(Some(icon_for(button.is_active())));
+            button.set_tooltip_text(Some(if button.is_active() {
+                "Dunkel — Klick schaltet auf hell"
+            } else {
+                "Hell — Klick schaltet auf dunkel"
+            }));
+            if theme.current() != wanted {
+                theme.choose(wanted);
+            }
+        });
+
+        self.toggles.borrow_mut().push(button.downgrade());
+        button
+    }
+
+    /// Ein Schalter statt Menue: „Dunkel" an oder aus.
+    ///
+    /// `System` bleibt als gespeicherter Wert bestehen (wer nichts waehlt,
+    /// bekommt die Systemeinstellung); der Schalter zeigt und setzt nur
+    /// dunkel/hell. Beim Umschalten wird daraus eine feste Wahl — ein Schalter,
+    /// der nichts bewirkt, weil „System" gewinnt, waere die schlechtere Loesung.
+    pub fn dark_switch(self: &Rc<Self>) -> gtk::Box {
+        let switch = gtk::Switch::new();
+        switch.set_active(self.current() != Palette::Light);
+        switch.set_valign(gtk::Align::Center);
+        switch.set_tooltip_text(Some("Dunkles Farbschema (aus = hell)"));
+        pointer(&switch);
+
+        let weak = Rc::downgrade(self);
+        switch.connect_active_notify(move |switch| {
+            let Some(theme) = weak.upgrade() else {
+                return;
+            };
+            let wanted = if switch.is_active() {
+                Palette::Dark
+            } else {
+                Palette::Light
+            };
+            if theme.current() != wanted {
+                theme.choose(wanted);
+            }
+        });
+
+        let lang = crate::settings_view::Settings::load().language;
+        let label = gtk::Label::new(Some(crate::lang::t(&lang, "set.dark")));
+        label.add_css_class("hw-cell");
+
+        self.switches.borrow_mut().push(switch.downgrade());
+
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        row.append(&switch);
+        row.append(&label);
+        row
+    }
+
+    /// Auswahl aus dem Menue oder vom Schalter: merken, anwenden, schreiben.
     pub fn choose(&self, palette: Palette) {
         self.palette.set(palette);
         self.set_style_scheme(palette);
@@ -141,6 +249,39 @@ impl Theme {
             eprintln!("hexwerk: ui.json nicht schreibbar: {err}");
         }
         self.refresh_menu();
+        self.sync_widgets();
+    }
+
+    /// Zieht alle Sonne/Mond-Knoepfe und Schalter auf den aktuellen Zustand.
+    ///
+    /// Wird nach jeder Wahl gerufen **und** beim Oeffnen der Einstellungen:
+    /// so kann kein Widget einen alten Zustand anzeigen, auch wenn eine
+    /// Aenderung an ihm vorbeigelaufen ist.
+    pub fn sync_widgets(&self) {
+        let dark = self.is_dark();
+        self.toggles.borrow_mut().retain(|weak| {
+            let Some(button) = weak.upgrade() else {
+                return false;
+            };
+            if button.is_active() != dark {
+                button.set_active(dark);
+            }
+            if let Some(child) = button.child() {
+                if let Some(icon) = child.downcast_ref::<gtk::Image>() {
+                    icon.set_icon_name(Some(icon_for(dark)));
+                }
+            }
+            true
+        });
+        self.switches.borrow_mut().retain(|weak| {
+            let Some(switch) = weak.upgrade() else {
+                return false;
+            };
+            if switch.is_active() != dark {
+                switch.set_active(dark);
+            }
+            true
+        });
     }
 
     fn set_style_scheme(&self, palette: Palette) {
@@ -262,52 +403,20 @@ impl Theme {
     }
 }
 
-/// Merkdatei `~/.config/hexwerk/ui.json`.
-fn config_path() -> Option<PathBuf> {
-    let base = match std::env::var_os("XDG_CONFIG_HOME") {
-        Some(dir) if !dir.is_empty() => PathBuf::from(dir),
-        _ => PathBuf::from(std::env::var_os("HOME")?).join(".config"),
-    };
-    Some(base.join("hexwerk").join("ui.json"))
-}
-
 pub fn load_palette() -> Palette {
-    // Vorgabe ist Dunkel: die Marke ist dunkel, und ein heller Start waere
-    // beim ersten Oeffnen ein Bruch mit dem Entwurf. "System" bleibt waehlbar.
-    let Some(path) = config_path() else {
-        return Palette::Dark;
-    };
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Palette::Dark;
-    };
-    parse_theme_value(&text).unwrap_or(Palette::Dark)
+    // Alles in EINER Datei: `~/.config/hexwerk/settings.json`. Vorgabe ist
+    // Dunkel (Marke), „System" bleibt waehlbar.
+    let value = crate::settings_view::Settings::load().theme;
+    Palette::from_key(&value).unwrap_or(Palette::Dark)
 }
 
 pub fn save_palette(palette: Palette) -> std::io::Result<()> {
-    let Some(path) = config_path() else {
-        return Ok(());
-    };
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    // Handgeschrieben statt serde: die Datei hat genau einen Schluessel, und
-    // ihre Form soll lesbar bleiben, weil Nutzer sie von Hand aendern koennen.
-    let text = format!(
-        "{{\n  \"theme\": \"{}\",\n  \"hinweis\": \"system | dark | light\"\n}}\n",
-        palette.key()
-    );
-    std::fs::write(path, text)
-}
-
-/// Liest den Wert von `"theme"` aus dem JSON. Bewusst kein vollstaendiger
-/// JSON-Parser: ein kaputter Wert soll auf „System" zurueckfallen, nicht die
-/// Anwendung aufhalten.
-fn parse_theme_value(text: &str) -> Option<Palette> {
-    let after_key = text.split("\"theme\"").nth(1)?;
-    let after_colon = after_key.split(':').nth(1)?;
-    let value = after_colon.trim_start().strip_prefix('"')?;
-    let end = value.find('"')?;
-    Palette::parse(&value[..end])
+    // Nicht die Datei ueberschreiben, sondern die Einstellungen laden, das
+    // Theme ersetzen und alles zusammen schreiben — sonst waeren Rangfolge,
+    // Sprache, Schluessel und Adressen nach einem Themewechsel weg.
+    let mut settings = crate::settings_view::Settings::load();
+    settings.theme = palette.key().to_string();
+    settings.save()
 }
 
 #[cfg(test)]
@@ -315,16 +424,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn json_wert_wird_erkannt() {
-        assert_eq!(
-            parse_theme_value("{\"theme\": \"dark\"}"),
-            Some(Palette::Dark)
-        );
-        assert_eq!(
-            parse_theme_value("{\n \"theme\" : \"light\"\n}"),
-            Some(Palette::Light)
-        );
-        assert_eq!(parse_theme_value("{\"theme\": \"pink\"}"), None);
-        assert_eq!(parse_theme_value("{}"), None);
+    fn farbschema_wird_erkannt() {
+        // Der Wert steht jetzt in `settings.json`; gelesen wird ueber
+        // `Palette::from_key`, damit „system", „dark" und „light" gelten.
+        assert_eq!(Palette::from_key("dark"), Some(Palette::Dark));
+        assert_eq!(Palette::from_key(" light "), Some(Palette::Light));
+        assert_eq!(Palette::from_key("system"), Some(Palette::System));
+        assert_eq!(Palette::from_key("pink"), None);
     }
 }

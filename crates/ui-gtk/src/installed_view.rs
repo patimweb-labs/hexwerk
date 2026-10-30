@@ -90,20 +90,27 @@ enum Filter {
     All,
     WithSource,
     NoSource,
+    Updates,
 }
 
 impl Filter {
-    const ALL: [Filter; 3] = [Filter::All, Filter::WithSource, Filter::NoSource];
+    const ALL: [Filter; 4] = [
+        Filter::All,
+        Filter::WithSource,
+        Filter::NoSource,
+        Filter::Updates,
+    ];
 
-    fn label(self) -> &'static str {
+    fn label(self, lang: &str) -> &'static str {
         match self {
-            Filter::All => "Alle",
-            Filter::WithSource => "mit Quell-ID",
-            Filter::NoSource => "ohne Quell-ID",
+            Filter::All => crate::lang::t(lang, "iv.filter.all"),
+            Filter::WithSource => crate::lang::t(lang, "iv.filter.with"),
+            Filter::NoSource => crate::lang::t(lang, "iv.filter.without"),
+            Filter::Updates => crate::lang::t(lang, "iv.filter.updates"),
         }
     }
 
-    fn keeps(self, addon: &hexwerk::InstalledAddon) -> bool {
+    fn keeps(self, addon: &hexwerk::InstalledAddon, has_update: bool) -> bool {
         let has_source = addon
             .toc
             .as_ref()
@@ -121,6 +128,7 @@ impl Filter {
             Filter::All => true,
             Filter::WithSource => has_source,
             Filter::NoSource => !has_source,
+            Filter::Updates => has_update,
         }
     }
 }
@@ -139,6 +147,8 @@ pub struct OpenRequest {
 }
 
 type OpenCallback = Box<dyn Fn(OpenRequest)>;
+/// „Alle faelligen Updates dieses Client-Ordners installieren."
+type UpdateCallback = Box<dyn Fn()>;
 /// Wird mit den markierten Ordnernamen gerufen.
 type RemoveCallback = Box<dyn Fn(Vec<String>)>;
 /// Wird ohne Argumente gerufen: der Bildschirm kennt das Ziel, die Aktion
@@ -154,6 +164,11 @@ struct Target {
 
 pub struct InstalledView {
     root: gtk::Box,
+    /// Kopfzeile und Beschriftungen, damit ein Sprachwechsel sie nachziehen kann.
+    title: gtk::Label,
+    sub: gtk::Label,
+    target_label: gtk::Label,
+    lang: RefCell<String>,
     target: gtk::DropDown,
     columns: gtk::ColumnView,
     store: gtk::gio::ListStore,
@@ -163,31 +178,40 @@ pub struct InstalledView {
     empty: gtk::Box,
     data: RefCell<Option<Rc<ScanData>>>,
     targets: RefCell<Vec<Target>>,
+    /// Faellige Updates aus `Index::updates`. Die Tabelle zeigt nur das
+    /// Ergebnis, sie rechnet nicht selbst; der Schluessel ist (Client, Ordner),
+    /// weil derselbe Ordnername in mehreren Client-Ordnern liegen kann.
+    updates: RefCell<Vec<hexwerk_index::Update>>,
     filter: Cell<Filter>,
     on_open: RefCell<Option<OpenCallback>>,
     remove: gtk::Button,
     clear: gtk::Button,
+    /// Installieren aus Datei und von einer Adresse: Handarbeit sichtbar machen.
+    install_file: gtk::Button,
+    install_url: gtk::Button,
+    update: gtk::Button,
     on_remove: RefCell<Option<RemoveCallback>>,
     on_clear: RefCell<Option<ClearCallback>>,
+    on_install_file: RefCell<Option<Box<dyn Fn()>>>,
+    on_install_url: RefCell<Option<Box<dyn Fn(String)>>>,
+    on_update: RefCell<Option<UpdateCallback>>,
 }
 
 impl InstalledView {
     pub fn new() -> Rc<Self> {
-        let title = gtk::Label::new(Some("Installiert"));
+        let lang = crate::settings_view::Settings::load().language;
+        let title = gtk::Label::new(Some(crate::lang::t(&lang, "iv.title")));
         title.add_css_class("hw-h1");
         title.set_xalign(0.0);
 
-        let sub = gtk::Label::new(Some(
-            "Alle Zeilen stammen aus den TOC-Dateien im Addon-Ordner. Doppelklick öffnet die \
-             Detailansicht.",
-        ));
+        let sub = gtk::Label::new(Some(crate::lang::t(&lang, "iv.sub")));
         sub.add_css_class("hw-sub");
         sub.set_xalign(0.0);
         sub.set_wrap(true);
         sub.set_margin_top(2);
         sub.set_margin_bottom(14);
 
-        let target_label = gtk::Label::new(Some("ZIEL-CLIENT"));
+        let target_label = gtk::Label::new(Some(crate::lang::t(&lang, "iv.target")));
         target_label.add_css_class("hw-badge");
 
         let target = gtk::DropDown::from_strings(&["—"]);
@@ -208,7 +232,7 @@ impl InstalledView {
         let count = gtk::Label::new(Some("—"));
         count.add_css_class("hw-dim2");
 
-        let remove = gtk::Button::with_label("Deinstallieren…");
+        let remove = gtk::Button::with_label(crate::lang::t(&lang, "iv.remove"));
         crate::theme::pointer(&remove);
         remove.add_css_class("hw-btn");
         remove.add_css_class("ghost");
@@ -216,7 +240,7 @@ impl InstalledView {
         remove.set_tooltip_text(Some(
             "Markierte Addons in den Papierkorb verschieben. Rückgängig geht danach direkt.",
         ));
-        let clear = gtk::Button::with_label("Addons leeren…");
+        let clear = gtk::Button::with_label(crate::lang::t(&lang, "iv.clear"));
         crate::theme::pointer(&clear);
         clear.add_css_class("hw-btn");
         clear.add_css_class("danger");
@@ -225,12 +249,30 @@ impl InstalledView {
             "Alle Addons dieses Client-Ordners in den Papierkorb. WTF bleibt unangetastet.",
         ));
 
-        let update = gtk::Button::with_label("Aktualisieren…");
+        let update = gtk::Button::with_label("Updates installieren…");
         crate::theme::pointer(&update);
         update.add_css_class("hw-btn");
         update.set_sensitive(false);
         update.set_tooltip_text(Some(
-            "Braucht Index und Quellen. Beides ist noch nicht angebunden.",
+            "Alle als „Update“ markierten Addons dieses Client-Ordners neu laden und entpacken.",
+        ));
+
+        // Handarbeit gehoert in die Oberflaeche, nicht nur ins Ablegen:
+        // nicht jeder zieht eine Datei, und ein selbst geladenes ZIP ist
+        // der Normalfall.
+        let install_file = gtk::Button::with_label(crate::lang::t(&lang, "iv.install"));
+        crate::theme::pointer(&install_file);
+        install_file.add_css_class("hw-btn");
+        install_file.set_tooltip_text(Some(
+            "Addon aus einer ZIP-Datei in den gewaehlten Client-Ordner installieren.",
+        ));
+
+        let install_url = gtk::Button::with_label(crate::lang::t(&lang, "iv.install.url"));
+        crate::theme::pointer(&install_url);
+        install_url.add_css_class("hw-btn");
+        install_url.add_css_class("ghost");
+        install_url.set_tooltip_text(Some(
+            "Addon von einer Adresse laden und in den gewaehlten Client-Ordner installieren.",
         ));
 
         let filter_bar = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -239,6 +281,8 @@ impl InstalledView {
         let gap = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         gap.set_hexpand(true);
         filter_bar.append(&gap);
+        filter_bar.append(&install_file);
+        filter_bar.append(&install_url);
         filter_bar.append(&count);
         filter_bar.append(&remove);
         filter_bar.append(&clear);
@@ -255,17 +299,35 @@ impl InstalledView {
         columns.set_tooltip_text(Some(
             "Mehrfachauswahl mit Strg- oder Umschalt-Klick; Doppelklick öffnet das Addon.",
         ));
-        columns.append_column(&text_column("Addon", "folder", 220, true, "hw-cell"));
-        columns.append_column(&text_column("Version", "version", 90, false, "hw-cell-dim"));
         columns.append_column(&text_column(
-            "Interface",
+            crate::lang::t(&lang, "iv.col.addon"),
+            "folder",
+            220,
+            true,
+            "hw-cell",
+        ));
+        columns.append_column(&text_column(
+            crate::lang::t(&lang, "iv.col.version"),
+            "version",
+            90,
+            false,
+            "hw-cell-dim",
+        ));
+        columns.append_column(&text_column(
+            crate::lang::t(&lang, "iv.col.interface"),
             "interface",
             170,
             false,
             "hw-cell-dim",
         ));
-        columns.append_column(&chip_column("Quelle", "source"));
-        columns.append_column(&chip_column("Status", "status"));
+        columns.append_column(&chip_column(
+            crate::lang::t(&lang, "iv.col.source"),
+            "source",
+        ));
+        columns.append_column(&chip_column(
+            crate::lang::t(&lang, "iv.col.status"),
+            "status",
+        ));
         // Die Zeilen oeffnen die Detailseite; der Zeiger gehoert auf die Tabelle,
         // weil jede Zeile ein Ziel ist (Kopfzeile ausgenommen - der Unterschied
         // ist im Raster klein genug, um ihn zu verschmerzen).
@@ -290,15 +352,6 @@ impl InstalledView {
         table_area.append(&empty);
         table_area.append(&table_scroll);
 
-        let note = gtk::Label::new(Some(
-            "„unbekannt“ heißt: die TOC-Datei nennt keine Quell-ID. Solche Ordner bleiben unangetastet, \
-             Hexwerk löscht nichts, was es nicht sicher zuordnen kann.",
-        ));
-        note.add_css_class("hw-note");
-        note.set_xalign(0.0);
-        note.set_wrap(true);
-        note.set_margin_top(12);
-
         let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
         body.add_css_class("hw-pane");
         body.set_margin_top(20);
@@ -311,7 +364,6 @@ impl InstalledView {
         body.append(&target_row);
         body.append(&filter_bar);
         body.append(&table_area);
-        body.append(&note);
 
         let view = Rc::new(Self {
             root: body,
@@ -320,16 +372,27 @@ impl InstalledView {
             store,
             selection,
             chips,
+            title: title.clone(),
+            sub: sub.clone(),
+            target_label: target_label.clone(),
+            lang: RefCell::new(lang.clone()),
             count,
             empty,
             data: RefCell::new(None),
             targets: RefCell::new(Vec::new()),
+            updates: RefCell::new(Vec::new()),
             filter: Cell::new(Filter::All),
             on_open: RefCell::new(None),
             remove,
             clear,
+            update: update.clone(),
             on_remove: RefCell::new(None),
             on_clear: RefCell::new(None),
+            install_file,
+            install_url,
+            on_install_file: RefCell::new(None),
+            on_install_url: RefCell::new(None),
+            on_update: RefCell::new(None),
         });
         view.wire();
         view
@@ -337,6 +400,47 @@ impl InstalledView {
 
     pub fn widget(&self) -> &gtk::Widget {
         self.root.upcast_ref()
+    }
+
+    /// Zieht die festen Texte auf eine Sprache nach: Titel, Untertitel,
+    /// Ziel-Beschriftung, Knoepfe und Filterleiste.
+    pub fn retranslate(self: &Rc<Self>, lang: &str) {
+        *self.lang.borrow_mut() = lang.to_string();
+        self.title.set_text(crate::lang::t(lang, "iv.title"));
+        self.sub.set_text(crate::lang::t(lang, "iv.sub"));
+        self.target_label
+            .set_text(crate::lang::t(lang, "iv.target"));
+        self.remove.set_label(crate::lang::t(lang, "iv.remove"));
+        self.clear.set_label(crate::lang::t(lang, "iv.clear"));
+        let mut index = 0;
+        let mut child = self.chips.first_child();
+        while let Some(widget) = child {
+            if let Some(button) = widget.downcast_ref::<gtk::Button>() {
+                if let Some(filter) = Filter::ALL.get(index) {
+                    button.set_label(filter.label(lang));
+                }
+                index += 1;
+            }
+            child = widget.next_sibling();
+        }
+        // Spaltenkoepfe: sie tragen den Text aus dem Aufbau.
+        let keys = [
+            "iv.col.addon",
+            "iv.col.version",
+            "iv.col.interface",
+            "iv.col.source",
+            "iv.col.status",
+        ];
+        let model = self.columns.columns();
+        for (index, key) in keys.iter().enumerate() {
+            if let Some(column) = model
+                .item(index as u32)
+                .and_then(|item| item.downcast::<gtk::ColumnViewColumn>().ok())
+            {
+                column.set_title(Some(crate::lang::t(lang, key)));
+            }
+        }
+        self.rebuild();
     }
 
     pub fn set_on_open<F: Fn(OpenRequest) + 'static>(self: &Rc<Self>, f: F) {
@@ -348,7 +452,7 @@ impl InstalledView {
     /// View -> Widget).
     fn wire(self: &Rc<Self>) {
         for filter in Filter::ALL {
-            let button = gtk::Button::with_label(filter.label());
+            let button = gtk::Button::with_label(filter.label(&self.lang.borrow()));
             button.add_css_class("hw-chip");
             button.set_tooltip_text(Some("Filtert die Zeilen nach Quell-Kennung in der .toc"));
             let weak = Rc::downgrade(self);
@@ -411,6 +515,16 @@ impl InstalledView {
                 *view.on_clear.borrow_mut() = Some(cb);
             }
         });
+
+        let weak = Rc::downgrade(self);
+        self.update.connect_clicked(move |_| {
+            let Some(view) = weak.upgrade() else { return };
+            let cb = view.on_update.borrow_mut().take();
+            if let Some(cb) = cb {
+                cb();
+                *view.on_update.borrow_mut() = Some(cb);
+            }
+        });
     }
 
     /// Waehlt den Ziel-Client aus, ohne die Ansicht zu wechseln. Der Aufrufer
@@ -429,6 +543,22 @@ impl InstalledView {
     }
 
     pub fn set_data(&self, data: Rc<ScanData>) {
+        // Welcher Ordner war gewaehlt? Gemerkt wird der Addon-Pfad, nicht der
+        // Index: nach jeder Installation/Deinstallation kommt ein neuer Scan,
+        // und Indizes koennen sich verschieben. Ohne das springt die Auswahl
+        // bei „Deinstallieren" auf den ersten Eintrag zurueck.
+        let previous: Option<std::path::PathBuf> = {
+            let targets = self.targets.borrow();
+            let data = self.data.borrow();
+            targets
+                .get(self.target.selected() as usize)
+                .and_then(|target| {
+                    let client = data.as_ref()?.clients.get(target.client)?;
+                    let flavor = client.flavors.get(target.flavor)?;
+                    Some(flavor.addons_dir.clone())
+                })
+        };
+
         let mut targets = Vec::new();
         let mut labels = Vec::new();
         for (ci, client) in data.clients.iter().enumerate() {
@@ -452,9 +582,40 @@ impl InstalledView {
         self.empty.set_visible(!has_targets);
         self.columns.set_visible(has_targets);
         if has_targets {
-            self.target.set_selected(0);
+            // Vorherige Wahl wiederherstellen; sonst der erste Eintrag.
+            let restored = previous.and_then(|dir| {
+                let data = self.data.borrow();
+                self.targets.borrow().iter().position(|target| {
+                    data.as_ref()
+                        .and_then(|data| data.clients.get(target.client))
+                        .and_then(|client| client.flavors.get(target.flavor))
+                        .is_some_and(|flavor| flavor.addons_dir == dir)
+                })
+            });
+            self.target.set_selected(restored.unwrap_or(0) as u32);
         }
         self.rebuild();
+    }
+
+    /// Neue Update-Kenntnis uebernehmen (aus `Index::updates`) und die Tabelle
+    /// neu bauen. Eine leere Liste heisst: nichts ist veraltet.
+    pub fn set_updates(&self, updates: Vec<hexwerk_index::Update>) {
+        *self.updates.borrow_mut() = updates;
+        self.rebuild();
+    }
+
+    /// Faelliges Update fuer genau diesen Client-Ordner und dieses Addon.
+    fn update_for(&self, client_id: &str, folder: &str) -> Option<(String, String)> {
+        self.updates
+            .borrow()
+            .iter()
+            .find(|update| update.client_id == client_id && update.folder == folder)
+            .map(|update| {
+                (
+                    update.available_version.clone(),
+                    update.source.label().to_string(),
+                )
+            })
     }
 
     fn rebuild(&self) {
@@ -484,25 +645,34 @@ impl InstalledView {
         };
 
         let filter = self.filter.get();
-        for addon in flavor.addons.iter().filter(|a| filter.keeps(a)) {
+        let client_id = client.id.clone();
+        for addon in flavor
+            .addons
+            .iter()
+            .filter(|a| filter.keeps(a, self.update_for(&client_id, &a.folder).is_some()))
+        {
             let sources = source_rows(addon);
             let (source, source_id) = match sources.first() {
                 Some((name, id)) => (name.clone(), id.clone()),
                 None => ("—".to_string(), String::new()),
             };
             let known = !sources.is_empty();
+            // Ein Update schlaegt jede andere Statusaussage: es ist die
+            // einzige Zeile, auf die der Nutzer reagieren soll.
+            let update = self.update_for(&client_id, &addon.folder);
+            let (status, tone) = match update {
+                Some((version, _)) => (format!("Update {version}"), "sig".to_string()),
+                None if known => ("nicht geprüft".to_string(), "warn".to_string()),
+                None => ("unbekannt".to_string(), "off".to_string()),
+            };
             self.store.append(&AddonRow::new(CellView {
                 folder: addon.folder.clone(),
                 version: addon.version.clone().unwrap_or_else(|| "—".to_string()),
                 interface: interface_list(&addon.interface_numbers),
                 source,
                 source_id,
-                status: if known {
-                    "nicht geprüft".to_string()
-                } else {
-                    "unbekannt".to_string()
-                },
-                tone: if known { "warn" } else { "off" }.to_string(),
+                status,
+                tone,
             }));
         }
         self.update_count();
@@ -527,15 +697,29 @@ impl InstalledView {
     fn update_count(&self) {
         let shown = self.store.n_items();
         let selected = self.selection.selection().size();
+        let fresh = self.updates.borrow().len();
         let text = if selected > 0 {
-            format!("{shown} Zeilen · {selected} ausgewählt")
+            crate::lang::t(&self.lang.borrow(), "iv.count")
+                .replacen("{}", &shown.to_string(), 1)
+                .replacen("{}", &selected.to_string(), 1)
+                .replacen("{}", &fresh.to_string(), 1)
         } else {
-            format!("{shown} Zeilen")
+            crate::lang::t(&self.lang.borrow(), "iv.count")
+                .replacen("{}", &shown.to_string(), 1)
+                .replacen("{}", "0", 1)
+                .replacen("{}", &fresh.to_string(), 1)
         };
         self.count.set_text(&text);
         // Loeschen braucht eine Auswahl, Leeren braucht einen Ziel-Client.
         self.remove.set_sensitive(selected > 0);
         self.clear.set_sensitive(shown > 0);
+        let here = self.current_updates().len();
+        self.update.set_sensitive(here > 0);
+        self.update.set_label(if here > 0 {
+            crate::lang::t(&self.lang.borrow(), "iv.update.all")
+        } else {
+            crate::lang::t(&self.lang.borrow(), "iv.update.none")
+        });
     }
 
     /// Ordnernamen der markierten Zeilen, in Tabellenreihenfolge.
@@ -571,8 +755,122 @@ impl InstalledView {
         *self.on_remove.borrow_mut() = Some(Box::new(f));
     }
 
+    /// Rueckruf fuer „Installieren…" (Dateiauswahl).
+    pub fn set_on_install_file<F: Fn() + 'static>(self: &Rc<Self>, f: F) {
+        *self.on_install_file.borrow_mut() = Some(Box::new(f));
+        let weak = Rc::downgrade(self);
+        self.install_file.clone().connect_clicked(move |_| {
+            let Some(view) = weak.upgrade() else { return };
+            let cb = view.on_install_file.borrow_mut().take();
+            if let Some(cb) = cb {
+                cb();
+                *view.on_install_file.borrow_mut() = Some(cb);
+            }
+        });
+    }
+
+    /// Rueckruf fuer „Adresse…": bekommt die eingegebene Adresse.
+    pub fn set_on_install_url<F: Fn(String) + 'static>(self: &Rc<Self>, f: F) {
+        *self.on_install_url.borrow_mut() = Some(Box::new(f));
+        let weak = Rc::downgrade(self);
+        self.install_url.clone().connect_clicked(move |button| {
+            let Some(view) = weak.upgrade() else { return };
+
+            // Ein Feld, zwei Knoepfe: eine Adresse ist eine Zeile Text. Kein
+            // eigener Reiter, nichts Verstecktes.
+            let dialog = gtk::Window::builder()
+                .title(crate::lang::tn("iv.url.title"))
+                .modal(true)
+                .default_width(560)
+                .build();
+            if let Some(root) = button.root().and_downcast::<gtk::Window>() {
+                dialog.set_transient_for(Some(&root));
+            }
+            dialog.add_css_class("hw-window");
+            let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
+            body.set_margin_top(16);
+            body.set_margin_bottom(16);
+            body.set_margin_start(16);
+            body.set_margin_end(16);
+            let entry = gtk::Entry::new();
+            entry.set_placeholder_text(Some("https://…/addon.zip"));
+            entry.set_hexpand(true);
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            row.set_halign(gtk::Align::End);
+            let ok = gtk::Button::with_label(crate::lang::tn("iv.install.ok"));
+            ok.add_css_class("hw-btn");
+            let cancel = gtk::Button::with_label(crate::lang::tn("iv.install.cancel"));
+            cancel.add_css_class("hw-btn");
+            cancel.add_css_class("ghost");
+            crate::theme::pointer(&ok);
+            crate::theme::pointer(&cancel);
+            row.append(&cancel);
+            row.append(&ok);
+            body.append(&entry);
+            body.append(&row);
+            dialog.set_child(Some(&body));
+
+            let dialog_cancel = dialog.clone();
+            cancel.connect_clicked(move |_| dialog_cancel.close());
+
+            let weak_ok = Rc::downgrade(&view);
+            let entry_ok = entry.clone();
+            let dialog_ok = dialog.clone();
+            ok.connect_clicked(move |_| {
+                let url = entry_ok.text().trim().to_string();
+                if url.is_empty() {
+                    return;
+                }
+                if let Some(view) = weak_ok.upgrade() {
+                    if let Some(cb) = view.on_install_url.borrow().as_ref() {
+                        cb(url);
+                    }
+                }
+                dialog_ok.close();
+            });
+            dialog.present();
+        });
+    }
+
     pub fn set_on_clear<F: Fn() + 'static>(&self, f: F) {
         *self.on_clear.borrow_mut() = Some(Box::new(f));
+    }
+
+    /// Klick auf „Updates installieren…": der Aufrufer holt sich die Liste
+    /// ueber [`InstalledView::current_updates`] und arbeitet sie ab.
+    pub fn set_on_update<F: Fn() + 'static>(&self, f: F) {
+        *self.on_update.borrow_mut() = Some(Box::new(f));
+    }
+
+    /// Faellige Updates fuer den gerade gewaehlten Client-Ordner.
+    pub fn current_updates(&self) -> Vec<hexwerk_index::Update> {
+        let Some((client_id, folders)) = self.current_scope() else {
+            return Vec::new();
+        };
+        self.updates
+            .borrow()
+            .iter()
+            .filter(|update| {
+                update.client_id == client_id && folders.iter().any(|f| *f == update.folder)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Client-Kennung und Ordnernamen des gewaehlten Ziels.
+    fn current_scope(&self) -> Option<(String, Vec<String>)> {
+        let data = self.data.borrow().clone()?;
+        let target = self
+            .targets
+            .borrow()
+            .get(self.target.selected() as usize)
+            .copied()?;
+        let client = data.clients.get(target.client)?;
+        let flavor = client.flavors.get(target.flavor)?;
+        Some((
+            client.id.clone(),
+            flavor.addons.iter().map(|a| a.folder.clone()).collect(),
+        ))
     }
 
     /// Doppelklick auf eine Zeile: Detailansicht fuer dieses Addon bauen. Alles,

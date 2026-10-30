@@ -15,6 +15,7 @@
 //! unbekannte Quellenkennungen werden behandelt, nicht angenommen.
 
 pub mod queries;
+pub mod remote;
 pub mod schema;
 pub mod sync;
 pub mod version;
@@ -25,6 +26,7 @@ pub use queries::{
     source_from_key, source_key, CatalogueItem, ClientRow, Filters, InstalledRow, ReleaseRow,
     SourceRelease, Stats, Update, UpdateHint,
 };
+pub use remote::{Manifest, RemoteCatalog, SyncOutcome};
 pub use schema::{Index, SCHEMA_VERSION};
 pub use sync::SyncReport;
 pub use version::compare as compare_versions;

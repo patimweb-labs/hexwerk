@@ -42,6 +42,7 @@ fn client_fixture(
             dir,
             addons_dir,
             interface_numbers: vec![11509],
+            game_version: None,
         }],
     }
 }
@@ -73,6 +74,7 @@ fn entry(key: &str, name: &str, author: &str, releases: Vec<Release>) -> Entry {
         summary: "Beschreibung".to_string(),
         homepage: Some("https://example.invalid".to_string()),
         category: Some("Combat".to_string()),
+        screenshots: vec!["https://example.invalid/bild.png".to_string()],
         releases,
     }
 }
@@ -232,17 +234,17 @@ fn filter_nach_quelle_und_interface() {
 
     // Interface 20506 kennt nur DBM, 11509 beide.
     let mut filters = Filters {
-        interface_number: Some(20_506),
+        interface_numbers: vec![20_506],
         ..Filters::default()
     };
     let hits = index.search(&filters, 50, 0).expect("Suche");
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].name, "Deadly Boss Mods");
 
-    filters.interface_number = Some(11_509);
+    filters.interface_numbers = vec![11_509];
     assert_eq!(index.search(&filters, 50, 0).expect("Suche").len(), 2);
 
-    filters.interface_number = Some(99_999);
+    filters.interface_numbers = vec![99_999];
     assert!(index.search(&filters, 50, 0).expect("Suche").is_empty());
 }
 
@@ -794,14 +796,14 @@ fn interface_filter_sieht_nur_die_angebotene_version() {
         .expect("Katalog");
 
     let mut filters = Filters {
-        interface_number: Some(20_506),
+        interface_numbers: vec![20_506],
         ..Filters::default()
     };
     assert!(
         index.search(&filters, 10, 0).expect("Suche").is_empty(),
         "ein Classic-Release von 2019 darf im Retail-Filter nicht auftauchen"
     );
-    filters.interface_number = Some(11_509);
+    filters.interface_numbers = vec![11_509];
     assert_eq!(index.search(&filters, 10, 0).expect("Suche").len(), 1);
     // Die Historie bleibt trotzdem vollstaendig (Tab „Dateien“).
     let hit = index

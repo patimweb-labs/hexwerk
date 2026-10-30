@@ -83,12 +83,14 @@ mod tests {
                     dir: game_dir.join("_retail_"),
                     addons_dir: retail,
                     interface_numbers: vec![11509],
+                    game_version: None,
                 },
                 FlavorDir {
                     flavor: Flavor::Classic,
                     dir: game_dir.join("_classic_"),
                     addons_dir: classic,
                     interface_numbers: vec![20506],
+                    game_version: None,
                 },
             ],
         }

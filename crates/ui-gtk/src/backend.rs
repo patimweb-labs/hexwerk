@@ -180,7 +180,7 @@ fn pipeline(discovery: &Discovery, run_sources: bool, tx: &async_channel::Sender
     runs.sort_by_key(|run| run.source);
     let _ = tx.send_blocking(IndexMsg::Sources(runs));
 
-    let merged = merge(entries);
+    let merged = merge::merge_with(entries, &source_priority());
     let report = index.sync_catalogue(&merged);
     let _ = tx.send_blocking(IndexMsg::Catalogue(report));
 }
@@ -189,6 +189,8 @@ fn pipeline(discovery: &Discovery, run_sources: bool, tx: &async_channel::Sender
 pub struct InstallJob {
     pub client: Client,
     pub flavor: Flavor,
+    /// Interface-Nummern des Ziel-Ordners (`Flavor` kennt nur den Ordnernamen).
+    pub flavor_interfaces: Vec<u32>,
     pub release: Release,
     /// Anzeigename fuer die Rueckmeldung; der Ordnername kommt aus dem ZIP.
     pub name: String,
@@ -196,12 +198,70 @@ pub struct InstallJob {
 
 /// Ergebnis einer Installation.
 pub enum InstallMsg {
+    /// Zwischenstand: `phase` ist der Schritt, `done`/`total` in Bytes.
+    Progress {
+        phase: &'static str,
+        done: u64,
+        total: Option<u64>,
+    },
     Done {
         name: String,
         version: String,
         folder: String,
     },
     Failed(String),
+    /// Ende eines Sammellaufs (alle Updates eines Client-Ordners).
+    BatchDone {
+        ok: usize,
+        failed: Vec<String>,
+    },
+}
+
+/// Ein Bild, wie es angekommen ist: Adresse und rohe Bytes.
+pub struct FetchedImage {
+    pub url: String,
+    pub bytes: Vec<u8>,
+}
+
+/// Ergebnis eines Bildabrufs.
+pub enum ImageMsg {
+    Done(Vec<FetchedImage>),
+}
+
+/// Laedt Bilder im Hintergrund (Screenshots der Detailseite).
+///
+/// Bilder sind kein Kataloginhalt, sondern Anzeige: sie werden erst geholt,
+/// wenn jemand den Eintrag oeffnet — sonst zoege ein Kataloglauf zehntausend
+/// Bilder mit. Im Index stehen nur die Adressen.
+pub fn spawn_image_fetch(urls: Vec<String>, tx: async_channel::Sender<ImageMsg>) {
+    std::thread::Builder::new()
+        .name("hexwerk-images".to_string())
+        .spawn(move || {
+            let http: Arc<dyn Http> = Arc::new(UreqHttp::new());
+            let mut out = Vec::new();
+            for url in urls {
+                let request = hexwerk_sources::Request::get(&url).header("accept", "image/*");
+                if let Ok(response) = http.request(&request) {
+                    if response.is_success() {
+                        out.push(FetchedImage {
+                            url,
+                            bytes: response.body,
+                        });
+                    }
+                }
+            }
+            let _ = tx.send_blocking(ImageMsg::Done(out));
+        })
+        .ok();
+}
+
+/// Rangfolge der Quellen aus den Einstellungen.
+///
+/// Dieselbe Datei, die der Reiter „Einstellungen" schreibt
+/// (`~/.config/hexwerk/settings.json`). Fehlt sie, gilt die Vorgabe
+/// CurseForge → WoWInterface → Tukui → GitHub → Wago.
+pub fn source_priority() -> merge::Priority {
+    merge::Priority::new(crate::settings_view::Settings::load().priority)
 }
 
 /// Laedt und entpackt ein Release im Hintergrund.
@@ -214,7 +274,7 @@ pub fn spawn_install(job: InstallJob, tx: async_channel::Sender<InstallMsg>) {
     std::thread::Builder::new()
         .name("hexwerk-install".to_string())
         .spawn(move || {
-            let msg = match install(&job) {
+            let msg = match install(&job, &tx) {
                 Ok((version, folder)) => InstallMsg::Done {
                     name: job.name.clone(),
                     version,
@@ -227,7 +287,43 @@ pub fn spawn_install(job: InstallJob, tx: async_channel::Sender<InstallMsg>) {
         .ok();
 }
 
-fn install(job: &InstallJob) -> Result<(String, String), String> {
+/// Mehrere Updates nacheinander im selben Thread.
+///
+/// Ein Fehler bricht den Lauf nicht ab: was geht, wird installiert, der Rest
+/// steht danach im Bericht. Der Fortschritt zaehlt Addons, innerhalb eines
+/// Addons meldet [`install`] weiterhin Bytes.
+pub fn spawn_update_batch(jobs: Vec<InstallJob>, tx: async_channel::Sender<InstallMsg>) {
+    std::thread::Builder::new()
+        .name("hexwerk-update".to_string())
+        .spawn(move || {
+            let count = jobs.len();
+            let mut ok = 0usize;
+            let mut failed = Vec::new();
+            for (index, job) in jobs.into_iter().enumerate() {
+                let _ = tx.send_blocking(InstallMsg::Progress {
+                    phase: "Update",
+                    done: index as u64,
+                    total: Some(count as u64),
+                });
+                match install(&job, &tx) {
+                    Ok(_) => ok += 1,
+                    Err(err) => failed.push(format!("{}: {err}", job.name)),
+                }
+            }
+            let _ = tx.send_blocking(InstallMsg::Progress {
+                phase: "Update",
+                done: count as u64,
+                total: Some(count as u64),
+            });
+            let _ = tx.send_blocking(InstallMsg::BatchDone { ok, failed });
+        })
+        .ok();
+}
+
+fn install(
+    job: &InstallJob,
+    tx: &async_channel::Sender<InstallMsg>,
+) -> Result<(String, String), String> {
     if job.release.download_url.trim().is_empty() {
         return Err(format!(
             "{} nennt für {} keine Download-Adresse",
@@ -235,12 +331,56 @@ fn install(job: &InstallJob) -> Result<(String, String), String> {
             job.release.version
         ));
     }
+    // Zweite Verteidigungslinie: die Oberflaeche bietet nur passende Ziele an,
+    // aber ein Addon fuer Classic Era darf auch dann nicht in einem anderen
+    // Client landen, wenn die Auswahl sie faelschlich zulaesst.
+    if !job.release.interface_numbers.is_empty() && !job.flavor_interfaces.is_empty() {
+        let fits = job
+            .release
+            .interface_numbers
+            .iter()
+            .any(|number| job.flavor_interfaces.contains(number));
+        if !fits {
+            return Err(format!(
+                "{} {} ist für Interface {} gebaut, {} lädt Interface {} — nicht installiert",
+                job.release.source.label(),
+                job.release.version,
+                join_numbers(&job.release.interface_numbers),
+                job.flavor.label(),
+                join_numbers(&job.flavor_interfaces)
+            ));
+        }
+    }
+
     let keys = KeyProvider::default_provider();
     let http: Arc<dyn Http> = Arc::new(UreqHttp::new());
     let registry = Registry::build(&keys, http, Cache::open_default());
+
+    let _ = tx.send_blocking(InstallMsg::Progress {
+        phase: "Download",
+        done: 0,
+        total: job.release.size_bytes,
+    });
+    let mut last_sent = 0u64;
     let bytes = registry
-        .download(&job.release)
+        .download_with(&job.release, &mut |done, total| {
+            if done.saturating_sub(last_sent) < 512 * 1024 {
+                return;
+            }
+            last_sent = done;
+            let _ = tx.send_blocking(InstallMsg::Progress {
+                phase: "Download",
+                done,
+                total,
+            });
+        })
         .map_err(|err| format!("{}: {err}", job.release.source.label()))?;
+
+    let _ = tx.send_blocking(InstallMsg::Progress {
+        phase: "Entpacken",
+        done: bytes.len() as u64,
+        total: Some(bytes.len() as u64),
+    });
 
     let request = hexwerk_install::InstallRequest {
         client: job.client.clone(),
@@ -260,6 +400,15 @@ fn install(job: &InstallJob) -> Result<(String, String), String> {
         done.version.unwrap_or_else(|| job.release.version.clone()),
         folder,
     ))
+}
+
+/// `11509, 20506` — fuer Fehlertexte.
+fn join_numbers(numbers: &[u32]) -> String {
+    numbers
+        .iter()
+        .map(|number| number.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Index oeffnen (oder anlegen). Getrennt, damit die UI den Fehlertext anzeigen
@@ -308,6 +457,7 @@ pub fn core_client(data: &ClientData) -> Client {
                 dir: data.game_dir.join(&flavor.dir_name),
                 addons_dir: flavor.addons_dir.clone(),
                 interface_numbers: flavor.interface_numbers.clone(),
+                game_version: flavor.game_version.clone(),
             })
             .collect(),
     }
@@ -319,10 +469,8 @@ pub fn source_state(runs: &[SourceRun], source: Source) -> Option<SourceRun> {
 }
 
 /// Quellen, die der Katalog kennt. Reihenfolge wie in PLAN §5.
-pub const CATALOGUE_SOURCES: [Source; 5] = [
-    Source::GitHub,
-    Source::Tukui,
-    Source::WowInterface,
-    Source::Wago,
-    Source::CurseForge,
-];
+/// Quellen, die der Katalog befragt.
+///
+/// GitHub und Tukui sind entfernt: GitHub ist ohne Token auf 60 Anfragen je
+/// Stunde gedrosselt und fuehrt kaum WoW-Addons, Tukui nur seine eigenen.
+pub const CATALOGUE_SOURCES: [Source; 3] = [Source::CurseForge, Source::WowInterface, Source::Wago];

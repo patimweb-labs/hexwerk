@@ -21,7 +21,9 @@ use crate::format::initial;
 /// kein Katalog, sondern eine Wand. Wer mehr braucht, verfeinert die Suche.
 pub const PAGE: u32 = 60;
 
-const SEARCH_HINT: &str = "Suche: Name, Autor, Beschreibung …";
+fn search_hint() -> &'static str {
+    crate::lang::tn("cv.search.hint")
+}
 
 /// Was gesucht wird. Eigener Rueckruf statt direkter Indexzugriff: das Widget
 /// kennt keine Datenbank, der Aufrufer keine Karten.
@@ -34,7 +36,17 @@ const CARD_HEIGHT: i32 = 156;
 pub struct CatalogView {
     root: gtk::ScrolledWindow,
     search: gtk::SearchEntry,
-    chip_box: gtk::Box,
+    /// Ueberschrift der Versionsleiste; sie muss beim Sprachwechsel mitziehen.
+    title: gtk::Label,
+    sub: gtk::Label,
+    /// Quellenfilter als Klappmenue mit Kaestchen: mehrere gleichzeitig.
+    source_button: gtk::MenuButton,
+    source_menu: gtk::Box,
+    source_checks: RefCell<Vec<(hexwerk_sources::Source, gtk::CheckButton)>>,
+    /// Versionsfilter ebenso, ebenfalls mehrere Fassungen gleichzeitig.
+    version_button: gtk::MenuButton,
+    version_menu: gtk::Box,
+    version_checks: RefCell<Vec<(u32, gtk::CheckButton)>>,
     summary: gtk::Label,
     stack: gtk::Stack,
     building_detail: gtk::Label,
@@ -54,14 +66,11 @@ pub struct CatalogView {
 
 impl CatalogView {
     pub fn new() -> Rc<Self> {
-        let title = gtk::Label::new(Some("Katalog"));
+        let title = gtk::Label::new(Some(crate::lang::tn("cv.title")));
         title.add_css_class("hw-h1");
         title.set_xalign(0.0);
 
-        let sub = gtk::Label::new(Some(
-            "Dasselbe Addon aus mehreren Märkten ist ein Eintrag. Suche und Filter laufen über den \
-             lokalen Index, nie über das Netz.",
-        ));
+        let sub = gtk::Label::new(Some(crate::lang::tn("cv.sub")));
         sub.add_css_class("hw-sub");
         sub.set_xalign(0.0);
         sub.set_wrap(true);
@@ -70,17 +79,63 @@ impl CatalogView {
 
         let search = gtk::SearchEntry::new();
         search.add_css_class("hw-search");
-        search.set_placeholder_text(Some(SEARCH_HINT));
+        search.set_placeholder_text(Some(search_hint()));
         search.set_hexpand(true);
 
         let search_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         search_row.set_margin_bottom(12);
         search_row.append(&search);
 
+        // Quellenfilter: ein Klappmenue mit Kaestchen statt einer Knopfreihe.
+        // Bei mehreren Quellen war die Reihe breit und man konnte nur umstaendlich
+        // zwei gleichzeitig waehlen.
+        let source_menu = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        source_menu.set_margin_top(6);
+        source_menu.set_margin_bottom(6);
+        source_menu.set_margin_start(6);
+        source_menu.set_margin_end(6);
+        let source_popover = gtk::Popover::new();
+        source_popover.set_child(Some(&source_menu));
+        let source_button = gtk::MenuButton::new();
+        source_button.add_css_class("hw-drop");
+        source_button.set_label(crate::lang::tn("cv.allSources"));
+        source_button.set_popover(Some(&source_popover));
+        source_button.set_tooltip_text(Some(crate::lang::tn("cv.sources.hint")));
+        crate::theme::pointer(&source_button);
+
         let chips = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         chips.set_margin_bottom(14);
+        chips.append(&source_button);
 
-        let summary = gtk::Label::new(Some("Katalog wird aufgebaut …"));
+        // Versionsleiste: je installierter WoW-Fassung eine Schaltflaeche.
+        // Sie steht sichtbar unter den Quellenchips statt in einem Menue -
+        // „nur was auf meinem Client laeuft“ ist die haeufigste Einschraenkung.
+        // Die Beschriftung nennt Version und Interface-Nummer, weil jede Quelle
+        // Spielversionen anders schreibt („11.2.0“, „Retail“, „110200“); die
+        // Nummer ist der gemeinsame Nenner, nach dem der Index filtert.
+
+        let version_buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let version_menu = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        version_menu.set_margin_top(6);
+        version_menu.set_margin_bottom(6);
+        version_menu.set_margin_start(6);
+        version_menu.set_margin_end(6);
+        let version_popover = gtk::Popover::new();
+        version_popover.set_child(Some(&version_menu));
+        let version_button = gtk::MenuButton::new();
+        version_button.add_css_class("hw-drop");
+        version_button.set_label(crate::lang::tn("cv.allVersions"));
+        version_button.set_popover(Some(&version_popover));
+        version_button.set_tooltip_text(Some(crate::lang::tn("cv.version.hint")));
+        crate::theme::pointer(&version_button);
+        version_buttons.append(&version_button);
+
+        // Beide Filter stehen nebeneinander in einer Zeile: Quelle links,
+        // Fassung rechts. Eine eigene Beschriftung braucht es nicht mehr, die
+        // Beschriftung des Menues sagt selbst, was gewaehlt ist.
+        chips.append(&version_buttons);
+
+        let summary = gtk::Label::new(Some(crate::lang::tn("cv.building")));
         summary.add_css_class("hw-dim2");
         summary.set_margin_bottom(14);
         summary.set_xalign(0.0);
@@ -90,7 +145,7 @@ impl CatalogView {
         spinner.set_size_request(34, 34);
         spinner.set_halign(gtk::Align::Start);
 
-        let building_headline = gtk::Label::new(Some("Katalog wird aufgebaut …"));
+        let building_headline = gtk::Label::new(Some(crate::lang::tn("cv.building")));
         building_headline.add_css_class("hw-note-title");
         building_headline.set_xalign(0.0);
 
@@ -126,7 +181,7 @@ impl CatalogView {
         empty.append(&empty_text);
 
         // ---- Zustand „Index nicht lesbar“ ----
-        let error_headline = gtk::Label::new(Some("Der Index lässt sich nicht lesen"));
+        let error_headline = gtk::Label::new(Some(crate::lang::tn("cv.error.head")));
         error_headline.add_css_class("hw-note-title");
         error_headline.set_xalign(0.0);
 
@@ -189,7 +244,14 @@ impl CatalogView {
         let view = Rc::new(Self {
             root,
             search,
-            chip_box: chips,
+            title: title.clone(),
+            sub: sub.clone(),
+            source_button: source_button.clone(),
+            source_menu,
+            source_checks: RefCell::new(Vec::new()),
+            version_button: version_button.clone(),
+            version_menu,
+            version_checks: RefCell::new(Vec::new()),
             summary,
             stack,
             building_detail,
@@ -203,7 +265,7 @@ impl CatalogView {
             on_open: RefCell::new(None),
             search_generation: std::cell::Cell::new(0),
         });
-        view.build_chips();
+        view.build_source_menu();
         view.wire();
         view
     }
@@ -214,6 +276,24 @@ impl CatalogView {
 
     /// Rueckruf fuer jede Suchanfrage. Der Aufrufer beantwortet sie aus dem
     /// Index und ruft danach [`CatalogView::show_results`].
+    /// Zieht die festen Texte des Katalogs auf die aktuelle Sprache nach.
+    pub fn retranslate(self: &Rc<Self>) {
+        self.search.set_placeholder_text(Some(search_hint()));
+        self.title.set_text(crate::lang::tn("cv.title"));
+        self.sub.set_text(crate::lang::tn("cv.sub"));
+        // Quellenchips tragen einen Tooltip mit der Quelle; neu bauen ist
+        // billiger als jeden Knopf einzeln zu suchen.
+        self.source_button
+            .set_tooltip_text(Some(crate::lang::tn("cv.sources.hint")));
+        let chosen_sources = self.filters.borrow().sources.clone();
+        self.build_source_menu();
+        for (source, check) in self.source_checks.borrow().iter() {
+            check.set_active(chosen_sources.contains(source));
+        }
+        self.update_source_label();
+        self.update_version_label();
+    }
+
     pub fn set_on_search<F: Fn(Filters) + 'static>(self: &Rc<Self>, f: F) {
         *self.on_search.borrow_mut() = Some(Box::new(f));
     }
@@ -230,36 +310,156 @@ impl CatalogView {
         self.filters.borrow().clone()
     }
 
-    fn build_chips(self: &Rc<Self>) {
+    /// Baut das Quellenmenue: ein Kaestchen je Quelle.
+    ///
+    /// Mehrfachauswahl ist der Normalfall („CurseForge und WoWInterface"), eine
+    /// Knopfreihe konnte das nur mit Umschalten und war bei drei Quellen schon
+    /// breiter als die Suche.
+    fn build_source_menu(self: &Rc<Self>) {
+        while let Some(child) = self.source_menu.first_child() {
+            self.source_menu.remove(&child);
+        }
+        self.source_checks.borrow_mut().clear();
         for source in CATALOGUE_SOURCES {
-            let button = gtk::ToggleButton::with_label(source.label());
-            button.add_css_class("hw-chip");
-            button.set_tooltip_text(Some(&format!(
-                "Nur Einträge, die {} als Quelle haben",
-                source.label()
-            )));
+            let check = gtk::CheckButton::with_label(source.label());
+            check.add_css_class("hw-check");
+            crate::theme::pointer(&check);
             let weak = Rc::downgrade(self);
-            button.connect_toggled(move |button| {
+            check.connect_toggled(move |button| {
+                let Some(view) = weak.upgrade() else {
+                    return;
+                };
+                let mut filters = view.filters.borrow_mut();
+                if button.is_active() {
+                    if !filters.sources.contains(&source) {
+                        filters.sources.push(source);
+                    }
+                } else {
+                    filters.sources.retain(|s| *s != source);
+                }
+                drop(filters);
+                view.update_source_label();
+                view.request_search(false);
+            });
+            self.source_menu.append(&check);
+            self.source_checks.borrow_mut().push((source, check));
+        }
+        self.update_source_label();
+    }
+
+    /// Beschriftung des Quellenmenues: „Alle Quellen" oder die Namen.
+    fn update_source_label(&self) {
+        let chosen: Vec<&str> = self
+            .source_checks
+            .borrow()
+            .iter()
+            .filter(|(_, check)| check.is_active())
+            .map(|(source, _)| source.label())
+            .collect();
+        let text = if chosen.is_empty() {
+            crate::lang::tn("cv.allSources").to_string()
+        } else {
+            chosen.join(", ")
+        };
+        self.source_button.set_label(&text);
+    }
+
+    /// Setzt das Versionsmenue: ein Kaestchen je installierter WoW-Fassung.
+    ///
+    /// Gefiltert wird ueber die **Interface-Nummer**, die einzige Angabe, die
+    /// alle Quellen teilen. Mehrere Fassungen gleichzeitig sind erlaubt, weil
+    /// „Retail und Classic" auf diesem Rechner der Normalfall ist.
+    pub fn set_versions(self: &Rc<Self>, versions: &[(u32, String)]) {
+        while let Some(child) = self.version_menu.first_child() {
+            self.version_menu.remove(&child);
+        }
+        self.version_checks.borrow_mut().clear();
+
+        // Fassungen, die es nicht mehr gibt, fallen aus dem Filter.
+        {
+            let mut filters = self.filters.borrow_mut();
+            filters
+                .interface_numbers
+                .retain(|number| versions.iter().any(|(known, _)| known == number));
+        }
+
+        if versions.is_empty() {
+            let hint = gtk::Label::new(Some(crate::lang::tn("cv.fitness")));
+            hint.add_css_class("hw-dim2");
+            hint.set_xalign(0.0);
+            hint.set_wrap(true);
+            hint.set_max_width_chars(40);
+            self.version_menu.append(&hint);
+            self.version_button.set_sensitive(false);
+            self.version_button
+                .set_label(crate::lang::tn("cv.allVersions"));
+            return;
+        }
+
+        self.version_button.set_sensitive(true);
+        for (number, text) in versions {
+            let check = gtk::CheckButton::with_label(&format!("{text} ({number})"));
+            check.add_css_class("hw-check");
+            crate::theme::pointer(&check);
+            check.set_active(self.filters.borrow().interface_numbers.contains(number));
+            let weak = Rc::downgrade(self);
+            let number = *number;
+            check.connect_toggled(move |button| {
                 let Some(view) = weak.upgrade() else {
                     return;
                 };
                 {
                     let mut filters = view.filters.borrow_mut();
                     if button.is_active() {
-                        button.add_css_class("sig");
-                        if !filters.sources.contains(&source) {
-                            filters.sources.push(source);
+                        if !filters.interface_numbers.contains(&number) {
+                            filters.interface_numbers.push(number);
                         }
                     } else {
-                        button.remove_css_class("sig");
-                        filters.sources.retain(|s| *s != source);
+                        filters.interface_numbers.retain(|n| *n != number);
                     }
                 }
+                view.update_version_label();
                 view.request_search(false);
             });
-            crate::theme::pointer(&button);
-            self.chip_box.append(&button);
+            self.version_menu.append(&check);
+            self.version_checks.borrow_mut().push((number, check));
         }
+        self.update_version_label();
+    }
+
+    /// Beschriftung des Versionsmenues: „Alle Versionen" oder die Fassungen.
+    fn update_version_label(&self) {
+        let chosen: Vec<String> = self
+            .version_checks
+            .borrow()
+            .iter()
+            .filter(|(_, check)| check.is_active())
+            .map(|(number, _)| number.to_string())
+            .collect();
+        let text = if chosen.is_empty() {
+            crate::lang::tn("cv.allVersions").to_string()
+        } else {
+            chosen.join(", ")
+        };
+        self.version_button.set_label(&text);
+    }
+
+    /// Die gewaehlten Fassungen mit ihrer Beschriftung, fuer die Trefferzeile.
+    fn selected_versions(&self) -> Vec<(u32, String)> {
+        self.version_checks
+            .borrow()
+            .iter()
+            .filter(|(_, check)| check.is_active())
+            .map(|(number, check)| {
+                (
+                    *number,
+                    check
+                        .label()
+                        .map(|text| text.to_string())
+                        .unwrap_or_default(),
+                )
+            })
+            .collect()
     }
 
     fn wire(self: &Rc<Self>) {
@@ -304,7 +504,7 @@ impl CatalogView {
     /// Zustand „laeuft“: Spinner, Zwischenstand, keine Karten.
     pub fn set_building(&self) {
         self.stack.set_visible_child_name("building");
-        self.summary.set_text("Katalog wird aufgebaut …");
+        self.summary.set_text(crate::lang::tn("cv.building"));
         self.clear_cards();
     }
 
@@ -316,7 +516,7 @@ impl CatalogView {
     /// Kein Client gefunden: dann wurde der Kataloglauf uebersprungen.
     pub fn set_no_clients(&self) {
         self.show_empty(
-            "Kein Client-Ordner gefunden",
+            crate::lang::tn("cv.no.client"),
             "Deshalb wurden die Quellen nicht befragt: ein Katalog ohne Ziel-Client wäre eine \
              Liste, aus der man nichts installieren kann. Der Scan-Bildschirm zeigt je Herkunft, \
              wo gesucht wurde.",
@@ -362,7 +562,7 @@ impl CatalogView {
         self.clear_cards();
         if stats.catalogue == 0 {
             self.show_empty(
-                "Der Index enthält keine Katalogeinträge",
+                crate::lang::tn("cv.empty.index"),
                 "Das passiert, wenn keine Quelle geantwortet hat oder noch kein Client gefunden \
                  wurde. Die Zeilen unten nennen den Zustand je Quelle. „Erneut scannen“ auf dem \
                  Scan-Bildschirm baut Clients und Katalog noch einmal.",
@@ -372,17 +572,11 @@ impl CatalogView {
         if items.is_empty() {
             let filters = self.filters.borrow();
             let text = if filters.query.trim().is_empty() {
-                format!(
-                    "Kein Eintrag passt zu den gewählten Quellen. Es sind {} Einträge im Index.",
-                    stats.catalogue
-                )
+                crate::lang::tn("cv.empty.filter").replacen("{}", &stats.catalogue.to_string(), 1)
             } else {
-                format!(
-                    "Kein Treffer für „{}“. Gesucht wird über Name, Autor und Kurztext: {} \
-                     Einträge sind im Index.",
-                    filters.query.trim(),
-                    stats.catalogue
-                )
+                crate::lang::tn("cv.no.hit")
+                    .replacen("{}", filters.query.trim(), 1)
+                    .replacen("{}", &stats.catalogue.to_string(), 1)
             };
             drop(filters);
             self.show_empty("Keine Treffer", &text);
@@ -405,29 +599,40 @@ impl CatalogView {
     pub fn show_error(&self, text: &str) {
         self.clear_cards();
         self.error_text.set_text(text);
-        self.summary.set_text("Index nicht lesbar");
+        self.summary.set_text(crate::lang::tn("cv.index.error"));
         self.stack.set_visible_child_name("error");
     }
 
     fn show_empty(&self, headline: &str, text: &str) {
         self.empty_headline.set_text(headline);
         self.empty_text.set_text(text);
-        self.summary.set_text("0 Einträge");
+        self.summary.set_text(crate::lang::tn("cv.count.zero"));
         self.stack.set_visible_child_name("empty");
     }
 
     fn summary_text(&self, shown: usize, stats: &Stats) -> String {
         let filters = self.filters.borrow();
-        let mut parts = vec![format!("{shown} von {} Einträgen", stats.catalogue)];
+        let mut parts = vec![crate::lang::tn("cv.count")
+            .replacen("{}", &shown.to_string(), 1)
+            .replacen("{}", &stats.catalogue.to_string(), 1)];
         if !filters.query.trim().is_empty() {
-            parts.push(format!("Suche „{}“", filters.query.trim()));
+            parts.push(crate::lang::tn("cv.count.search").replacen("{}", filters.query.trim(), 1));
         }
         if !filters.sources.is_empty() {
             let names: Vec<&str> = filters.sources.iter().map(|s| s.label()).collect();
-            parts.push(format!("Quellen: {}", names.join(", ")));
+            parts.push(crate::lang::tn("cv.sources.on").replacen("{}", &names.join(", "), 1));
+        }
+        let versions = self.selected_versions();
+        if !versions.is_empty() {
+            let labels: Vec<String> = versions.iter().map(|(_, label)| label.clone()).collect();
+            parts.push(
+                crate::lang::tn("cv.version.on")
+                    .replacen("{}", &labels.join(", "), 1)
+                    .replacen("{}", "", 1),
+            );
         }
         if shown as u32 >= PAGE {
-            parts.push("erste Seite, Suche verfeinern".to_string());
+            parts.push(crate::lang::tn("cv.count.first").to_string());
         }
         parts.join(" · ")
     }
@@ -487,7 +692,7 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
     // Was die Quelle nicht liefert, wird nicht ersetzt: „keine Angabe“ ist
     // eine Aussage, ein erfundener Kurztext waere eine Luege.
     let summary = if item.summary.trim().is_empty() {
-        "keine Angabe".to_string()
+        crate::lang::tn("cv.unspecified").to_string()
     } else {
         item.summary.trim().to_string()
     };
@@ -512,7 +717,7 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
     let mehr = item.sources.len().saturating_sub(3);
     for release in item.sources.iter().take(3) {
         let version = if release.version.trim().is_empty() {
-            "keine Version".to_string()
+            crate::lang::tn("cv.no.version").to_string()
         } else {
             release.version.clone()
         };
@@ -527,7 +732,7 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
         let chip = gtk::Label::new(Some(&text));
         chip.add_css_class("hw-chip");
         chip.set_tooltip_text(Some(&if release.download_url.trim().is_empty() {
-            format!("{version}: diese Quelle nennt keine Download-Adresse.")
+            crate::lang::tn("cv.no.download").replacen("{}", &version, 1)
         } else {
             format!("{} {version}", release.source.label())
         }));
@@ -540,11 +745,11 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
         let chip = gtk::Label::new(Some(&format!("+{mehr}")));
         chip.add_css_class("hw-chip");
         chip.add_css_class("off");
-        chip.set_tooltip_text(Some("weitere Quellen in der Detailansicht"));
+        chip.set_tooltip_text(Some(crate::lang::tn("cv.more.sources")));
         chips.append(&chip);
     }
     if item.sources.is_empty() {
-        let chip = gtk::Label::new(Some("ohne Quelle"));
+        let chip = gtk::Label::new(Some(crate::lang::tn("cv.no.source")));
         chip.add_css_class("hw-chip");
         chip.add_css_class("off");
         chips.append(&chip);
@@ -555,11 +760,13 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
         let version = first
             .version
             .clone()
-            .unwrap_or_else(|| "ohne Version".to_string());
+            .unwrap_or_else(|| crate::lang::tn("cv.no.version").to_string());
         let label = if item.installed.len() > 1 {
-            format!("installiert {version} · {} Clients", item.installed.len())
+            crate::lang::tn("cv.installed.multi")
+                .replacen("{}", &version, 1)
+                .replacen("{}", &item.installed.len().to_string(), 1)
         } else {
-            format!("installiert {version}")
+            crate::lang::tn("cv.installed").replacen("{}", &version, 1)
         };
         let chip = gtk::Label::new(Some(&label));
         chip.add_css_class("hw-chip");
@@ -584,7 +791,7 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
             }
         }
     });
-    card.set_tooltip_text(Some("Details öffnen"));
+    card.set_tooltip_text(Some(crate::lang::tn("cv.open")));
     card
 }
 
@@ -593,8 +800,8 @@ fn byline(item: &CatalogueItem) -> String {
     let author = item.author.trim();
     let sources = item.sources.len();
     let origin = match sources {
-        0 => "ohne Quelle".to_string(),
-        1 => format!("{} · 1 Quelle", item.sources[0].source.label()),
+        0 => crate::lang::tn("cv.no.source").to_string(),
+        1 => crate::lang::tn("cv.sources.one").replacen("{}", item.sources[0].source.label(), 1),
         n => format!("{} · {n} Quellen gemergt", item.sources[0].source.label()),
     };
     if author.is_empty() {
@@ -660,6 +867,7 @@ mod tests {
             latest: None,
             releases: Vec::new(),
             installed: Vec::new(),
+            screenshots: Vec::new(),
         }
     }
 

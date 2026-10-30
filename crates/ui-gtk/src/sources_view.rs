@@ -143,6 +143,18 @@ impl SourcesView {
         view
     }
 
+    /// Uebersicht ohne eigenen Scrollbereich — zum Einbetten in eine Seite,
+    /// die selbst schon scrollt.
+    pub fn overview_widget(&self) -> &gtk::Widget {
+        // Eingebettet soll die Ansicht ihre natuerliche Hoehe nehmen und nicht
+        // in einem eigenen Scrollfenster stehen: sonst scrollt man doppelt und
+        // die Karten werden abgeschnitten.
+        // Natuerliche Hoehe statt „füllt den Platz": die Seite selbst scrollt.
+        self.root.set_vexpand(false);
+        self.root.set_valign(gtk::Align::Start);
+        self.root.upcast_ref()
+    }
+
     pub fn widget(&self) -> &gtk::Widget {
         self.root.upcast_ref()
     }
@@ -420,6 +432,7 @@ fn key_text(source: Source, keys: &KeyProvider) -> String {
                 KeyOrigin::Environment => "Umgebungsvariable",
                 KeyOrigin::File => "keys.json",
                 KeyOrigin::Keyring => "Schlüsselbund",
+                KeyOrigin::BuiltIn => "eingebaut",
                 KeyOrigin::Missing => "nicht gesetzt",
                 KeyOrigin::NotNeeded => "nicht nötig",
             }

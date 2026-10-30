@@ -16,8 +16,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
-use hexwerk_index::{source_key, CatalogueItem, Filters, Index, Stats};
-use hexwerk_sources::Source;
+use hexwerk_index::{source_key, Filters, Index, Stats};
+use hexwerk_sources::{KeyProvider, Source};
 
 use crate::backend::{self, IndexMsg, InstallJob, InstallMsg, SourceRun};
 use crate::catalog_view::{self, CatalogView};
@@ -26,6 +26,7 @@ use crate::detail_view::{DetailTarget, DetailView, InstallChoice};
 use crate::format::iso_date;
 use crate::installed_view::{InstalledView, OpenRequest};
 use crate::scan_view::ScanView;
+use crate::settings_view::SettingsView;
 use crate::sources_view::{SourceInfo, SourcesView};
 use crate::state::{ScanData, ScanMsg};
 use crate::theme::Theme;
@@ -34,13 +35,16 @@ pub const APP_ID: &str = "de.weppelmann.Hexwerk";
 
 /// Reihenfolge der Bildschirme: Name im Stack, Titel, Untertitel fuer den
 /// Kopfbereich. Eine Tabelle, damit Leiste und Kopf nicht auseinanderlaufen.
-const PAGES: [(&str, &str, &str); 6] = [
-    ("scan", "Scan", "Herkünfte prüfen"),
+const PAGES: [(&str, &str, &str); 5] = [
     ("clients", "Clients", "Gefundene WoW-Installationen"),
     ("installed", "Installiert", "Addons je Client-Ordner"),
     ("catalog", "Katalog", "Suche im lokalen Index"),
-    ("sources", "Quellen", "Zustand, Verbindungstest, Schlüssel"),
     ("detail", "Addon-Detail", "Quellen, Versionen, Ziel"),
+    (
+        "settings",
+        "Einstellungen",
+        "Sprache, Aussehen und Ablage",
+    ),
 ];
 
 /// Zaehler in der Leiste und in der Fusszeile. Eigene Labels, weil ein Widget
@@ -51,7 +55,15 @@ struct Counts {
     nav_catalog: gtk::Label,
     info_addons: gtk::Label,
     footer: gtk::Label,
+    /// Erklaerender Text links in der Fusszeile; muss beim Sprachwechsel
+    /// mitziehen wie alle anderen Texte dort.
     footer_scan: gtk::Label,
+    /// Was gerade laeuft („Scan läuft …", „Katalog wird befragt …") - der
+    /// einzige Ort, an dem man ohne Klick sieht, dass die App arbeitet.
+    footer_state: gtk::Label,
+    footer_busy: adw::Spinner,
+    /// Die Markenzeile oben in der Leiste (Logo plus Wortmarke).
+    brand_row: gtk::Box,
 }
 
 /// Eine Ansicht in der Leiste. Ein Knopf statt einer Listenzeile: so ist die
@@ -60,6 +72,11 @@ struct Counts {
 struct NavItem {
     name: &'static str,
     button: gtk::Button,
+    /// Die sichtbare Beschriftung: sie haengt an der Sprache und wird beim
+    /// Wechsel neu gesetzt, ohne die Leiste neu zu bauen.
+    label: gtk::Label,
+    /// Symbol fuer die kompakte Leiste (nur Symbole, keine Beschriftung).
+    icon: gtk::Image,
 }
 
 struct Ui {
@@ -70,11 +87,13 @@ struct Ui {
     back: gtk::Button,
     toast: adw::ToastOverlay,
     scan: ScanView,
-    clients_view: ClientsView,
+    clients_view: Rc<ClientsView>,
     installed: Rc<InstalledView>,
     catalog: Rc<CatalogView>,
     detail: Rc<DetailView>,
     counts: Counts,
+    /// Laufband in der Fusszeile: laeuft, solange Katalog oder Scan arbeiten.
+    nyan: crate::nyan::NyanCat,
     /// Quellenzustand links; die Texte kommen aus dem Index und dem letzten
     /// Lauf, nicht aus einer festen Liste.
     rail_sources: Vec<(Source, gtk::Label)>,
@@ -92,11 +111,19 @@ struct Ui {
     /// Der Unterstrich sagt dem Compiler, dass hier absichtlich nichts gelesen
     /// wird: der Wert existiert nur, um zu leben.
     _theme: Rc<Theme>,
+    /// Fortschrittsleiste ueber der Fusszeile: nur waehrend einer Installation sichtbar.
+    progress_box: gtk::Box,
+    progress_bar: gtk::ProgressBar,
+    progress_label: gtk::Label,
+    /// Ueberschriften und Zahlen der Leiste: in der kompakten Leiste weg.
+    rail_extra: Vec<gtk::Widget>,
     /// Brotkrumen in der Kopfleiste: Weg zurueck in den Katalog.
     crumb: gtk::Box,
     crumb_name: gtk::Label,
     /// Bildschirm "Quellen": Zustand, Test, Schluessel.
     sources: Rc<SourcesView>,
+    /// Bildschirm "Einstellungen": Rangfolge der Quellen, Sprache.
+    settings_view: Rc<SettingsView>,
     /// Testergebnisse dieser Sitzung, je Quelle.
     source_tests: RefCell<std::collections::BTreeMap<hexwerk_sources::Source, SourceInfo>>,
 }
@@ -116,8 +143,13 @@ pub fn run() -> glib::ExitCode {
 /// Baut das Hauptfenster. Oeffentlich, damit eine Vorschau oder ein Test es
 /// ohne `run()` und ohne eigene Hauptschleife aufbauen kann.
 pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
-    let window = adw::ApplicationWindow::builder()
+    // Allererste Handlung: die Sprache steht, bevor irgendein Widget einen
+    // Text bekommt. Sonst entstehen Titel und Hinweise auf Deutsch, waehrend
+    // die Leiste schon in der gewaehlten Sprache steht.
+    crate::lang::set_current(&crate::settings_view::Settings::load().language);
+    let window: adw::ApplicationWindow = adw::ApplicationWindow::builder()
         .application(app)
+        .icon_name(APP_ID)
         .title("Hexwerk")
         .default_width(1280)
         .default_height(820)
@@ -135,13 +167,15 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let installed = InstalledView::new();
     let catalog = CatalogView::new();
     let detail = DetailView::new();
+    let settings_view = SettingsView::new();
+
     let sources = SourcesView::new();
 
-    stack.add_named(scan.widget(), Some("scan"));
     stack.add_named(clients_view.widget(), Some("clients"));
     stack.add_named(installed.widget(), Some("installed"));
     stack.add_named(catalog.widget(), Some("catalog"));
-    stack.add_named(sources.widget(), Some("sources"));
+
+    stack.add_named(settings_view.widget(), Some("settings"));
     stack.add_named(detail.widget(), Some("detail"));
 
     // ---- Kopfbereich der Inhaltsspalte ----
@@ -187,8 +221,9 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     });
     header.pack_start(&crumb);
 
-    let switcher = theme.switcher();
-    header.pack_end(&switcher);
+    // Sonne/Mond statt Menue: ein Klick schaltet, das Icon zeigt den Zustand.
+    let theme_toggle = theme.dark_toggle();
+    header.pack_end(&theme_toggle);
 
     // ---- Fusszeile ----
     let footer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -197,31 +232,73 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let brand = gtk::Label::new(Some("HEXWERK"));
     brand.add_css_class("hw-footer-item");
 
-    let source_note = gtk::Label::new(Some(
-        "Clients aus dem Präfix-Scan, Katalog aus dem lokalen Index",
-    ));
-    source_note.add_css_class("hw-footer-item");
-    source_note.set_hexpand(true);
-    source_note.set_xalign(0.0);
+    // Erklaertexte stehen nicht mehr in der Fusszeile: sie war zur Haelfte
+    // Prosa. Was bleibt, sind Schlagworte und Zahlen.
 
-    let footer_stats = gtk::Label::new(Some("kein Scan gelaufen"));
+    let lang_now = crate::settings_view::Settings::load().language;
+    let footer_stats = gtk::Label::new(Some(crate::lang::t(&lang_now, "st.footer.noScan")));
     footer_stats.add_css_class("hw-footer-item");
 
-    let footer_scan = gtk::Label::new(Some("Stand —"));
+    let footer_scan = gtk::Label::new(Some(crate::lang::t(&lang_now, "st.footer.stand")));
     footer_scan.add_css_class("hw-footer-item");
 
+    // Was gerade laeuft. Ohne diese Zeile sieht ein Katalogaufbau aus wie eine
+    // haengende App: der Scan laeuft im Hintergrund, das Fenster bleibt
+    // bedienbar, und nichts sagt, dass Arbeit im Gange ist.
+    let nyan = crate::nyan::NyanCat::new();
+
+    let footer_busy = adw::Spinner::new();
+    footer_busy.set_size_request(14, 14);
+    footer_busy.set_valign(gtk::Align::Center);
+    footer_busy.set_visible(false);
+
+    let footer_state = gtk::Label::new(Some(crate::lang::t(&lang_now, "st.footer.idle")));
+    footer_state.add_css_class("hw-footer-item");
+    footer_state.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    footer_state.set_max_width_chars(70);
+    footer_state.set_hexpand(true);
+    footer_state.set_xalign(0.0);
+
     footer.append(&brand);
-    footer.append(&source_note);
+    // Die Katze fliegt rechts neben der Wortmarke, nicht davor: links steht
+    // der Name, danach die Anzeige, danach der Zustand.
+    footer.append(nyan.widget());
+    footer.append(&footer_busy);
+    footer.append(&footer_state);
     footer.append(&footer_stats);
     footer.append(&footer_scan);
 
+    // ---- Fortschritt einer Installation ----
+    // Eigene Leiste ueber der Fusszeile: sie erscheint nur, solange etwas
+    // geladen oder entpackt wird, und nennt Schritt, Groesse und Tempo.
+    let progress_label = gtk::Label::new(Some(""));
+    progress_label.add_css_class("hw-footer-item");
+    progress_label.set_xalign(0.0);
+    progress_label.set_hexpand(true);
+    progress_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+
+    let progress_bar = gtk::ProgressBar::new();
+    progress_bar.set_show_text(false);
+    progress_bar.set_hexpand(true);
+
+    let progress_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    progress_box.add_css_class("hw-progress");
+    progress_box.set_margin_start(18);
+    progress_box.set_margin_end(18);
+    progress_box.set_margin_top(8);
+    progress_box.set_margin_bottom(8);
+    progress_box.append(&progress_label);
+    progress_box.append(&progress_bar);
+    progress_box.set_visible(false);
+
     let content_view = adw::ToolbarView::new();
     content_view.add_top_bar(&header);
+    content_view.add_bottom_bar(&progress_box);
     content_view.add_bottom_bar(&footer);
     content_view.set_content(Some(&stack));
 
     // ---- Leiste links ----
-    let (rail, nav, counts, rail_sources) = build_rail();
+    let (rail, nav, counts, rail_sources, extras) = build_rail();
 
     let rail_scroll = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
@@ -260,21 +337,35 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         counts: Counts {
             footer: footer_stats,
             footer_scan,
+            footer_state,
+            footer_busy,
             ..counts
         },
+        nyan,
+        progress_box,
+        progress_bar,
+        progress_label,
         rail_sources,
         data: RefCell::new(None),
         index: RefCell::new(None),
         index_sources: RefCell::new(Vec::new()),
         pipeline: Cell::new(0),
         _theme: theme,
+        rail_extra: extras,
         crumb,
         crumb_name,
         sources,
+        settings_view,
         source_tests: RefCell::new(std::collections::BTreeMap::new()),
     });
 
     wire(&ui);
+    // Drag and drop: ein ZIP oder eine Adresse aufs Fenster ziehen.
+    attach_drop_targets(&ui, &window);
+    // Leiste und Kopfzeile einmal in der gespeicherten Sprache setzen: die
+    // Beschriftungen entstehen auf Deutsch, und ohne diesen Aufruf stand beim
+    // Start „Katalog" neben „Catalogue" in der Fusszeile.
+    apply_language(&ui, &crate::lang::current());
     // Die Rueckrufe haengen als schwache Verweise an diesen Strukturen. Ohne
     // einen starken Verweis hier waeren sie nach dem Aufbau sofort weg - das
     // Fenster haette dann Knoepfe, die nichts tun. Ein Fenster je Prozess,
@@ -352,7 +443,7 @@ fn wire(ui: &Rc<Ui>) {
 
     ui.scan.connect_rescan(move || {
         if let Some(ui) = weak.upgrade() {
-            start_scan(&ui, true);
+            start_scan(&ui, false);
         }
     });
 
@@ -410,13 +501,137 @@ fn wire(ui: &Rc<Ui>) {
         }
     });
 
+    // Einstellungen: Rueckmeldung als Toast und sofortige Wirkung.
+    let weak = Rc::downgrade(ui);
+    ui.settings_view.set_on_saved(move |message| {
+        if let Some(ui) = weak.upgrade() {
+            toast(&ui, message);
+        }
+    });
+
+    let weak = Rc::downgrade(ui);
+    ui.settings_view.set_on_change(move |settings| {
+        if let Some(ui) = weak.upgrade() {
+            apply_language(&ui, &settings.language);
+            apply_nav_mode(&ui, settings.nav == "compact");
+            refresh_settings_sources(&ui);
+            start_scan(&ui, false);
+        }
+    });
+
+    // Installieren von Hand: Datei waehlen oder Adresse eingeben. Beides
+    // landet im selben Weg wie ein abgelegtes ZIP.
+    let weak = Rc::downgrade(ui);
+    ui.installed.set_on_install_file(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        // `FileChooserDialog` statt `FileDialog`: gebunden ist GTK 4.6,
+        // `FileDialog` gibt es erst ab 4.10.
+        // `FileChooserNative`: in GTK4 gibt es den Dateidialog nur noch so,
+        // `FileChooserDialog` kennt die Auswahl-Schnittstelle nicht mehr.
+        let dialog = gtk::FileChooserNative::new(
+            Some(crate::lang::tn("iv.install")),
+            None::<&gtk::Window>,
+            gtk::FileChooserAction::Open,
+            Some(crate::lang::tn("iv.install.ok")),
+            Some(crate::lang::tn("iv.install.cancel")),
+        );
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("Addon-ZIP"));
+        filter.add_pattern("*.zip");
+        filter.add_pattern("*.ZIP");
+        dialog.add_filter(&filter);
+
+        let weak_inner = Rc::downgrade(&ui);
+        dialog.connect_response(move |dialog, response| {
+            let path = dialog.file().and_then(|file| file.path());
+            dialog.hide();
+            if response != gtk::ResponseType::Accept {
+                return;
+            }
+            let Some(ui) = weak_inner.upgrade() else { return };
+            let Some(path) = path else { return };
+            match std::fs::read(&path) {
+                Ok(data) => {
+                    let name = path
+                        .file_name()
+                        .map(|name| name.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    install_dropped(&ui, data, name);
+                }
+                Err(err) => toast_error(&ui, &format!("{}: {err}", path.display())),
+            }
+        });
+        dialog.show();
+    });
+
+    let weak = Rc::downgrade(ui);
+    ui.installed.set_on_install_url(move |url| {
+        let Some(ui) = weak.upgrade() else { return };
+        let lang = ui_lang(&ui);
+        set_activity(&ui, &crate::lang::t(&lang, "st.kw.download"), true);
+        let (tx, rx) = async_channel::bounded::<Result<Vec<u8>, String>>(1);
+        let target = url.clone();
+        std::thread::spawn(move || {
+            let result = (|| -> Result<Vec<u8>, String> {
+                let agent = ureq::AgentBuilder::new()
+                    .timeout(std::time::Duration::from_secs(180))
+                    .build();
+                let response = agent
+                    .get(&target)
+                    .call()
+                    .map_err(|err| format!("{target}: {err}"))?;
+                let mut bytes = Vec::new();
+                std::io::Read::read_to_end(&mut response.into_reader(), &mut bytes)
+                    .map_err(|err| format!("{target}: {err}"))?;
+                Ok(bytes)
+            })();
+            let _ = tx.send_blocking(result);
+        });
+        let weak_inner = Rc::downgrade(&ui);
+        glib::spawn_future_local(async move {
+            let Ok(result) = rx.recv().await else { return };
+            let Some(ui) = weak_inner.upgrade() else { return };
+            set_activity(&ui, crate::lang::tn("st.ready"), false);
+            match result {
+                Ok(data) => {
+                    let name = url.rsplit('/').next().unwrap_or("addon.zip").to_string();
+                    install_dropped(&ui, data, name);
+                }
+                Err(err) => toast_error(&ui, &err),
+            }
+        });
+    });
+
+    let weak = Rc::downgrade(ui);
+    ui.installed.set_on_update(move || {
+        if let Some(ui) = weak.upgrade() {
+            start_update_all(&ui);
+        }
+    });
+
+    let weak = Rc::downgrade(ui);
+    ui.clients_view.set_on_rescan(move || {
+        if let Some(ui) = weak.upgrade() {
+            start_scan(&ui, false);
+        }
+    });
+
+    let compact = ui.settings_view.settings().nav == "compact";
+    apply_nav_mode(ui, compact);
+
     // Der Scan startet, sobald das Fenster steht - der Startbildschirm ist
     // sonst ein leerer Bildschirm mit einem Knopf.
     let weak = Rc::downgrade(ui);
     glib::idle_add_local_once(move || {
         if let Some(ui) = weak.upgrade() {
             show_page(&ui, "scan");
-            start_scan(&ui, true);
+            // Nur Ordner lesen: den Katalog liefert der Dienst. Ein eigener
+            // Quellenlauf wuerde ihn mit denselben Addons aus zweiter Hand
+            // auffuellen und die Zahl verfaelschen.
+            start_scan(&ui, false);
+            // Der Katalog kommt fertig vom Dienst: der Abruf laeuft neben dem
+            // Scan, damit die Liste gefuellt ist, bevor man sie braucht.
+            start_catalog_sync(&ui);
         }
     });
 }
@@ -602,13 +817,150 @@ fn set_crumb(ui: &Ui, name: &str) {
 
 /// Bildschirm zeigen und Leiste nachziehen. Idempotent, damit Aufrufe aus
 /// Rueckrufen und aus der Leiste sich nicht im Kreis drehen.
+/// Beschriftung einer Seite in der gewaehlten Sprache (Rueckfall: Deutsch).
+fn nav_text(lang: &str, page: &str, fallback: &str) -> String {
+    let key = format!("nav.{page}");
+    let text = crate::lang::t(lang, &key);
+    if text.is_empty() {
+        fallback.to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+/// Untertitel einer Seite in der gewaehlten Sprache.
+fn page_text(lang: &str, page: &str, fallback: &str) -> String {
+    let key = format!("page.{page}.sub");
+    let text = crate::lang::t(lang, &key);
+    if text.is_empty() {
+        fallback.to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+/// Symbol je Seite fuer die kompakte Leiste.
+/// Waagerechter Ausgleich je Symbol, in Pixeln. Nur wo das Symbol nicht
+/// mittig in seinem Feld steht; alles andere bleibt bei 0.
+fn nav_icon_nudge(page: &str) -> Option<i32> {
+    match page {
+        "catalog" => Some(4),
+        _ => None,
+    }
+}
+
+fn nav_icon(page: &str) -> &'static str {
+    match page {
+        "clients" => "computer-symbolic",
+        "installed" => "folder-symbolic",
+        "catalog" => "system-search-symbolic",
+        "settings" => "emblem-system-symbolic",
+        _ => "view-list-symbolic",
+    }
+}
+
+/// Stellt die Leiste um: voll (Symbol, Beschriftung, Zahlen) oder kompakt
+/// (nur Symbole, Statistik weg, schmal).
+fn apply_nav_mode(ui: &Rc<Ui>, compact: bool) {
+    for item in &ui.nav {
+        item.label.set_visible(!compact);
+        item.icon.set_visible(true);
+        // Ohne Beschriftung muss der Tooltip sagen, wohin der Knopf fuehrt —
+        // ein Ordner-Icon allein erklaert „Installiert" nicht.
+        let title = PAGES
+            .iter()
+            .find(|(page, _, _)| *page == item.name)
+            .map(|(_, title, subtitle)| format!("{title}: {subtitle}"))
+            .unwrap_or_else(|| item.name.to_string());
+        item.button.set_tooltip_text(Some(&title));
+
+        // In der schmalen Leiste: quadratische Flaeche, Inhalt mittig. Sonst
+        // kleben die Symbole links am Rand, waehrend das Logo oben mittig steht.
+        if compact {
+            item.button.set_size_request(48, 44);
+            item.button.set_halign(gtk::Align::Fill);
+            if let Some(child) = item.button.child() {
+                child.set_halign(gtk::Align::Center);
+            }
+        } else {
+            item.button.set_size_request(-1, -1);
+            if let Some(child) = item.button.child() {
+                child.set_halign(gtk::Align::Fill);
+            }
+        }
+    }
+    for extra in &ui.rail_extra {
+        extra.set_visible(!compact);
+    }
+    ui.counts.nav_clients.set_visible(!compact);
+    ui.counts.nav_installed.set_visible(!compact);
+    ui.counts.nav_catalog.set_visible(!compact);
+    // Klasse fuer das symmetrische Innenmass der schmalen Leiste.
+    if let Some(nav_box) = ui.nav.first().and_then(|item| item.button.parent()) {
+        if compact {
+            nav_box.add_css_class("hw-nav-compact");
+        } else {
+            nav_box.remove_css_class("hw-nav-compact");
+        }
+    }
+
+    // Markenzeile: schmal mittig, breit wieder linksbuendig.
+    ui.counts.brand_row.set_halign(if compact {
+        gtk::Align::Center
+    } else {
+        gtk::Align::Fill
+    });
+    ui.counts
+        .brand_row
+        .set_margin_start(if compact { 0 } else { 18 });
+
+    // Schmal: 64 px reichen fuer ein Symbol mit Rand.
+    ui.split
+        .set_min_sidebar_width(if compact { 64.0 } else { 212.0 });
+    ui.split
+        .set_max_sidebar_width(if compact { 92.0 } else { 268.0 });
+}
+
+/// Setzt Navigation und Kopfzeile auf die gewaehlte Sprache um.
+///
+/// Nur das Geruest: die Fliesstexte der einzelnen Bildschirme kommen als
+/// naechster Block. Ein Wechsel wirkt sofort, ohne Neustart.
+fn apply_language(ui: &Rc<Ui>, lang: &str) {
+    // Zuerst die globale Sprache: alles, was danach Texte baut, hat sie schon.
+    crate::lang::set_current(lang);
+    for item in &ui.nav {
+        let title = PAGES
+            .iter()
+            .find(|(page, _, _)| *page == item.name)
+            .map(|(page, title, _)| nav_text(lang, page, title))
+            .unwrap_or_else(|| item.name.to_string());
+        item.label.set_text(&title);
+        item.button
+            .update_property(&[gtk::accessible::Property::Label(&title)]);
+    }
+    // Seite und Einstellungen ziehen ihre Texte nach; sonst bleibt der offene
+    // Bildschirm in der alten Sprache stehen.
+    ui.settings_view.retranslate(lang);
+    ui.installed.retranslate(lang);
+    ui.catalog.retranslate();
+    ui.clients_view.retranslate();
+    relabel_footer(ui, lang);
+    let current = ui
+        .stack
+        .visible_child_name()
+        .map(|name| name.to_string())
+        .unwrap_or_else(|| "scan".to_string());
+    show_page(ui, &current);
+}
+
 fn show_page(ui: &Rc<Ui>, name: &str) {
     if ui.stack.visible_child_name().as_deref() != Some(name) {
         ui.stack.set_visible_child_name(name);
     }
-    if let Some((_, title, subtitle)) = PAGES.iter().find(|(page, _, _)| *page == name) {
-        ui.title.set_title(title);
-        ui.title.set_subtitle(subtitle);
+    let language = ui.settings_view.settings().language;
+    if let Some((page, title, subtitle)) = PAGES.iter().find(|(page, _, _)| *page == name) {
+        ui.title.set_title(&nav_text(&language, page, title));
+        ui.title.set_subtitle(&page_text(&language, page, subtitle));
     }
     for item in &ui.nav {
         if item.name == name {
@@ -621,9 +973,19 @@ fn show_page(ui: &Rc<Ui>, name: &str) {
                 .update_state(&[gtk::accessible::State::Selected(Some(false))]);
         }
     }
-    if name == "sources" {
-        ui.sources.show_overview();
-        refresh_sources(ui);
+    if name == "installed" {
+        // Beim Betreten der Seite wird gegen den Index geprueft, ob es neuere
+        // Releases gibt. Der Knopf unten heisst dann „Updates installieren".
+        refresh_updates(ui);
+    }
+    if name == "settings" {
+        // Die Datei kann von aussen geaendert worden sein; der Reiter zeigt
+        // immer den Stand auf der Platte.
+        ui.settings_view.reload();
+        // Farbschema-Knoepfe angleichen: sonst zeigt der Schalter hier einen
+        // aelteren Zustand als das Icon in der Kopfzeile.
+        ui._theme.sync_widgets();
+        refresh_settings_sources(ui);
     }
     // Brotkrumen nur dort, wo es einen Rueckweg gibt.
     ui.crumb.set_visible(name == "detail");
@@ -662,16 +1024,30 @@ fn search_catalogue(ui: &Rc<Ui>, filters: &Filters) -> Result<Stats, String> {
 /// Aktuellen Filter des Katalogs neu beantworten.
 fn refresh_catalogue(ui: &Rc<Ui>) -> Result<Stats, String> {
     let filters = ui.catalog.filters();
-    search_catalogue(ui, &filters)
+    let stats = search_catalogue(ui, &filters)?;
+    refresh_updates(ui);
+    Ok(stats)
+}
+
+/// Faellige Updates in die Tabelle „Installiert“ geben.
+///
+/// Quelle ist `Index::updates` — der Vergleich installierte Fassung gegen die
+/// Releases der Quellen. Ohne Katalog gibt es nichts zu vergleichen; dann wird
+/// die Markierung geleert, statt eine alte stehen zu lassen.
+fn refresh_updates(ui: &Rc<Ui>) {
+    let updates = with_index(ui, |index| index.updates()).unwrap_or_default();
+    ui.installed.set_updates(updates);
 }
 
 fn update_counts(ui: &Rc<Ui>, stats: &Stats) {
     ui.counts.nav_catalog.set_text(&stats.catalogue.to_string());
     ui.counts.info_addons.set_text(&stats.installed.to_string());
-    ui.counts.footer.set_text(&format!(
-        "Katalog {} · installiert {} · Client-Ordner {}",
-        stats.catalogue, stats.installed, stats.clients
-    ));
+    ui.counts.footer.set_text(
+        &crate::lang::t(&ui_lang(ui), "st.kw.counts")
+            .replacen("{}", &stats.catalogue.to_string(), 1)
+            .replacen("{}", &stats.installed.to_string(), 1)
+            .replacen("{}", &stats.clients.to_string(), 1),
+    );
     update_rail_sources(ui, stats);
 }
 
@@ -750,25 +1126,38 @@ fn handle_index_msg(ui: &Rc<Ui>, msg: IndexMsg) {
         IndexMsg::Sources(runs) => {
             ui.catalog.set_sources(&runs);
             *ui.index_sources.borrow_mut() = runs;
+            set_activity(ui, crate::lang::t(&ui_lang(ui), "st.kw.index"), true);
             if let Ok(stats) = with_index(ui, |index| index.stats()) {
                 update_counts(ui, &stats);
             }
         }
-        IndexMsg::Catalogue(Ok(report)) => ui.catalog.set_building_detail(&format!(
-            "Katalog: {} Einträge im Index. Karten werden gezeichnet …",
-            report.catalogue
-        )),
+        IndexMsg::Catalogue(Ok(report)) => {
+            ui.catalog.set_building_detail(&format!(
+                "Katalog: {} Einträge im Index. Karten werden gezeichnet …",
+                report.catalogue
+            ));
+            set_activity(ui, crate::lang::t(&ui_lang(ui), "st.kw.ready"), false);
+        }
         IndexMsg::Catalogue(Err(err)) => {
             ui.catalog.show_error(&format!("Katalog schreiben: {err}"))
         }
-        IndexMsg::NoClients => ui.catalog.set_no_clients(),
-        IndexMsg::Error(err) => ui.catalog.show_error(&err),
+        IndexMsg::NoClients => {
+            ui.catalog.set_no_clients();
+            set_activity(ui, crate::lang::t(&ui_lang(ui), "st.kw.ready"), false);
+        }
+        IndexMsg::Error(err) => {
+            ui.catalog.show_error(&err);
+            set_activity(ui, &format!("Index nicht lesbar: {err}"), false);
+        }
         IndexMsg::Finished => {
             // Erst jetzt lesen: waehrend des Schreibens waere jede Abfrage ein
             // Blick auf eine halb geschriebene Transaktion.
             if let Err(err) = refresh_catalogue(ui) {
                 ui.catalog.show_error(&err);
             }
+            // Der Lauf ist zu Ende, gleich mit welchem Ausgang: der Spinner
+            // darf nicht weiterlaufen, der Text bleibt als Stand stehen.
+            ui.counts.footer_busy.set_visible(false);
         }
     }
 }
@@ -777,61 +1166,127 @@ fn handle_index_msg(ui: &Rc<Ui>, msg: IndexMsg) {
 fn open_item(ui: &Rc<Ui>, id: i64) {
     match with_index(ui, |index| index.addon(id)) {
         Ok(Some(item)) => {
-            let targets = detail_targets(ui, &item);
+            let targets = detail_targets(ui);
+            // Bildabruf vor dem Zeigen starten: die Antwort darf frueher
+            // eintreffen als das Zeichnen, sie wird ueber die Nummer zugeordnet.
+            let generation = ui.detail.begin_images();
             ui.detail.show_item(&item, &targets);
             set_crumb(ui, &item.name);
             show_page(ui, "detail");
+            load_images(ui, generation, item.screenshots.clone());
         }
         Ok(None) => toast(ui, "Der Eintrag steht nicht mehr im Index."),
         Err(err) => toast_error(ui, &format!("Index: {err}")),
     }
 }
 
-/// Ziele fuer die Installation: jeder Client-Ordner, dessen Interface zum
-/// Release passt. Passt keiner, werden alle angeboten - lieber eine bewusste
-/// Wahl als ein leerer Knopf.
-fn detail_targets(ui: &Rc<Ui>, item: &CatalogueItem) -> Vec<DetailTarget> {
+/// Bilder eines Eintrags im Hintergrund holen und in die Galerie setzen.
+fn load_images(ui: &Rc<Ui>, generation: u64, urls: Vec<String>) {
+    if urls.is_empty() {
+        ui.detail.set_images(generation, &[]);
+        return;
+    }
+    let (tx, rx) = async_channel::unbounded::<backend::ImageMsg>();
+    backend::spawn_image_fetch(urls, tx);
+    let weak = Rc::downgrade(ui);
+    glib::spawn_future_local(async move {
+        while let Ok(msg) = rx.recv().await {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match msg {
+                backend::ImageMsg::Done(images) => {
+                    let pairs: Vec<(String, Vec<u8>)> = images
+                        .into_iter()
+                        .map(|image| (image.url, image.bytes))
+                        .collect();
+                    ui.detail.set_images(generation, &pairs);
+                }
+            }
+        }
+    });
+}
+
+/// Quellenliste des Einstellungsreiters fuellen: Zustand, Menge, Schluessel.
+///
+/// Die Zahlen kommen aus dem Index (`Stats::per_source`), die Schluesselherkunft
+/// aus `KeyProvider` — dieselbe Quelle wie im Quellenbildschirm, nur als Zeile
+/// statt als Karte.
+fn refresh_settings_sources(ui: &Rc<Ui>) {
+    let lang = ui.settings_view.settings().language;
+    let (stats, keys) = (
+        with_index(ui, |index| index.stats()).unwrap_or_default(),
+        KeyProvider::default_provider(),
+    );
+    // Reihenfolge wie die Rangfolge darueber: zwei Listen mit verschiedener
+    // Sortierung auf einer Seite liest niemand gern, und die Prioritaet ist
+    // ohnehin das wichtigere Kriterium.
+    let order = ui.settings_view.settings().priority;
+    let ordered: Vec<&hexwerk_sources::Source> = order
+        .iter()
+        .filter(|source| backend::CATALOGUE_SOURCES.contains(source))
+        .collect();
+    let rows: Vec<(hexwerk_sources::Source, String, String, String)> = ordered
+        .iter()
+        .map(|source| {
+            let count = stats
+                .per_source
+                .get(source_key(**source))
+                .copied()
+                .unwrap_or(0);
+            let origin = keys.origin(**source);
+            let off = origin == hexwerk_sources::KeyOrigin::Missing;
+            let key_text = if off {
+                crate::lang::t(&lang, "set.key.missing")
+            } else if !source.needs_key() {
+                crate::lang::t(&lang, "set.key.none")
+            } else {
+                crate::lang::t(&lang, "set.key.set")
+            };
+            (
+                **source,
+                format!("{count} {}", crate::lang::t(&lang, "set.entries.word")),
+                key_text.to_string(),
+                if off {
+                    crate::lang::t(&lang, "set.state.off")
+                } else {
+                    crate::lang::t(&lang, "set.state.on")
+                }
+                .to_string(),
+            )
+        })
+        .collect();
+    ui.settings_view.set_sources(&rows);
+}
+
+/// Alle Client-Ordner als moegliche Installationsziele.
+///
+/// Welche davon zu einem Release passen, entscheidet die Detailseite - sie
+/// kennt das gewaehlte Release und filtert danach. Hier wird absichtlich
+/// nichts vorsortiert und nichts „zur Not" angeboten: eine Liste, die bei
+/// fehlender Eignung trotzdem alle Ziele zeigt, ist genau der Weg, auf dem ein
+/// Classic-Era-Addon in einem Forever-Client landet.
+fn detail_targets(ui: &Rc<Ui>) -> Vec<DetailTarget> {
     let Some(data) = ui.data.borrow().clone() else {
         return Vec::new();
     };
-    let interfaces: Vec<u32> = item
-        .latest
-        .as_ref()
-        .map(|release| release.interfaces.clone())
-        .unwrap_or_default();
-
-    let mut matching = Vec::new();
-    let mut others = Vec::new();
+    let mut out = Vec::new();
     for (client_index, client) in data.clients.iter().enumerate() {
         for (flavor_index, flavor) in client.flavors.iter().enumerate() {
-            let target = DetailTarget {
+            out.push(DetailTarget {
                 client: client_index,
                 flavor: flavor_index,
-                label: format!(
-                    "{} · {} · {}",
-                    client.origin.label(),
-                    client.label,
-                    flavor.dir_name
-                ),
-            };
-            let fits = interfaces.is_empty()
-                || flavor.interface_numbers.is_empty()
-                || flavor
-                    .interface_numbers
-                    .iter()
-                    .any(|number| interfaces.contains(number));
-            if fits {
-                matching.push(target);
-            } else {
-                others.push(target);
-            }
+                // Kurz halten: ein `GtkDropDown` fordert die Breite seines
+                // laengsten Eintrags als Mindestbreite an. „Faugus · battlenet ·
+                // Classic Era 1.15.9" hat die rechte Spalte aus dem Fenster
+                // geschoben, deshalb Fassung plus Clientname und die Herkunft
+                // nur im Tooltip.
+                label: format!("{} · {}", flavor.version_label(), client.label),
+                interfaces: flavor.interface_numbers.clone(),
+            });
         }
     }
-    if matching.is_empty() {
-        others
-    } else {
-        matching
-    }
+    out
 }
 
 /// Doppelklick in „Installiert“: wenn der Index den Ordner einem Katalog
@@ -891,48 +1346,331 @@ fn start_install(ui: &Rc<Ui>, choice: InstallChoice) {
     let job = InstallJob {
         client: backend::core_client(client),
         flavor: flavor.flavor.clone(),
+        flavor_interfaces: flavor.interface_numbers.clone(),
         release: choice.release,
         name: choice.name,
     };
     let (tx, rx) = async_channel::unbounded::<InstallMsg>();
     backend::spawn_install(job, tx);
+    install_loop(ui, rx);
+}
 
+/// Alle faelligen Updates des gewaehlten Client-Ordners installieren.
+///
+/// Nur Eintraege, deren neue Fassung zur Schnittstelle des Client-Ordners
+/// passt: der Filter sitzt schon in `Index::updates` (dort wird gegen die
+/// Interface-Nummern des Releases verglichen) und noch einmal im Backend.
+fn start_update_all(ui: &Rc<Ui>) {
+    let Some((client_index, flavor_index)) = ui.installed.current_target() else {
+        toast_error(ui, "Kein Client-Ordner gewählt.");
+        return;
+    };
+    let Some(data) = ui.data.borrow().clone() else {
+        toast_error(ui, "Kein Scan gelaufen, der Ziel-Client ist unbekannt.");
+        return;
+    };
+    let Some(client) = data.clients.get(client_index) else {
+        toast_error(
+            ui,
+            "Der gewählte Client ist nicht mehr da. Bitte neu scannen.",
+        );
+        return;
+    };
+    let Some(flavor) = client.flavors.get(flavor_index) else {
+        toast_error(ui, "Der gewählte Client-Ordner ist nicht mehr da.");
+        return;
+    };
+
+    let jobs: Vec<InstallJob> = ui
+        .installed
+        .current_updates()
+        .into_iter()
+        .map(|update| InstallJob {
+            client: backend::core_client(client),
+            flavor: flavor.flavor.clone(),
+            flavor_interfaces: flavor.interface_numbers.clone(),
+            release: hexwerk_sources::Release {
+                source: update.source,
+                external_id: update.external_id,
+                version: update.available_version,
+                released_at: update.released_at,
+                download_url: update.download_url,
+                size_bytes: update.size_bytes,
+                interface_numbers: update.interface_numbers,
+            },
+            name: update.addon_name,
+        })
+        .collect();
+    if jobs.is_empty() {
+        toast(ui, "Keine Updates in diesem Client-Ordner.");
+        return;
+    }
+    let (tx, rx) = async_channel::unbounded::<InstallMsg>();
+    backend::spawn_update_batch(jobs, tx);
+    install_loop(ui, rx);
+}
+
+/// Rueckmeldungen eines Installationslaufs bis zum Ende lesen und anzeigen.
+///
+/// Gilt fuer einen einzelnen Download wie fuer eine Sammlung: der Fortschritt
+/// kommt als Folge von Zwischenstaenden, das Ergebnis zuletzt.
+fn install_loop(ui: &Rc<Ui>, rx: async_channel::Receiver<InstallMsg>) {
     let weak = Rc::downgrade(ui);
     glib::spawn_future_local(async move {
-        let Ok(msg) = rx.recv().await else {
-            return;
-        };
-        let Some(ui) = weak.upgrade() else {
-            return;
-        };
-        match msg {
-            InstallMsg::Done {
-                name,
-                version,
-                folder,
-            } => {
-                toast(
-                    &ui,
-                    &format!("{name} {version} installiert: Interface/AddOns/{folder}"),
-                );
-                // Dateisystem hat sich geaendert: Scan ohne Netzlauf, danach
-                // steht die neue Fassung in „Installiert“ und im Katalog.
-                start_scan(&ui, false);
-                show_page(&ui, "installed");
-            }
-            InstallMsg::Failed(err) => {
-                toast_error(&ui, &format!("Installation fehlgeschlagen: {err}"))
+        while let Ok(msg) = rx.recv().await {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match msg {
+                InstallMsg::Progress { phase, done, total } => {
+                    show_install_progress(&ui, phase, done, total)
+                }
+                InstallMsg::Done {
+                    name,
+                    version,
+                    folder,
+                } => {
+                    ui.progress_box.set_visible(false);
+                    toast(
+                        &ui,
+                        &format!("{name} {version} installiert: Interface/AddOns/{folder}"),
+                    );
+                    // Dateisystem hat sich geaendert: Scan ohne Netzlauf, danach
+                    // steht die neue Fassung in „Installiert“ und im Katalog.
+                    start_scan(&ui, false);
+                    show_page(&ui, "installed");
+                }
+                InstallMsg::BatchDone { ok, failed } => {
+                    ui.progress_box.set_visible(false);
+                    if failed.is_empty() {
+                        toast(&ui, &format!("{ok} Update(s) installiert"));
+                    } else {
+                        // Die Namen nennen, nicht nur die Zahl: sonst sucht der
+                        // Nutzer selbst, welches Addon liegen blieb.
+                        toast_error(
+                            &ui,
+                            &format!(
+                                "{ok} aktualisiert, {} fehlgeschlagen: {}",
+                                failed.len(),
+                                failed.join(" · ")
+                            ),
+                        );
+                    }
+                    start_scan(&ui, false);
+                    show_page(&ui, "installed");
+                }
+                InstallMsg::Failed(err) => {
+                    ui.progress_box.set_visible(false);
+                    toast_error(&ui, &format!("Installation fehlgeschlagen: {err}"));
+                }
             }
         }
     });
+}
+
+/// Fortschrittsleiste fuellen: Schritt, Groesse und Balken.
+///
+/// Prozent nur, wenn die Quelle eine Gesamtgroesse nennt; sonst laeuft der
+/// Balken unbestimmt weiter und der Text zeigt die geladenen Bytes. Ein
+/// geratener Prozentsatz waere schlimmer als keiner.
+fn show_install_progress(ui: &Rc<Ui>, phase: &str, done: u64, total: Option<u64>) {
+    ui.progress_box.set_visible(true);
+    let text = match (total, phase) {
+        (Some(total), _) if total > 0 => format!(
+            "{phase} · {} von {} ({:.0} %)",
+            crate::format::human_size(done),
+            crate::format::human_size(total),
+            (done as f64 / total as f64) * 100.0
+        ),
+        (_, "Entpacken") => "Entpacken · ZIP wird in den Addon-Ordner geschrieben".to_string(),
+        (_, _) => format!("{phase} · {}", crate::format::human_size(done)),
+    };
+    ui.progress_label.set_text(&text);
+    match total {
+        Some(total) if total > 0 => {
+            ui.progress_bar
+                .set_fraction((done as f64 / total as f64).min(1.0));
+            ui.progress_bar.set_show_text(false);
+        }
+        _ => ui.progress_bar.pulse(),
+    }
+}
+
+/// Zustand in der Fusszeile: was gerade laeuft, ohne Klick sichtbar.
+fn set_activity(ui: &Ui, text: &str, busy: bool) {
+    ui.counts.footer_state.set_text(text);
+    ui.counts.footer_state.set_tooltip_text(Some(text));
+    // Der Spinner ist durch das Laufband ersetzt: eine Bewegung sagt mehr als
+    // zwei, und die Katze laeuft genau so lange wie die Arbeit.
+    ui.counts.footer_busy.set_visible(false);
+    ui.nyan.set_running(busy);
+    ui.nyan.widget().set_visible(busy);
 }
 
 // ---------------------------------------------------------------------------
 // Scan
 // ---------------------------------------------------------------------------
 
+/// Was der Katalog als Versionsfilter anbietet: je Interface-Nummer eine
+/// Beschriftung aus Flavor und Spielversion.
+///
+/// Zwei Client-Ordner derselben Fassung (etwa Steam und Faugus) ergeben nur
+/// einen Knopf - die Schnittstelle ist dieselbe. Sortiert wird aufsteigend,
+/// damit die aelteste Fassung links steht und die Anzeige nicht springt.
+fn catalogue_versions(data: &ScanData) -> Vec<(u32, String)> {
+    let mut out: Vec<(u32, String)> = Vec::new();
+    for client in &data.clients {
+        for flavor in &client.flavors {
+            let Some(number) = flavor.interface_number() else {
+                continue;
+            };
+            // Nach Paar entdoppeln, nicht nach Nummer: Retail und eine
+            // Classic-Fassung koennen dieselbe Interface-Nummer tragen, sind
+            // aber zwei getrennte Installationen.
+            let label = flavor.version_label();
+            if out
+                .iter()
+                .any(|(known, known_label)| *known == number && *known_label == label)
+            {
+                continue;
+            }
+            out.push((number, label));
+        }
+    }
+    out.sort_by_key(|(number, _)| *number);
+    out
+}
+
+/// Setzt alle Texte der Fusszeile neu.
+///
+/// Die Fusszeile wird an mehreren Stellen geschrieben (Scan, Katalog,
+/// Installieren). Ohne diesen Durchlauf bleiben einzelne Stuecke in der alten
+/// Sprache stehen, weil sie ihren Text beim Entstehen bekommen haben.
+fn relabel_footer(ui: &Rc<Ui>, lang: &str) {
+    match ui.data.borrow().clone() {
+        Some(data) => {
+            ui.counts.footer_scan.set_text(&iso_date(data.finished));
+        }
+        None => {
+            ui.counts.footer_scan.set_text("");
+        }
+    }
+    if !ui.counts.footer_busy.is_visible() {
+        ui.counts
+            .footer_state
+            .set_text(crate::lang::t(lang, "st.footer.idle"));
+    }
+    if let Ok(stats) = with_index(ui, |index| index.stats()) {
+        update_counts(ui, &stats);
+    }
+}
+
+/// Sprache der Oberflaeche, wie sie in den Einstellungen steht.
+fn ui_lang(ui: &Rc<Ui>) -> String {
+    ui.settings_view.settings().language.clone()
+}
+
+/// Holt den Katalog vom Dienst und uebernimmt ihn in den Index.
+///
+/// Laeuft im Hintergrund: der Abruf kann einige Megabyte sein. Ohne Schluessel
+/// passiert nichts, weil der Dienst ohne Schluessel nichts herausgibt.
+fn start_catalog_sync(ui: &Rc<Ui>) {
+    let settings = crate::settings_view::Settings::load();
+    let base = settings
+        .urls
+        .iter()
+        .find(|(name, _)| name == "catalog")
+        .map(|(_, value)| value.clone())
+        .unwrap_or_else(|| "https://hexwerk-api.weppelmann.eu".to_string());
+    let key = settings
+        .keys
+        .iter()
+        .find(|(name, _)| name == "catalog")
+        .map(|(_, value)| value.clone())
+        .unwrap_or_default();
+    if key.trim().is_empty() {
+        return;
+    }
+
+    let lang = ui_lang(ui);
+    set_activity(ui, &crate::lang::t(&lang, "st.kw.catalog"), true);
+
+    let (tx, rx) = async_channel::bounded::<Result<(usize, bool), String>>(1);
+    std::thread::spawn(move || {
+        let result = sync_catalog_blocking(&base, &key);
+        let _ = tx.send_blocking(result);
+    });
+
+    let weak = Rc::downgrade(ui);
+    glib::spawn_future_local(async move {
+        let Ok(result) = rx.recv().await else {
+            return;
+        };
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let lang = ui_lang(&ui);
+        match result {
+            Ok((entries, changed)) => {
+                if let Err(err) = refresh_catalogue(&ui) {
+                    eprintln!("Katalog nach dem Abruf nicht lesbar: {err}");
+                }
+                set_activity(
+                    &ui,
+                    &crate::lang::t(&lang, "st.ready").replacen("{}", &entries.to_string(), 1),
+                    false,
+                );
+                // Nur melden, wenn wirklich etwas passiert ist: bei jedem Start
+                // eine Meldung „nichts Neues“ waere Laerm.
+                if changed {
+                    let message = crate::lang::t(&lang, "ct.sync.done")
+                        .replacen("{}", &entries.to_string(), 1);
+                    toast(&ui, &message);
+                }
+            }
+            Err(err) => {
+                set_activity(&ui, &crate::lang::t(&lang, "st.kw.ready"), false);
+                let message =
+                    crate::lang::t(&lang, "ct.sync.fail").replacen("{}", &err, 1);
+                toast(&ui, &message);
+            }
+        }
+    });
+}
+
+/// Der Abruf selbst, ohne Oberflaeche: eigener Index, eigener Thread.
+fn sync_catalog_blocking(base: &str, key: &str) -> Result<(usize, bool), String> {
+    let path = Index::default_path();
+    let mut index = Index::open(&path)?;
+    let cache = path
+        .parent()
+        .map(|dir| dir.join("catalog"))
+        .unwrap_or_else(|| std::path::PathBuf::from("catalog"));
+    let remote = hexwerk_index::RemoteCatalog::new(base, key);
+    match remote.sync(&mut index, &cache, false)? {
+        hexwerk_index::SyncOutcome::UpToDate { .. } => {
+            let entries = index.stats().map(|stats| stats.catalogue).unwrap_or(0);
+            Ok((entries, false))
+        }
+        hexwerk_index::SyncOutcome::Imported { entries, .. } => {
+            Ok((entries.max(0) as usize, true))
+        }
+    }
+}
+
 fn start_scan(ui: &Rc<Ui>, run_sources: bool) {
-    ui.scan.set_running(true);
+    let lang = ui_lang(ui);
+    ui.clients_view
+        .set_scan_summary(crate::lang::t(&lang, "st.scan.folders"), true);
+    set_activity(
+        ui,
+        if run_sources {
+            crate::lang::t(&lang, "st.kw.scan")
+        } else {
+            crate::lang::t(&lang, "st.kw.scan")
+        },
+        true,
+    );
     let (tx, rx) = async_channel::unbounded::<ScanMsg>();
     crate::state::spawn_scan(tx);
 
@@ -961,19 +1699,29 @@ fn apply_scan(ui: &Rc<Ui>, data: ScanData, run_sources: bool) {
     ui.counts
         .info_addons
         .set_text(&shared.addon_count().to_string());
-    ui.counts.footer.set_text(&format!(
-        "{} Clients · {} Addons",
-        shared.clients.len(),
-        shared.addon_count()
-    ));
-    ui.counts
-        .footer_scan
-        .set_text(&format!("Scan {}", iso_date(shared.finished)));
+    let lang = ui_lang(ui);
+    ui.counts.footer.set_text(
+        &crate::lang::t(&lang, "st.kw.counts")
+            .replacen("{}", &ui.counts.nav_catalog.text().to_string(), 1)
+            .replacen("{}", &shared.addon_count().to_string(), 1)
+            .replacen("{}", &shared.clients.len().to_string(), 1),
+    );
+    ui.counts.footer_scan.set_text(&iso_date(shared.finished));
 
-    ui.scan.show(&shared);
-    ui.scan.set_running(false);
+    ui.clients_view.set_scan_summary(
+        &crate::lang::t(&lang, "st.intros")
+            .replacen("{}", &shared.notes.len().to_string(), 1)
+            .replacen("{}", &shared.clients.len().to_string(), 1)
+            .replacen("{}", &shared.addon_count().to_string(), 1),
+        false,
+    );
     ui.clients_view.set_data(&shared);
     ui.installed.set_data(shared.clone());
+    // Versionsfilter im Katalog: was auf diesem Rechner installiert ist, wird
+    // zur Auswahl. Das gehoert an den Scan und nicht an den Index, weil die
+    // Spielversion aus `.build.info` kommt und nicht aus der Datenbank.
+    ui.catalog.set_versions(&catalogue_versions(&shared));
+    set_activity(ui, crate::lang::t(&lang, "st.kw.index"), true);
     *ui.data.borrow_mut() = Some(shared.clone());
 
     // Der Index haengt am Scan: ohne Client-Ordner gaebe es weder Zuordnung
@@ -1130,6 +1878,7 @@ fn show_undo_toast(ui: &Rc<Ui>, text: &str, entries: Vec<hexwerk_install::TrashE
     let meldung = adw::Toast::new(text);
     meldung.set_button_label(Some("Rückgängig"));
     meldung.set_timeout(8);
+    dismiss_later(&meldung, 8);
     let weak = Rc::downgrade(ui);
     meldung.connect_button_clicked(move |_| {
         let Some(ui) = weak.upgrade() else { return };
@@ -1144,10 +1893,252 @@ fn show_undo_toast(ui: &Rc<Ui>, text: &str, entries: Vec<hexwerk_install::TrashE
     ui.toast.add_toast(meldung);
 }
 
+// ---------------------------------------------------------------------------
+// Drag and drop: ZIP oder Adresse
+// ---------------------------------------------------------------------------
+
+/// Nimmt Dateien und Adressen an, die aufs Fenster gezogen werden.
+///
+/// Zwei Ziele, weil GTK sie getrennt liefert: eine Datei kommt als
+/// `FileList`, eine aus dem Browser gezogene Adresse als Text. Beides endet in
+/// derselben Pruefung - ohne `.toc` im Archiv wird nichts installiert.
+fn attach_drop_targets(ui: &Rc<Ui>, window: &adw::ApplicationWindow) {
+    let weak = Rc::downgrade(ui);
+    let files = gtk::DropTarget::new(
+        gtk::gdk::FileList::static_type(),
+        gtk::gdk::DragAction::COPY,
+    );
+    files.connect_drop(move |_, value, _, _| {
+        let Some(ui) = weak.upgrade() else {
+            return false;
+        };
+        let Ok(list) = value.get::<gtk::gdk::FileList>() else {
+            return false;
+        };
+        let mut taken = false;
+        for file in list.files() {
+            let Some(path) = file.path() else { continue };
+            let is_zip = path
+                .extension()
+                .map(|ext| ext.eq_ignore_ascii_case("zip"))
+                .unwrap_or(false);
+            if !is_zip {
+                toast_error(&ui, crate::lang::tn("drop.only.zip"));
+                continue;
+            }
+            match std::fs::read(&path) {
+                Ok(data) => {
+                    let name = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    install_dropped(&ui, data, name);
+                    taken = true;
+                }
+                Err(err) => toast_error(&ui, &format!("{}: {err}", path.display())),
+            }
+        }
+        taken
+    });
+    window.add_controller(files);
+
+    let weak = Rc::downgrade(ui);
+    let text = gtk::DropTarget::new(String::static_type(), gtk::gdk::DragAction::COPY);
+    text.connect_drop(move |_, value, _, _| {
+        let Some(ui) = weak.upgrade() else {
+            return false;
+        };
+        let Ok(text) = value.get::<String>() else {
+            return false;
+        };
+        let url = text.trim().to_string();
+        if !(url.starts_with("http://") || url.starts_with("https://")) {
+            return false;
+        }
+        download_and_install(&ui, url);
+        true
+    });
+    window.add_controller(text);
+}
+
+/// Interface-Nummern aus dem `.toc` im ZIP.
+///
+/// Ohne `.toc` ist es kein Addon: dann bleibt die Liste leer und die
+/// Installation wird abgelehnt, statt fremde Archive ins Spiel zu schreiben.
+fn toc_interfaces(data: &[u8]) -> Vec<u32> {
+    let mut out = Vec::new();
+    let Ok(mut archive) = ::zip::ZipArchive::new(std::io::Cursor::new(data)) else {
+        return out;
+    };
+    for index in 0..archive.len() {
+        let Ok(mut entry) = archive.by_index(index) else {
+            continue;
+        };
+        let Ok(name) = entry.name().map(|value| value.to_string()) else {
+            continue;
+        };
+        if !name.to_ascii_lowercase().ends_with(".toc") {
+            continue;
+        }
+        // Nur `.toc` in der ersten oder zweiten Ebene: ein `.toc` tief im
+        // Archiv gehoert zu einer Bibliothek, nicht zum Addon selbst.
+        if name.matches('/').count() > 1 {
+            continue;
+        }
+        let mut text = String::new();
+        if std::io::Read::read_to_string(&mut entry, &mut text).is_err() {
+            continue;
+        }
+        let toc = hexwerk::toc::parse_str(&text);
+        for number in toc.interface_numbers {
+            if !out.contains(&number) {
+                out.push(number);
+            }
+        }
+    }
+    out
+}
+
+/// Sucht den Client-Ordner, dessen Fassung zu den Interface-Nummern passt.
+fn pick_flavor(data: &crate::state::ScanData, interfaces: &[u32]) -> Option<(usize, usize)> {
+    for (client_index, client) in data.clients.iter().enumerate() {
+        for (flavor_index, flavor) in client.flavors.iter().enumerate() {
+            if flavor
+                .interface_numbers
+                .iter()
+                .any(|number| interfaces.contains(number))
+            {
+                return Some((client_index, flavor_index));
+            }
+        }
+    }
+    None
+}
+
+/// Prueft ein ZIP und entpackt es in den passenden Client.
+fn install_dropped(ui: &Rc<Ui>, data: Vec<u8>, label: String) {
+    let interfaces = toc_interfaces(&data);
+    if interfaces.is_empty() {
+        toast_error(ui, crate::lang::tn("drop.no.toc"));
+        return;
+    }
+    let Some(data_scan) = ui.data.borrow().clone() else {
+        toast_error(ui, crate::lang::tn("drop.no.scan"));
+        return;
+    };
+    let Some((client_index, flavor_index)) = pick_flavor(&data_scan, &interfaces) else {
+        toast_error(ui, crate::lang::tn("drop.no.target"));
+        return;
+    };
+    let Some(client_data) = data_scan.clients.get(client_index) else {
+        toast_error(ui, crate::lang::tn("drop.no.target"));
+        return;
+    };
+    let client = backend::core_client(client_data);
+    let Some(flavor) = data_scan
+        .clients
+        .get(client_index)
+        .and_then(|c| c.flavors.get(flavor_index))
+    else {
+        toast_error(ui, crate::lang::tn("drop.no.target"));
+        return;
+    };
+    let target_flavor = flavor.flavor.clone();
+    let release = hexwerk_sources::Release {
+        source: hexwerk_sources::Source::Local,
+        external_id: label.clone(),
+        version: String::new(),
+        released_at: None,
+        download_url: String::new(),
+        size_bytes: Some(data.len() as u64),
+        interface_numbers: interfaces.clone(),
+    };
+    let request = hexwerk_install::InstallRequest {
+        client,
+        flavor: target_flavor,
+        release,
+        folder: None,
+    };
+    match hexwerk_install::apply(&request, &data) {
+        Ok(installed) => {
+            let name = installed
+                .folder
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or(label);
+            toast(ui, &format!("{name} {}", crate::lang::tn("drop.done")));
+            start_scan(ui, false);
+        }
+        Err(err) => toast_error(ui, &format!("{err}")),
+    }
+}
+
+/// Laedt eine Adresse im Hintergrund und installiert sie wie eine Datei.
+fn download_and_install(ui: &Rc<Ui>, url: String) {
+    use hexwerk_sources::http::Http;
+    toast(ui, crate::lang::tn("drop.downloading"));
+    let (tx, rx) = async_channel::bounded::<Result<Vec<u8>, String>>(1);
+    let url_for_thread = url.clone();
+    std::thread::spawn(move || {
+        let http = hexwerk_sources::http::UreqHttp::new();
+        let mut bytes = Vec::new();
+        let result = match http.get(&url_for_thread) {
+            Ok(response) => {
+                bytes.extend_from_slice(&response.body);
+                Ok(bytes)
+            }
+            Err(err) => Err(err.to_string()),
+        };
+        let _ = tx.send_blocking(result);
+    });
+    let weak = Rc::downgrade(ui);
+    glib::spawn_future_local(async move {
+        if let Ok(result) = rx.recv().await {
+            let Some(ui) = weak.upgrade() else { return };
+            match result {
+                Ok(bytes) => install_dropped(&ui, bytes, url),
+                Err(err) => toast_error(&ui, &format!("{err}")),
+            }
+        }
+    });
+}
+
 fn toast(ui: &Rc<Ui>, text: &str) {
+    show_toast(ui, text, 4);
+}
+
+thread_local! {
+    /// Zaehlt die Hinweise: nur der jeweils letzte darf sich selbst schliessen,
+    /// sonst raeumt ein alter Zeitgeber einen neueren Hinweis weg.
+    static TOAST_SEQ: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Zeigt einen Hinweis und raeumt ihn selbst wieder weg.
+///
+/// Der Zeitgeber von `AdwToast` allein reicht nicht: haengt die Oberflaeche
+/// kurz (Kataloglauf, Netzzugriff), steht die Meldung weiter im Bild. Der
+/// eigene Zeitgeber haelt eine starke Referenz und schliesst sie selbst; das
+/// Kreuz bleibt als schnellerer Weg.
+fn show_toast(ui: &Rc<Ui>, text: &str, seconds: u32) {
     let toast = adw::Toast::new(text);
-    toast.set_timeout(5);
-    ui.toast.add_toast(toast);
+    toast.set_timeout(seconds);
+    ui.toast.add_toast(toast.clone());
+    dismiss_later(&toast, seconds);
+}
+
+/// Schliesst einen Hinweis nach Ablauf, auch wenn ein Knopf daran haengt.
+fn dismiss_later(toast: &adw::Toast, seconds: u32) {
+    let handle = toast.clone();
+    let mine = TOAST_SEQ.with(|seq| {
+        seq.set(seq.get() + 1);
+        seq.get()
+    });
+    glib::timeout_add_seconds_local(seconds, move || {
+        if TOAST_SEQ.with(|seq| seq.get() == mine) {
+            handle.dismiss();
+        }
+        glib::ControlFlow::Break
+    });
 }
 
 /// Fehler bleiben laenger stehen und stehen oben: sie sind der Grund, warum
@@ -1156,7 +2147,8 @@ fn toast_error(ui: &Rc<Ui>, text: &str) {
     let toast = adw::Toast::new(text);
     toast.set_timeout(9);
     toast.set_priority(adw::ToastPriority::High);
-    ui.toast.add_toast(toast);
+    ui.toast.add_toast(toast.clone());
+    dismiss_later(&toast, 9);
 }
 
 // ---------------------------------------------------------------------------
@@ -1165,24 +2157,36 @@ fn toast_error(ui: &Rc<Ui>, text: &str) {
 
 /// Leiste: Ansichten oben, Bestand und Quellen darunter. Die Quellen zeigen
 /// ihren Zustand, damit ein leerer Katalog nicht wie ein Fehler aussieht.
-fn build_rail() -> (gtk::Box, Vec<NavItem>, Counts, Vec<(Source, gtk::Label)>) {
+fn build_rail() -> (
+    gtk::Box,
+    Vec<NavItem>,
+    Counts,
+    Vec<(Source, gtk::Label)>,
+    Vec<gtk::Widget>,
+) {
     let rail = gtk::Box::new(gtk::Orientation::Vertical, 0);
     rail.set_margin_bottom(14);
 
     // Marke oben in der Leiste. Kein eigener HeaderBar mehr: zwei Kopfleisten
     // nebeneinander liessen die Trennlinie der SplitView mitten durch laufen.
+    let mut extras: Vec<gtk::Widget> = Vec::new();
     let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     brand_row.add_css_class("hw-brand");
     brand_row.set_margin_top(14);
     brand_row.set_margin_bottom(12);
     brand_row.set_margin_start(18);
-    brand_row.append(&brand_icon(34));
+    // Groesser als die Beschriftung darunter: das Logo ist der Anker der
+    // Leiste, kein Beiwerk.
+    brand_row.append(&brand_icon(58));
     let wordmark = gtk::Label::new(Some("HEXWERK"));
     wordmark.add_css_class("hw-wordmark");
     brand_row.append(&wordmark);
     rail.append(&brand_row);
+    extras.push(wordmark.clone().upcast());
 
-    rail.append(&section("ANSICHT"));
+    let view_title = section("ANSICHT");
+    rail.append(&view_title);
+    extras.push(view_title.clone().upcast());
 
     let nav = gtk::Box::new(gtk::Orientation::Vertical, 0);
     nav.add_css_class("hw-nav");
@@ -1212,7 +2216,21 @@ fn build_rail() -> (gtk::Box, Vec<NavItem>, Counts, Vec<(Source, gtk::Label)>) {
         label.set_xalign(0.0);
         label.set_hexpand(true);
 
+        // Symbol je Seite: in der kompakten Leiste ist es das Einzige, was
+        // bleibt — deshalb bekommt es eine feste Breite und steht vorn.
+        let icon = gtk::Image::from_icon_name(nav_icon(name));
+        icon.add_css_class("hw-nav-item-icon");
+        icon.set_pixel_size(18);
+        // Adwaita zeichnet die Lupe nicht mittig in ihr Feld: gemessen am
+        // Bildschirmabzug sitzt sie 2 px zu weit links, waehrend Monitor,
+        // Ordner und Zahnrad auf derselben Achse stehen. Der Versatz wird
+        // ausgeglichen, damit alle vier Symbole eine Flucht haben.
+        if let Some(nudge) = nav_icon_nudge(name) {
+            icon.set_margin_start(nudge);
+        }
+
         let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        line.append(&icon);
         line.append(&label);
 
         // Zaehler nur dort, wo es etwas zu zaehlen gibt.
@@ -1231,23 +2249,38 @@ fn build_rail() -> (gtk::Box, Vec<NavItem>, Counts, Vec<(Source, gtk::Label)>) {
         button.update_property(&[gtk::accessible::Property::Label(title)]);
         crate::theme::pointer(&button);
         nav.append(&button);
-        nav_items.push(NavItem { name, button });
+        nav_items.push(NavItem {
+            name,
+            button,
+            label,
+            icon,
+        });
     }
     rail.append(&nav);
 
-    rail.append(&section("BESTAND"));
+    let bestand_title = section("BESTAND");
+    rail.append(&bestand_title);
+    extras.push(bestand_title.clone().upcast());
+
     let info_addons = gtk::Label::new(Some("—"));
     info_addons.add_css_class("hw-info-value");
     info_addons.set_xalign(1.0);
-    rail.append(&info_line("Addons", Some(&info_addons)));
-    rail.append(&info_line("Herkünfte", None));
+    let addons_line = info_line("Addons", Some(&info_addons));
+    rail.append(&addons_line);
+    extras.push(addons_line.upcast());
+    let origins_line = info_line("Herkünfte", None);
+    rail.append(&origins_line);
+    extras.push(origins_line.upcast());
 
-    rail.append(&section("QUELLEN"));
+    let sources_title = section("QUELLEN");
+    rail.append(&sources_title);
+    extras.push(sources_title.clone().upcast());
     let mut rail_sources = Vec::new();
     for source in backend::CATALOGUE_SOURCES {
         let (row, value) = source_line(source.label());
         value.set_tooltip_text(Some(&format!("{}: noch nicht abgefragt", source.label())));
         rail.append(&row);
+        extras.push(row.clone().upcast());
         rail_sources.push((source, value));
     }
 
@@ -1256,10 +2289,17 @@ fn build_rail() -> (gtk::Box, Vec<NavItem>, Counts, Vec<(Source, gtk::Label)>) {
         nav_installed,
         nav_catalog,
         info_addons,
+        // Die echten Fusszeilen-Widgets entstehen weiter oben im Fensterbau und
+        // werden dort eingesetzt; hier stehen nur Platzhalter.
         footer: gtk::Label::new(None),
         footer_scan: gtk::Label::new(None),
+        footer_state: gtk::Label::new(None),
+        footer_busy: adw::Spinner::new(),
+        brand_row: brand_row.clone(),
     };
-    (rail, nav_items, counts, rail_sources)
+    // `extras`: Ueberschriften und Zahlen, die in der kompakten Leiste
+    // verschwinden. Die Navigation selbst bleibt immer sichtbar.
+    (rail, nav_items, counts, rail_sources, extras)
 }
 
 fn section(text: &str) -> gtk::Label {
@@ -1308,17 +2348,61 @@ fn source_line(name: &str) -> (gtk::Box, gtk::Label) {
 /// Das App-Logo als Bild. Die PNG-Fassung ist eingebettet; SVG kann GTK nicht
 /// direkt als Textur laden, und eine Datei zur Laufzeit wuerde im Flatpak einen
 /// weiteren Pfad voraussetzen, der stimmen muss.
+/// Das Zeichen der Leiste.
+///
+/// Bewusst das **symbolische** Bild statt der farbigen PNG-Datei: ein
+/// symbolisches Symbol faerbt GTK ueber die CSS-Eigenschaft `color`, also
+/// uebernimmt es `--hw-signal` der aktiven Palette. Damit steht das Zeichen
+/// im dunklen Thema in Signalgruen (#39DD93, 10,76:1 auf #0A111C) und im
+/// hellen in dunklem Gruen (#0B7A52, 4,99:1 auf #F5F7FB). Eine farbige Datei
+/// kann das nicht: sie brachte beide Themen auf denselben Ton und kam im
+/// hellen Modus auf 1,64:1, war also praktisch unsichtbar.
 fn brand_icon(px: i32) -> gtk::Image {
-    const LOGO: &[u8] =
-        include_bytes!("../../../data/icons/hicolor/64x64/apps/de.weppelmann.Hexwerk.png");
-    let image = gtk::Image::new();
-    let bytes = glib::Bytes::from_static(LOGO);
-    match gtk::gdk::Texture::from_bytes(&bytes) {
-        Ok(texture) => image.set_paintable(Some(&texture)),
-        // Ohne Textur bleibt ein leerer Platz; das ist besser als ein Absturz
-        // beim Start, und der Fehler steht im Protokoll.
-        Err(err) => eprintln!("hexwerk: Logo nicht lesbar: {err}"),
-    }
+    let image = gtk::Image::from_icon_name("de.weppelmann.Hexwerk-symbolic");
+    image.add_css_class("hw-logo");
     image.set_pixel_size(px);
     image
+}
+
+
+#[cfg(test)]
+mod drop_tests {
+    use super::*;
+    use std::io::Write;
+
+    /// Baut ein ZIP mit einer `.toc` im Wurzelordner.
+    fn zip_with_toc(interface: &str) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        {
+            let mut writer = ::zip::ZipWriter::new(std::io::Cursor::new(&mut buffer));
+            let options = ::zip::write::SimpleFileOptions::default();
+            writer
+                .start_file("MeinAddon/MeinAddon.toc", options)
+                .unwrap();
+            writer
+                .write_all(format!("## Interface: {interface}\n## Title: MeinAddon\n").as_bytes())
+                .unwrap();
+            writer.finish().unwrap();
+        }
+        buffer
+    }
+
+    #[test]
+    fn toc_im_zip_liefert_die_interface_nummer() {
+        let data = zip_with_toc("11509");
+        assert_eq!(toc_interfaces(&data), vec![11509]);
+    }
+
+    #[test]
+    fn zip_ohne_toc_ergibt_keine_nummer() {
+        let mut buffer = Vec::new();
+        {
+            let mut writer = ::zip::ZipWriter::new(std::io::Cursor::new(&mut buffer));
+            let options = ::zip::write::SimpleFileOptions::default();
+            writer.start_file("MeinAddon/readme.txt", options).unwrap();
+            writer.write_all(b"kein toc").unwrap();
+            writer.finish().unwrap();
+        }
+        assert!(toc_interfaces(&buffer).is_empty());
+    }
 }

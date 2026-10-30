@@ -82,6 +82,9 @@ pub enum KeyOrigin {
     Environment,
     File,
     Keyring,
+    /// Zur Bauzeit eingebettet (`HEXWERK_CURSEFORGE_KEY`), als letzter Weg:
+    /// ein eigener Schluessel des Nutzers gewinnt immer.
+    BuiltIn,
     Missing,
     /// Quelle braucht keinen Schlüssel.
     NotNeeded,
@@ -93,9 +96,22 @@ impl KeyOrigin {
             KeyOrigin::Environment => "Umgebungsvariable",
             KeyOrigin::File => CONFIG_FILE,
             KeyOrigin::Keyring => "Schlüsselbund",
+            KeyOrigin::BuiltIn => "eingebaut",
             KeyOrigin::Missing => "kein Schlüssel",
             KeyOrigin::NotNeeded => "nicht nötig",
         }
+    }
+}
+
+/// Der zur Bauzeit eingebettete CurseForge-Schluessel, falls vorhanden.
+///
+/// `option_env!` liest ihn beim Uebersetzen (siehe `build.rs`); ohne
+/// `HEXWERK_CURSEFORGE_KEY` und ohne `.secrets/curseforge.key` ist er leer und
+/// das Programm verhaelt sich wie ohne Schluessel.
+pub fn built_in_key() -> Option<Secret> {
+    match option_env!("HEXWERK_CURSEFORGE_KEY") {
+        Some(value) if !value.trim().is_empty() => Some(Secret::new(value.trim())),
+        _ => None,
     }
 }
 
@@ -117,7 +133,36 @@ pub fn config_name(source: Source) -> Option<&'static str> {
     }
 }
 
-/// Liest Schlüssel in der Reihenfolge aus PLAN.md §7.
+/// Schluessel aus `~/.config/hexwerk/settings.json`, Abschnitt `keys`.
+///
+/// Bewusst ein eigener, kleiner Leser statt `serde_json`: dieses Modul liegt in
+/// `hexwerk-sources` und soll nicht die Abhaengigkeiten der Oberflaeche
+/// mitziehen. Gesucht wird `"keys"` gefolgt von `{ "quelle": "wert", … }`.
+fn read_settings_key(name: &str) -> Option<String> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
+        })?;
+    let text = fs::read_to_string(base.join("hexwerk").join("settings.json")).ok()?;
+    let at = text.find("\"keys\"")?;
+    let rest = &text[at..];
+    let open = rest.find('{')?;
+    let close = rest[open..].find('}')? + open;
+    let inside = &rest[open + 1..close];
+    for pair in inside.split(',') {
+        let mut parts = pair.splitn(2, ':');
+        let key = parts.next()?.trim().trim_matches('"').trim().to_string();
+        let value = parts.next()?.trim().trim_matches('"').trim().to_string();
+        if key == name && !value.is_empty() {
+            return Some(value);
+        }
+    }
+    None
+}
+
+/// Liest Schluessel in der Reihenfolge aus PLAN.md §7.
 ///
 /// `use_env`/`use_keyring` sind Schalter für Tests und für Aufrufer, die die
 /// Umgebung bewusst ignorieren wollen (etwa `hexwerk keys test` im Flatpak, wo
@@ -179,6 +224,14 @@ impl KeyProvider {
                 }
             }
         }
+        // Dieselbe Datei, die die Oberflaeche schreibt (Einstellungen-Reiter):
+        // der Schluessel wird dort eingetippt, hier gelesen. Die alte
+        // `keys.json` bleibt als Rueckfallebene gueltig.
+        if let Some(secret) = read_settings_key(name) {
+            if !secret.trim().is_empty() {
+                return Some((Secret::new(secret), KeyOrigin::File));
+            }
+        }
         if let Some(secret) = self.read_file().get(name).cloned() {
             let secret = Secret::new(secret);
             if !secret.is_empty() {
@@ -190,6 +243,13 @@ impl KeyProvider {
                 if !secret.is_empty() {
                     return Some((secret, KeyOrigin::Keyring));
                 }
+            }
+        }
+        // Zuletzt der eingebaute Schluessel: er ist fuer alle da, also darf er
+        // nur greifen, wenn niemand einen eigenen hinterlegt hat.
+        if source == Source::CurseForge {
+            if let Some(secret) = built_in_key() {
+                return Some((secret, KeyOrigin::BuiltIn));
             }
         }
         None
@@ -450,5 +510,30 @@ mod tests {
             KeyOrigin::File,
             "ohne Umgebung greift wieder die Datei"
         );
+    }
+}
+
+#[cfg(test)]
+mod builtin_tests {
+    use super::*;
+
+    #[test]
+    fn eingebauter_schluessel_aus_dem_bau() {
+        // Der Bau im Container liest `.secrets/curseforge.key`; liegt die Datei
+        // nicht vor, ist das kein Fehler, sondern der Zustand "ohne Schluessel".
+        match built_in_key() {
+            Some(secret) => {
+                assert!(secret.expose().len() > 40, "Schluessel zu kurz");
+                let provider = KeyProvider::new(std::env::temp_dir())
+                    .without_env()
+                    .without_keyring();
+                let (found, origin) = provider
+                    .key_with_origin(Source::CurseForge)
+                    .expect("eingebauter Schluessel muss greifen");
+                assert_eq!(origin, KeyOrigin::BuiltIn);
+                assert_eq!(found.expose(), secret.expose());
+            }
+            None => eprintln!("kein Schluessel eingebettet (keine .secrets/curseforge.key)"),
+        }
     }
 }

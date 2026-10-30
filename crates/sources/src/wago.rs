@@ -19,7 +19,6 @@ use crate::keys::Secret;
 use crate::merge::{id_key, Entry, Release};
 use crate::{AddonSource, Source, SourceError, SourceHealth};
 
-const API: &str = "https://addons.wago.io/api";
 const PAGE_SIZE: u32 = 25;
 
 pub struct WagoSource {
@@ -69,8 +68,9 @@ impl AddonSource for WagoSource {
         if self.token.is_none() {
             return Err(SourceError::Disabled);
         }
+        let api = crate::endpoints::base(Source::Wago);
         let url = format!(
-            "{API}/addons?search={}&page={}&limit={PAGE_SIZE}",
+            "{api}/addons?search={}&page={}&limit={PAGE_SIZE}",
             crate::http::urlencode(query.trim()),
             page + 1
         );
@@ -80,7 +80,7 @@ impl AddonSource for WagoSource {
             let response = self.http.request(&request)?;
             // 401/403 = Token ungültig. Der Klartext bleibt beim Code, weil
             // Wago in der Antwort nichts Vertrauliches mitschickt.
-            if let Some(err) = response.error(API) {
+            if let Some(err) = response.error(&api) {
                 return Err(err);
             }
             Ok(response.body)
@@ -91,15 +91,24 @@ impl AddonSource for WagoSource {
     }
 
     fn download(&self, release: &Release) -> Result<Vec<u8>, SourceError> {
+        self.download_with(release, &mut |_, _| {})
+    }
+
+    fn download_with(
+        &self,
+        release: &Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
         if release.download_url.is_empty() {
             return Err(SourceError::NotFound);
         }
         let request = self.authed(Request::get(&release.download_url))?;
-        let response = self.http.request(&request)?;
-        if let Some(err) = response.error(&release.download_url) {
-            return Err(err);
-        }
-        Ok(response.body)
+        crate::download_via_http(
+            self.http.as_ref(),
+            &request,
+            &release.download_url,
+            progress,
+        )
     }
 }
 
@@ -131,6 +140,7 @@ fn entry_from_item(item: &Value) -> Option<Entry> {
         .or_else(|| addon.get("latest_release"))
         .and_then(|r| release_from_value(r, &slug));
     Some(Entry {
+        screenshots: Vec::new(),
         key: id_key(Source::Wago, &slug),
         name,
         author,

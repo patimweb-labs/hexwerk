@@ -11,14 +11,25 @@ use rusqlite::{Connection, OptionalExtension};
 
 /// Schemaversion, die dieser Code erwartet. Steigt mit jeder Migration in
 /// [`MIGRATIONS`] um eins.
-pub const SCHEMA_VERSION: i64 = 1;
+/// 2: `addons.screenshots_json` (Bilder je Eintrag). Ein Index mit Version 1
+/// wird beim Oeffnen neu aufgebaut; der Katalog laedt sich beim naechsten Lauf
+/// wieder nach.
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// Migrationen in Reihenfolge; Index + 1 ist die Zielversion.
 ///
 /// Eine veroeffentlichte Migration wird nie mehr geaendert — sonst haetten
 /// bestehende Dateien nach dem Update ein anderes Schema als neu erzeugte,
 /// ohne dass es jemand merkt. Aenderungen kommen als neue Migration dazu.
-const MIGRATIONS: &[&str] = &[MIGRATION_1];
+const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2];
+
+/// Version 2: Bildadressen je Eintrag (`addons.screenshots_json`).
+///
+/// Als `ALTER TABLE`, damit bestehende Indexdateien die Spalte nachtraeglich
+/// bekommen, ohne den Katalog neu laden zu muessen.
+const MIGRATION_2: &str = r#"
+ALTER TABLE addons ADD COLUMN screenshots_json TEXT NOT NULL DEFAULT '[]';
+"#;
 
 /// Version 1: das Schema aus PLAN §6, ergaenzt um Spalten, die die
 /// Oberflaeche braucht, ohne den Katalog erneut zu befragen.
@@ -269,6 +280,70 @@ impl Index {
     /// Baut den Volltextindex neu. Noetig nur nach Eingriffen von aussen
     /// (SQLite-Werkzeug, Kopie einer Datei); im Normalbetrieb halten die
     /// Trigger in der Migration ihn aktuell.
+    /// Uebernimmt einen Katalog-Snapshot in diesen Index.
+    ///
+    /// Der Snapshot ist eine SQLite-Datei mit den Tabellen `addons`,
+    /// `addon_sources` und `releases` (dasselbe Schema wie hier). Vorhandene
+    /// Eintraege werden ergaenzt, nicht verworfen: was ein eigener Lauf ueber
+    /// eine Quelle weiss, bleibt stehen, nur leere Felder werden gefuellt.
+    ///
+    /// Rueckgabe ist die Zahl der Addons, die der Snapshot mitbringt.
+    pub fn merge_catalog(&mut self, snapshot: &Path) -> Result<usize, String> {
+        let path = snapshot.to_string_lossy().to_string();
+        self.conn
+            .execute("ATTACH DATABASE ?1 AS snap", [&path])
+            .map_err(|err| format!("Snapshot anhaengen: {err}"))?;
+        let result = self.merge_attached_catalog();
+        // Auch bei Fehlern loesen: sonst bleibt die Verbindung haengen und der
+        // naechste Lauf scheitert an "database snap is already in use".
+        let _ = self.conn.execute_batch("DETACH DATABASE snap;");
+        result
+    }
+
+    fn merge_attached_catalog(&mut self) -> Result<usize, String> {
+        let addons: i64 = self
+            .conn
+            .query_row("SELECT count(*) FROM snap.addons", [], |row| row.get(0))
+            .unwrap_or(0);
+        let statements = if self.has_column("addons", "screenshots_json")? {
+            MERGE_WITH_SCREENSHOTS
+        } else {
+            MERGE_WITHOUT_SCREENSHOTS
+        };
+        self.conn
+            .execute_batch(statements)
+            .map_err(|err| format!("Katalog uebernehmen: {err}"))?;
+        // Der Suchindex muss den neuen Bestand kennen; ein Fehler dabei ist
+        // kein Grund, das Uebernehmen zu verwerfen: die Suche findet dann
+        // weniger, die Zeilen sind aber da.
+        if let Err(err) = self.rebuild_fts() {
+            eprintln!("Suchindex nicht neu gebaut: {err}");
+        }
+        // Nach dem Import neu zuordnen: ein von Hand installiertes Addon
+        // bekommt seinen Katalogeintrag erst, wenn der Katalog da ist. Ohne
+        // diesen Schritt bleibt es fuer immer unverknuepft.
+        if let Err(err) = self.link_installed() {
+            eprintln!("Installierte Addons nicht zugeordnet: {err}");
+        }
+        Ok(addons as usize)
+    }
+
+    fn has_column(&self, table: &str, column: &str) -> Result<bool, String> {
+        let mut statement = self
+            .conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|err| format!("Spalten lesen: {err}"))?;
+        let names = statement
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|err| format!("Spalten lesen: {err}"))?;
+        for name in names {
+            if name.map_err(|err| format!("Spalten lesen: {err}"))? == column {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub fn rebuild_fts(&self) -> Result<(), String> {
         self.conn
             .execute("INSERT INTO addons_fts(addons_fts) VALUES('rebuild')", [])
@@ -359,6 +434,96 @@ impl Index {
 pub(crate) fn db_err(what: &'static str) -> impl Fn(rusqlite::Error) -> String {
     move |e| format!("{what}: {e}")
 }
+
+
+/// Uebernehmen eines angehaengten Snapshots (`snap`) in den eigenen Index.
+///
+/// Vorhandene Werte gewinnen: ein eigener Lauf ueber eine Quelle kennt mehr
+/// als der Dienst, etwa die Bilder, die beim Oeffnen der Detailseite geholt
+/// wurden. Nur leere Felder werden gefuellt.
+const MERGE_WITH_SCREENSHOTS: &str = r#"
+INSERT INTO addons (key, name, author, summary, homepage, icon_path, category, updated_at, screenshots_json)
+SELECT key, name, author, summary, homepage, icon_path, category, updated_at, screenshots_json
+FROM snap.addons
+WHERE true
+ON CONFLICT(key) DO UPDATE SET
+    name = excluded.name,
+    author = CASE WHEN addons.author = '' THEN excluded.author ELSE addons.author END,
+    summary = CASE WHEN addons.summary = '' THEN excluded.summary ELSE addons.summary END,
+    homepage = COALESCE(addons.homepage, excluded.homepage),
+    icon_path = COALESCE(addons.icon_path, excluded.icon_path),
+    category = COALESCE(addons.category, excluded.category),
+    updated_at = COALESCE(addons.updated_at, excluded.updated_at),
+    screenshots_json = CASE
+        WHEN addons.screenshots_json IN ('', '[]') THEN excluded.screenshots_json
+        ELSE addons.screenshots_json END;
+
+INSERT INTO addon_sources (addon_id, source, external_id, version, released_at, download_url, size_bytes)
+SELECT a.id, s.source, s.external_id, s.version, s.released_at, s.download_url, s.size_bytes
+FROM snap.addon_sources s
+JOIN snap.addons sa ON sa.id = s.addon_id
+JOIN addons a ON a.key = sa.key
+WHERE true
+ON CONFLICT(addon_id, source) DO UPDATE SET
+    external_id = excluded.external_id,
+    version = excluded.version,
+    released_at = excluded.released_at,
+    download_url = excluded.download_url,
+    size_bytes = excluded.size_bytes;
+
+INSERT INTO releases (addon_id, source, version, interface_json, url, size_bytes, fetched_at)
+SELECT a.id, r.source, r.version, r.interface_json, r.url, r.size_bytes, r.fetched_at
+FROM snap.releases r
+JOIN snap.addons sa ON sa.id = r.addon_id
+JOIN addons a ON a.key = sa.key
+WHERE true
+ON CONFLICT(addon_id, source, version) DO UPDATE SET
+    interface_json = excluded.interface_json,
+    url = excluded.url,
+    size_bytes = excluded.size_bytes,
+    fetched_at = excluded.fetched_at;
+"#;
+
+/// Dasselbe fuer Indexdateien ohne Bildspalte (Schema 1).
+const MERGE_WITHOUT_SCREENSHOTS: &str = r#"
+INSERT INTO addons (key, name, author, summary, homepage, icon_path, category, updated_at)
+SELECT key, name, author, summary, homepage, icon_path, category, updated_at
+FROM snap.addons
+WHERE true
+ON CONFLICT(key) DO UPDATE SET
+    name = excluded.name,
+    author = CASE WHEN addons.author = '' THEN excluded.author ELSE addons.author END,
+    summary = CASE WHEN addons.summary = '' THEN excluded.summary ELSE addons.summary END,
+    homepage = COALESCE(addons.homepage, excluded.homepage),
+    icon_path = COALESCE(addons.icon_path, excluded.icon_path),
+    category = COALESCE(addons.category, excluded.category),
+    updated_at = COALESCE(addons.updated_at, excluded.updated_at);
+
+INSERT INTO addon_sources (addon_id, source, external_id, version, released_at, download_url, size_bytes)
+SELECT a.id, s.source, s.external_id, s.version, s.released_at, s.download_url, s.size_bytes
+FROM snap.addon_sources s
+JOIN snap.addons sa ON sa.id = s.addon_id
+JOIN addons a ON a.key = sa.key
+WHERE true
+ON CONFLICT(addon_id, source) DO UPDATE SET
+    external_id = excluded.external_id,
+    version = excluded.version,
+    released_at = excluded.released_at,
+    download_url = excluded.download_url,
+    size_bytes = excluded.size_bytes;
+
+INSERT INTO releases (addon_id, source, version, interface_json, url, size_bytes, fetched_at)
+SELECT a.id, r.source, r.version, r.interface_json, r.url, r.size_bytes, r.fetched_at
+FROM snap.releases r
+JOIN snap.addons sa ON sa.id = r.addon_id
+JOIN addons a ON a.key = sa.key
+WHERE true
+ON CONFLICT(addon_id, source, version) DO UPDATE SET
+    interface_json = excluded.interface_json,
+    url = excluded.url,
+    size_bytes = excluded.size_bytes,
+    fetched_at = excluded.fetched_at;
+"#;
 
 #[cfg(test)]
 mod tests {

@@ -22,6 +22,9 @@ pub struct FlavorData {
     pub dir_name: String,
     pub addons_dir: PathBuf,
     pub interface_numbers: Vec<u32>,
+    /// Spielversion dieses Client-Ordners aus `.build.info` (`1.15.9`), sofern
+    /// vorhanden. Wird im Katalog als Versionsfilter angeboten.
+    pub game_version: Option<String>,
     /// Einmal eingeordnet: die Tabelle zeigt diese Liste, ohne erneut zu lesen.
     pub addons: Vec<InstalledAddon>,
     pub size_bytes: u64,
@@ -30,6 +33,47 @@ pub struct FlavorData {
 impl FlavorData {
     pub fn addon_count(&self) -> usize {
         self.addons.len()
+    }
+
+    /// Hoechste Interface-Nummer — die Fassung, auf der der Client laeuft.
+    pub fn interface_number(&self) -> Option<u32> {
+        self.interface_numbers.last().copied()
+    }
+
+    /// Was im Filter steht: `Classic Era 1.15.9`, sonst `Classic Era 11509`,
+    /// sonst nur `Classic Era`.
+    pub fn version_label(&self) -> String {
+        let label = flavor_label(&self.flavor);
+        match (&self.game_version, self.interface_number()) {
+            (Some(version), _) => format!("{label} {version}"),
+            (None, Some(number)) => format!("{label} {number}"),
+            (None, None) => label,
+        }
+    }
+}
+
+/// Anzeigename einer Client-Variante.
+///
+/// Bekannte Varianten liefern ihren Namen aus dem Kern (`Classic Era`). Neue,
+/// die es bei Erscheinen dieses Programms noch nicht gab, heissen im Kern
+/// `Other("_classic_beta_")` — deren Ordnername wird hier lesbar gemacht
+/// (`_classic_beta_` → `Classic Beta`), statt roh in der Oberflaeche zu stehen.
+fn flavor_label(flavor: &Flavor) -> String {
+    match flavor {
+        Flavor::Other(raw) => raw
+            .trim_matches('_')
+            .split('_')
+            .filter(|part| !part.is_empty())
+            .map(|part| {
+                let mut chars = part.chars();
+                match chars.next() {
+                    Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
+        other => other.label().to_string(),
     }
 }
 
@@ -118,6 +162,7 @@ fn prepare_client(client: Client) -> ClientData {
                     flavor: flavor_dir.flavor,
                     addons_dir: flavor_dir.addons_dir,
                     interface_numbers: flavor_dir.interface_numbers,
+                    game_version: flavor_dir.game_version,
                     addons,
                     size_bytes,
                 }

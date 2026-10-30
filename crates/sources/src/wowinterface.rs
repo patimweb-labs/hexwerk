@@ -26,8 +26,6 @@ use crate::http::{Http, Request};
 use crate::merge::{id_key, Entry, Release};
 use crate::{AddonSource, Source, SourceError, SourceHealth};
 
-const LIST_URL: &str = "https://api.mmoui.com/v4/game/WOW/filelist.json";
-const DETAILS_URL: &str = "https://api.mmoui.com/v3/game/WOW/filedetails";
 const PAGE_SIZE: usize = 25;
 
 /// Ein Eintrag der Gesamtliste.
@@ -81,6 +79,7 @@ impl WowiFile {
             interface_numbers: Vec::new(),
         };
         Entry {
+            screenshots: Vec::new(),
             key: id_key(Source::WowInterface, &self.id),
             name: self.title,
             author: self.author,
@@ -105,8 +104,12 @@ impl WowInterfaceSource {
     /// Gesamtliste. Sechs Stunden TTL: 2,7 MB je Anfrage wären sonst teuer.
     pub fn files(&self) -> Result<Vec<WowiFile>, SourceError> {
         let body = self.cache.cached("wowi:filelist", TTL_LIST, || {
-            let response = self.http.request(&Request::get(LIST_URL))?;
-            if let Some(err) = response.error(LIST_URL) {
+            let list_url = format!(
+                "{}/v4/game/WOW/filelist.json",
+                crate::endpoints::base(Source::WowInterface)
+            );
+            let response = self.http.request(&Request::get(&list_url))?;
+            if let Some(err) = response.error(&list_url) {
                 return Err(err);
             }
             Ok(response.body)
@@ -116,7 +119,10 @@ impl WowInterfaceSource {
 
     /// Detailantwort eines Addons (ZIP-Adresse, Beschreibung, Changelog).
     pub fn details(&self, id: &str) -> Result<WowiDetails, SourceError> {
-        let url = format!("{DETAILS_URL}/{id}.json");
+        let url = format!(
+            "{}/v3/game/WOW/filedetails/{id}.json",
+            crate::endpoints::base(Source::WowInterface)
+        );
         let cache_key = format!("wowi:details:{id}");
         let body = self.cache.cached(&cache_key, TTL_DETAILS, || {
             let response = self.http.request(&Request::get(&url))?;
@@ -166,6 +172,14 @@ impl AddonSource for WowInterfaceSource {
     }
 
     fn download(&self, release: &Release) -> Result<Vec<u8>, SourceError> {
+        self.download_with(release, &mut |_, _| {})
+    }
+
+    fn download_with(
+        &self,
+        release: &Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
         // Die Liste kennt nur die Dateiseite; die CDN-Adresse steht im Detail.
         let url = match self.details(&release.external_id) {
             Ok(details) => details
@@ -180,11 +194,7 @@ impl AddonSource for WowInterfaceSource {
                 release.download_url.clone()
             }
         };
-        let response = self.http.request(&Request::get(&url))?;
-        if let Some(err) = response.error(&url) {
-            return Err(err);
-        }
-        Ok(response.body)
+        crate::download_via_http(self.http.as_ref(), &Request::get(&url), &url, progress)
     }
 }
 

@@ -43,6 +43,23 @@ window.hw-dark {
   --hw-head: #080E18;
   --hw-cell: #0C1626;
   --hw-banner-glow: rgba(57, 221, 147, 0.16);
+  /* Bildbetrachter und Ueberlagerungen: eigene Flaeche, weil dort Bilder
+     stehen und kein Text der Seite. In beiden Paletten dunkel, damit ein
+     Screenshot nicht auf hellem Grund schwimmt. */
+  --hw-viewer-bg: #05080F;
+  --hw-overlay-bg: rgba(4, 8, 16, 0.62);
+  --hw-overlay-bg-strong: rgba(4, 8, 16, 0.88);
+  --hw-overlay-ink: #FFFFFF;
+  --hw-overlay-line: rgba(255, 255, 255, 0.35);
+  --hw-overlay-line-weak: rgba(255, 255, 255, 0.12);
+  --hw-overlay-shadow: rgba(0, 0, 0, 0.55);
+  --hw-overlay-ink-dim: rgba(255, 255, 255, 0.55);
+  --hw-overlay-fill: rgba(255, 255, 255, 0.10);
+  --hw-overlay-line-strong: rgba(255, 255, 255, 0.28);
+  --hw-overlay-fill-hover: rgba(255, 255, 255, 0.20);
+  --hw-signal-strong: rgba(57, 221, 147, 0.55);
+  --hw-signal-halo: rgba(57, 221, 147, 0.12);
+  --hw-bad-wash: rgba(226, 101, 122, 0.08);
 }
 
 /* ---- Palette hell (gleiche Geometrie, andere Werte) ---- */
@@ -71,6 +88,20 @@ window.hw-light {
   /* Heller Grund braucht mehr Farbe, damit der Verlauf im Banner sichtbar
      bleibt - 0.16 auf #F5F7FB waere praktisch unsichtbar. */
   --hw-banner-glow: rgba(11, 122, 82, 0.18);
+  --hw-viewer-bg: #10151D;
+  --hw-overlay-bg: rgba(4, 8, 16, 0.62);
+  --hw-overlay-bg-strong: rgba(4, 8, 16, 0.88);
+  --hw-overlay-ink: #FFFFFF;
+  --hw-overlay-line: rgba(255, 255, 255, 0.35);
+  --hw-overlay-line-weak: rgba(255, 255, 255, 0.12);
+  --hw-overlay-shadow: rgba(0, 0, 0, 0.55);
+  --hw-overlay-ink-dim: rgba(255, 255, 255, 0.55);
+  --hw-overlay-fill: rgba(255, 255, 255, 0.10);
+  --hw-overlay-line-strong: rgba(255, 255, 255, 0.28);
+  --hw-overlay-fill-hover: rgba(255, 255, 255, 0.20);
+  --hw-signal-strong: rgba(11, 122, 82, 0.55);
+  --hw-signal-halo: rgba(11, 122, 82, 0.12);
+  --hw-bad-wash: rgba(163, 34, 56, 0.08);
 }
 
 /* ---- Grundflaechen ---- */
@@ -109,7 +140,10 @@ headerbar.hw-header {
   border-top: 1px solid var(--hw-line);
   color: var(--hw-dim2);
   font-size: 12px;
-  padding: 7px 14px;
+  /* Etwas hoeher als eine Textzeile: die Ladeanzeige braucht Platz, und eine
+     Fusszeile, in der die Grafik oben und unten klebt, sieht gequetscht aus. */
+  padding: 10px 14px;
+  min-height: 34px;
 }
 
 .hw-footer .hw-footer-item {
@@ -117,7 +151,20 @@ headerbar.hw-header {
   border-right: 1px solid var(--hw-line);
 }
 
+/* Der letzte Eintrag bekommt keinen Trennstrich: hinter dem Datum ist die
+   Fusszeile zu Ende, ein Balken dort trennt nichts mehr. */
+.hw-footer .hw-footer-item:last-child {
+  border-right: 0;
+}
+
 /* ---- Wortmarke und Abschnitte ---- */
+/* Das Zeichen folgt der Palette: `--hw-signal` ist im dunklen Thema das
+   Signalgruen (10,76:1 auf der Leiste), im hellen ein dunkles Gruen
+   (4,99:1). Symbolische Symbole nehmen ihre Farbe aus `color`. */
+.hw-logo {
+  color: var(--hw-signal);
+}
+
 .hw-wordmark {
   color: var(--hw-signal);
   font-size: 13px;
@@ -149,6 +196,11 @@ button.hw-nav-item {
   box-shadow: none;
   padding: 7px 14px 7px 12px;
   min-height: 34px;
+}
+/* Schmale Leiste (nur Symbole): gleiches Innenmass links und rechts, damit das
+   Symbol in der Spalte mittig sitzt statt am linken Rand zu kleben. */
+.hw-nav-compact button.hw-nav-item {
+  padding: 7px 13px;
 }
 
 button.hw-nav-item:hover {
@@ -515,8 +567,106 @@ progressbar.hw-bar progress {
   min-height: 84px;
 }
 
+/* ---- Bildbetrachter: eigenes Fenster mit Blaetternpfeilen ---- */
+.hw-viewer {
+  background-color: var(--hw-viewer-bg);
+}
+.hw-viewer-stage {
+  background-color: var(--hw-viewer-bg);
+}
+/* Die Pfeile liegen ueber dem Bild und bleiben auch auf hellen Screenshots
+   sichtbar: halbtransparentes Schwarz plus heller Rand. */
+/* Zeile, ueber der beim Ziehen etwas schwebt */
+.hw-setting-row {
+  padding: 6px 10px;
+  border: 1px solid var(--hw-line);
+  background-color: var(--hw-cell);
+}
+.hw-grip {
+  opacity: 0.55;
+  padding: 2px 4px;
+}
+.hw-grip:hover {
+  opacity: 1;
+}
+
+.hw-setting-row.drop-target {
+  border-color: var(--hw-signal);
+  background-color: var(--hw-signal-halo);
+}
+/* Aufgeklappter Teil einer Quellenzeile (Schluessel setzen) */
+.hw-source-detail {
+  background-color: var(--hw-bg);
+  border: 1px solid var(--hw-line);
+  border-top: 0;
+  padding: 10px 12px;
+}
+
+/* Einfuegemarke: 2 px Signalgruen an der Kante, an der der Eintrag landet */
+.hw-setting-row.drop-above {
+  box-shadow: inset 0 2px 0 0 var(--hw-signal);
+}
+.hw-setting-row.drop-below {
+  box-shadow: inset 0 -2px 0 0 var(--hw-signal);
+}
+
+.hw-viewer-nav {
+  background-color: var(--hw-overlay-bg);
+  border: 1px solid var(--hw-overlay-line);
+  color: var(--hw-overlay-ink);
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0;
+  margin: 0 18px;
+  box-shadow: 0 2px 10px var(--hw-overlay-shadow);
+}
+.hw-viewer-nav:hover {
+  background-color: var(--hw-signal-strong);
+  border-color: var(--hw-signal);
+}
+.hw-viewer-nav:disabled {
+  opacity: 0.25;
+}
+.hw-viewer-bar {
+  background-color: var(--hw-overlay-bg-strong);
+  border-top: 1px solid var(--hw-overlay-line-weak);
+  padding: 8px 16px;
+}
+.hw-viewer-count {
+  color: var(--hw-overlay-ink);
+  font-size: 13px;
+  font-feature-settings: "tnum";
+}
+.hw-viewer-url {
+  color: var(--hw-overlay-ink-dim);
+  font-size: 12px;
+}
+.hw-viewer-close {
+  background-color: var(--hw-overlay-fill);
+  border: 1px solid var(--hw-overlay-line-strong);
+  color: var(--hw-overlay-ink);
+  padding: 4px 12px;
+}
+.hw-viewer-close:hover {
+  background-color: var(--hw-overlay-fill-hover);
+}
+
 .hw-tabbar {
   border-bottom: 1px solid var(--hw-line);
+}
+
+/* Der Reiter bekommt beim Aufbau den Fokus; GTK zeichnet dann ringsum einen
+   Fokusring, und waehrend die Details laden sieht die Leiste wie ein
+   umrandeter Kasten aus. Nur die Unterlinie markiert den aktiven Reiter. */
+.hw-tab:focus,
+.hw-tab:focus-visible,
+.hw-tabbar:focus,
+.hw-tabbar:focus-within {
+  outline: none;
+  box-shadow: none;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
 }
 
 .hw-tab {
@@ -781,7 +931,7 @@ button.hw-btn.danger {
 }
 
 button.hw-btn.danger:hover {
-  background-color: rgba(226, 101, 122, 0.08);
+  background-color: var(--hw-bad-wash);
 }
 
 /* Die Trennlinie der NavigationSplitView laeuft ueber die volle Hoehe und

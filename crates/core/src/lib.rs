@@ -8,6 +8,7 @@
 pub mod addon;
 pub mod clients;
 pub mod flavor;
+pub mod game_version;
 pub mod toc;
 
 pub use addon::{scan_addons, InstalledAddon};
@@ -15,6 +16,7 @@ pub use clients::{
     discover, discover_at, Client, Discovery, Note, NoteStatus, Origin, SearchRoots,
 };
 pub use flavor::{Flavor, FlavorDir};
+pub use game_version::GameVersion;
 pub use toc::{parse_file, parse_str, Toc, TocSourceIds};
 
 /// Wurzel für Index, Sicherungen und Papierkorb.

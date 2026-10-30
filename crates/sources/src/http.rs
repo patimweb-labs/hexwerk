@@ -14,9 +14,11 @@ use std::time::Duration;
 
 use crate::SourceError;
 
-/// Obergrenze je Antwort. Die WoWInterface-Gesamtliste ist 2,7 MB; 64 MB lässt
-/// Luft für ZIP-Downloads, ohne dass ein kaputter Server den Speicher füllt.
-const BODY_LIMIT: u64 = 64 * 1024 * 1024;
+/// Obergrenze je Antwort. Die WoWInterface-Gesamtliste ist 2,7 MB; Addon-ZIPs
+/// gehen bis deutlich ueber 64 MB (gemessen: `spoken-wow` 68,2 MB, das an der
+/// alten Grenze scheiterte). 256 MB laesst Luft fuer die groessten Pakete, ohne
+/// dass ein kaputter Server den Speicher fuellt.
+const BODY_LIMIT: u64 = 256 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
@@ -176,28 +178,93 @@ pub trait Http: Send + Sync {
     fn get(&self, url: &str) -> Result<HttpResponse, SourceError> {
         self.request(&Request::get(url))
     }
+
+    /// Wie [`Http::request`], meldet aber den Fortschritt beim Lesen des Rumpfes.
+    ///
+    /// `done` sind die bisher gelesenen Bytes, `total` die vom Server genannte
+    /// Gesamtgroesse (`content-length`), sofern er sie nennt. Kleine Antworten
+    /// (JSON-Suche) gehen den Vorgabeweg und melden einmal am Ende - fuer den
+    /// Fortschrittsbalken ist nur ein ZIP-Download interessant, und den
+    /// ueberschreibt [`UreqHttp`] mit einem stueckweisen Lesen.
+    fn download(
+        &self,
+        request: &Request,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<HttpResponse, SourceError> {
+        let response = self.request(request)?;
+        progress(response.body.len() as u64, Some(response.body.len() as u64));
+        Ok(response)
+    }
 }
 
 /// Echter Client. Wird erst im Betrieb gebaut, nie in Tests.
 pub struct UreqHttp {
     agent: ureq::Agent,
+    /// Zweiter Agent nur für Datei-Downloads: 30 s Gesamtzeit sind für JSON
+    /// richtig (ein toter Server soll schnell auffallen), für 68 MB über eine
+    /// langsame Leitung aber zu knapp.
+    download_agent: ureq::Agent,
 }
 
 impl UreqHttp {
     pub fn new() -> Self {
-        let config = ureq::Agent::config_builder()
-            // Ohne Timeout hängt der Hintergrundthread an einem toten CDN fest
-            // und die UI zeigt ewig „lädt".
-            .timeout_global(Some(Duration::from_secs(30)))
-            .user_agent(concat!("hexwerk/", env!("CARGO_PKG_VERSION")))
-            // Statuscodes selbst auswerten: `403` von CurseForge ohne Schlüssel
-            // und `429` von GitHub sollen unterscheidbar bleiben.
-            .http_status_as_error(false)
-            .build();
         Self {
-            agent: config.into(),
+            agent: build_agent(Duration::from_secs(30)),
+            download_agent: build_agent(Duration::from_secs(300)),
         }
     }
+
+    /// Baut die Anfrage und schickt sie ab - gemeinsam für [`Http::request`] und
+    /// [`Http::download`], damit Header und Fehlerabbildung nur an einer Stelle
+    /// stehen.
+    fn call(
+        &self,
+        agent: &ureq::Agent,
+        request: &Request,
+    ) -> Result<ureq::http::Response<ureq::Body>, SourceError> {
+        // GET und POST haben bei ureq verschiedene Builder-Typen
+        // (`WithoutBody` gegen `WithBody`), deshalb zwei Zweige statt einer
+        // gemeinsamen Schleife.
+        let result = match request.method {
+            Method::Get => {
+                let mut builder = agent.get(&request.url);
+                for (name, value) in &request.headers {
+                    builder = builder.header(name.as_str(), value.as_str());
+                }
+                builder.call()
+            }
+            Method::Post => {
+                let mut builder = agent.post(&request.url);
+                for (name, value) in &request.headers {
+                    builder = builder.header(name.as_str(), value.as_str());
+                }
+                let body = request.body.as_deref().unwrap_or(&[]);
+                builder.send(body)
+            }
+        };
+        match result {
+            Ok(response) => Ok(response),
+            Err(ureq::Error::StatusCode(code)) => Err(SourceError::Http {
+                status: code,
+                url: request.url_without_query(),
+            }),
+            Err(e) => Err(map_ureq_error(&e, &request.url_without_query())),
+        }
+    }
+}
+
+/// Ein Agent mit fester Gesamtzeit und eigener Kennung.
+fn build_agent(timeout: Duration) -> ureq::Agent {
+    ureq::Agent::config_builder()
+        // Ohne Timeout hängt der Hintergrundthread an einem toten CDN fest und
+        // die Oberflaeche zeigt ewig „lädt".
+        .timeout_global(Some(timeout))
+        .user_agent(concat!("hexwerk/", env!("CARGO_PKG_VERSION")))
+        // Statuscodes selbst auswerten: `403` von CurseForge ohne Schlüssel und
+        // `429` von GitHub sollen unterscheidbar bleiben.
+        .http_status_as_error(false)
+        .build()
+        .into()
 }
 
 impl Default for UreqHttp {
@@ -208,36 +275,7 @@ impl Default for UreqHttp {
 
 impl Http for UreqHttp {
     fn request(&self, request: &Request) -> Result<HttpResponse, SourceError> {
-        // GET und POST haben bei ureq verschiedene Builder-Typen
-        // (`WithoutBody` gegen `WithBody`), deshalb zwei Zweige statt einer
-        // gemeinsamen Schleife.
-        let result = match request.method {
-            Method::Get => {
-                let mut builder = self.agent.get(&request.url);
-                for (name, value) in &request.headers {
-                    builder = builder.header(name.as_str(), value.as_str());
-                }
-                builder.call()
-            }
-            Method::Post => {
-                let mut builder = self.agent.post(&request.url);
-                for (name, value) in &request.headers {
-                    builder = builder.header(name.as_str(), value.as_str());
-                }
-                let body = request.body.as_deref().unwrap_or(&[]);
-                builder.send(body)
-            }
-        };
-        let mut response = match result {
-            Ok(r) => r,
-            Err(ureq::Error::StatusCode(code)) => {
-                return Err(SourceError::Http {
-                    status: code,
-                    url: request.url_without_query(),
-                })
-            }
-            Err(e) => return Err(map_ureq_error(&e, &request.url_without_query())),
-        };
+        let mut response = self.call(&self.agent, request)?;
         let status = response.status().as_u16();
         let content_type = response
             .headers()
@@ -250,6 +288,50 @@ impl Http for UreqHttp {
             .limit(BODY_LIMIT)
             .read_to_vec()
             .map_err(|e| map_ureq_error(&e, &request.url_without_query()))?;
+        Ok(HttpResponse {
+            status,
+            body,
+            content_type,
+        })
+    }
+
+    /// Liest den Rumpf stueckweise und meldet nach jedem Block.
+    ///
+    /// WARUM stueckweise: erst damit gibt es einen Fortschrittsbalken, der
+    /// waehrend des Downloads laeuft und nicht erst beim Abschluss springt.
+    /// 64 KiB je Meldung sind klein genug fuer eine fluessige Anzeige und gross
+    /// genug, dass die Meldungen keinen Thread-Wechsel bremsen.
+    fn download(
+        &self,
+        request: &Request,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<HttpResponse, SourceError> {
+        let mut response = self.call(&self.download_agent, request)?;
+        let status = response.status().as_u16();
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.to_string());
+        let total = response
+            .headers()
+            .get("content-length")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
+        let mut body = Vec::new();
+        {
+            let mut reader = response.body_mut().with_config().limit(BODY_LIMIT).reader();
+            let mut block = [0u8; 64 * 1024];
+            loop {
+                let read = std::io::Read::read(&mut reader, &mut block)
+                    .map_err(|e| SourceError::Network(format!("Download abgebrochen: {e}")))?;
+                if read == 0 {
+                    break;
+                }
+                body.extend_from_slice(&block[..read]);
+                progress(body.len() as u64, total);
+            }
+        }
         Ok(HttpResponse {
             status,
             body,

@@ -69,11 +69,23 @@ pub struct FlavorDir {
     /// `## Interface` aller `.toc` im Ordner, entdoppelt und sortiert.
     /// Gemessen: mehrere Werte je Addon (`11509, 20506, 16001`).
     pub interface_numbers: Vec<u32>,
+    /// Spielversion aus `.build.info`, kurz (`11.2.0`, `1.15.9`).
+    ///
+    /// Getrennt von `interface_numbers`, weil beides verschiedene Dinge sagt:
+    /// die Version gilt fuer den Client, die Interface-Nummern stammen aus den
+    /// `.toc` der Addons und koennen veraltet sein. `None`, wenn der Ordner
+    /// keine `.flavor.info`/`.build.info` hat (z. B. ein Testbaum).
+    pub game_version: Option<String>,
 }
 
 impl FlavorDir {
     /// Passt dieser Client zu einer Interface-Nummer aus einem Addon?
     pub fn accepts(&self, interface_number: u32) -> bool {
         self.interface_numbers.is_empty() || self.interface_numbers.contains(&interface_number)
+    }
+
+    /// Hoechste bekannte Interface-Nummer - die, auf der der Client laeuft.
+    pub fn interface_number(&self) -> Option<u32> {
+        self.interface_numbers.last().copied()
     }
 }

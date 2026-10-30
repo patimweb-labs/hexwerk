@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 
 use crate::addon::scan_addons;
 use crate::flavor::{Flavor, FlavorDir};
+use crate::game_version;
 
 /// Herkunft eines Praefixes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -230,7 +231,12 @@ pub(crate) fn describe(game_dir: &Path) -> Vec<FlavorDir> {
         if !has_addons && !has_game_exe(&path) {
             continue;
         }
-        let interface_numbers = if has_addons {
+        // Version aus den Blizzard-Dateien: sie gilt auch dann, wenn noch kein
+        // Addon im Ordner liegt (frischer Client) - genau der Fall, in dem die
+        // `.toc`-Nummern unten leer bleiben.
+        let game = game_version::read(game_dir, &path);
+        let game_short = game.as_ref().map(|g| g.short_version().to_string());
+        let mut interface_numbers: Vec<u32> = if has_addons {
             scan_addons(&addons_dir)
                 .iter()
                 .flat_map(|a| a.interface_numbers.iter().copied())
@@ -240,11 +246,19 @@ pub(crate) fn describe(game_dir: &Path) -> Vec<FlavorDir> {
         } else {
             Vec::new()
         };
+        // Ohne Addons sagt die `.toc` nichts; dann ist die Spielversion die
+        // einzige ehrliche Quelle fuer die Interface-Nummer.
+        if interface_numbers.is_empty() {
+            if let Some(number) = game.as_ref().and_then(|g| g.interface_number()) {
+                interface_numbers.push(number);
+            }
+        }
         out.push(FlavorDir {
             flavor: Flavor::from_dir_name(name),
             dir: path,
             addons_dir,
             interface_numbers,
+            game_version: game_short,
         });
     }
     out.sort_by_key(|a| a.flavor.dir_name());

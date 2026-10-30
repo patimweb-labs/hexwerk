@@ -23,7 +23,9 @@ pub struct Filters {
     /// Nur diese Quellen.
     pub sources: Vec<hexwerk_sources::Source>,
     /// Nur Addons, die zu dieser Interface-Nummer passen.
-    pub interface_number: Option<u32>,
+    /// Mehrere Fassungen gleichzeitig: der Katalog soll „Retail oder Classic"
+    /// zeigen koennen, nicht nur eine.
+    pub interface_numbers: Vec<u32>,
     /// Nur Eintraege, fuer die es ein Update gibt.
     pub updates_only: bool,
 }
@@ -102,6 +104,9 @@ pub struct CatalogueItem {
     pub homepage: Option<String>,
     pub icon_path: Option<String>,
     pub category: Option<String>,
+    /// Bildadressen der Quelle: erstes ist das Logo, danach Screenshots.
+    /// Die Oberflaeche laedt sie selbst; der Index haelt nur die Adressen.
+    pub screenshots: Vec<String>,
     /// Je Quelle die hoechste Version, nach Quelle sortiert.
     pub sources: Vec<SourceRelease>,
     /// Anzeige-Version: die hoechste ueber alle Quellen (PLAN §5).
@@ -195,6 +200,13 @@ pub struct Update {
     pub available_version: String,
     pub download_url: String,
     pub released_at: Option<String>,
+    /// Projekt-ID bei der Quelle — fuer den Download braucht sie z. B.
+    /// WoWInterface, um die CDN-Adresse zu holen.
+    pub external_id: String,
+    /// Interface-Nummern der neuen Fassung. Grundlage der Eignungspruefung:
+    /// ein Update fuer eine andere Spielversion darf nicht installiert werden.
+    pub interface_numbers: Vec<u32>,
+    pub size_bytes: Option<u64>,
 }
 
 /// Zahlen fuer die Fusszeile und den leeren Zustand.
@@ -218,6 +230,7 @@ struct RawAddon {
     homepage: Option<String>,
     icon_path: Option<String>,
     category: Option<String>,
+    screenshots_json: String,
 }
 
 impl Index {
@@ -258,7 +271,8 @@ impl Index {
     /// Fassungen. `None`, wenn die ID nicht (mehr) existiert.
     pub fn addon(&self, id: i64) -> Result<Option<CatalogueItem>, String> {
         let raws = self.query_raw(
-            "SELECT a.id, a.key, a.name, a.author, a.summary, a.homepage, a.icon_path, a.category
+            "SELECT a.id, a.key, a.name, a.author, a.summary, a.homepage, a.icon_path, a.category,
+                    a.screenshots_json
              FROM addons a WHERE a.id = ?",
             &[Value::Integer(id)],
         )?;
@@ -282,6 +296,7 @@ impl Index {
                     homepage: row.get(5)?,
                     icon_path: row.get(6)?,
                     category: row.get(7)?,
+                    screenshots_json: row.get(8)?,
                 })
             })
             .map_err(|e| format!("Suche ausfuehren: {e}"))?;
@@ -330,6 +345,10 @@ impl Index {
                 homepage: raw.homepage,
                 icon_path: raw.icon_path,
                 category: raw.category,
+                // Adressen aus der JSON-Spalte; ein kaputter Wert ergibt eine
+                // leere Liste statt eines Fehlers, damit ein einzelner
+                // verdorbener Eintrag nicht die ganze Suche kippt.
+                screenshots: serde_json::from_str(&raw.screenshots_json).unwrap_or_default(),
                 sources: per_source,
                 latest,
                 releases: releases.remove(&raw.id).unwrap_or_default(),
@@ -362,7 +381,8 @@ fn search_sql(
         params.push(Value::Text(q.clone()));
     }
     sql.push_str(
-        "SELECT a.id, a.key, a.name, a.author, a.summary, a.homepage, a.icon_path, a.category
+        "SELECT a.id, a.key, a.name, a.author, a.summary, a.homepage, a.icon_path, a.category,
+                a.screenshots_json
          FROM addons a",
     );
     if fts.is_some() {
@@ -379,23 +399,35 @@ fn search_sql(
             params.push(Value::Text(source_key(*source).to_string()));
         }
     }
-    if let Some(iface) = filters.interface_number {
+    if !filters.interface_numbers.is_empty() {
         // `json_each` liefert eine Zeile je Nummer der Liste — der einzige
         // Weg, „passt zu diesem Client“ ohne Zusatztabelle zu fragen. Der Join
         // auf `addon_sources` beschraenkt die Pruefung auf die Version, die
         // gerade angeboten wird: ein Release von 2019 fuer Classic darf ein
         // Addon nicht im Retail-Filter auftauchen lassen.
-        conds.push(
-            "EXISTS (SELECT 1
-                     FROM addon_sources s
-                     JOIN releases r ON r.addon_id = s.addon_id
-                                    AND r.source = s.source
-                                    AND r.version = s.version
-                     JOIN json_each(r.interface_json) j
-                     WHERE s.addon_id = a.id AND j.value = ?)"
-                .to_string(),
-        );
-        params.push(Value::Integer(i64::from(iface)));
+        // Eine Bedingung je gewaehlter Fassung, verbunden mit ODER: ein
+        // Addon passt, wenn irgendein Release eine der Nummern nennt.
+        // `CAST(j.value AS INTEGER)` vergleicht Zahlen, nicht Text („110002"
+        // als Text waere sonst nicht gleich 110002).
+        let mut parts = Vec::new();
+        for iface in &filters.interface_numbers {
+            // Der Join auf `addon_sources` ist Pflicht: geprueft wird nur das
+            // Release, das gerade angeboten wird. Sonst taucht ein Classic-Release
+            // von 2019 im Retail-Filter auf, weil es irgendwann mal existierte.
+            parts.push(
+                "EXISTS (SELECT 1
+                         FROM addon_sources s
+                         JOIN releases r ON r.addon_id = s.addon_id
+                                        AND r.source = s.source
+                                        AND r.version = s.version
+                         JOIN json_each(r.interface_json) j
+                         WHERE s.addon_id = a.id
+                           AND CAST(j.value AS INTEGER) = ?)"
+                    .to_string(),
+            );
+            params.push(Value::Integer(i64::from(*iface)));
+        }
+        conds.push(format!("({})", parts.join(" OR ")));
     }
     if filters.updates_only {
         if update_ids.is_empty() {
@@ -810,6 +842,9 @@ impl Index {
                     available_version: source.version.clone(),
                     download_url: source.download_url.clone(),
                     released_at: source.released_at.clone(),
+                    external_id: source.external_id.clone(),
+                    interface_numbers: source.interfaces.clone(),
+                    size_bytes: source.size_bytes,
                 });
             }
         }

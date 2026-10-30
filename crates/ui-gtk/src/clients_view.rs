@@ -6,6 +6,7 @@
 //! Addon-Liste, die beim Scan sowieso gelesen wurde.
 
 use adw::prelude::*;
+use std::rc::Rc;
 
 use crate::format::{human_size, initial, interface_list, shorten_home};
 use crate::state::{ClientData, FlavorData, ScanData};
@@ -14,6 +15,14 @@ type OpenFlavor = Box<dyn Fn(usize, usize)>;
 
 pub struct ClientsView {
     root: gtk::ScrolledWindow,
+    /// Kopfzeile; beim Sprachwechsel nachzuziehen.
+    title: gtk::Label,
+    sub: gtk::Label,
+    data: std::cell::RefCell<Option<std::rc::Rc<crate::state::ScanData>>>,
+    /// Zusammenfassung des letzten Scans: Herkuenfte, Zahlen, Knopf.
+    scan_summary: gtk::Label,
+    rescan: gtk::Button,
+    on_rescan: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn()>>>>,
     grid: gtk::Grid,
     empty: gtk::Box,
     /// Wird mit (Client-Index, Flavor-Index) gerufen, wenn eine Zeile
@@ -23,15 +32,12 @@ pub struct ClientsView {
 }
 
 impl ClientsView {
-    pub fn new() -> Self {
-        let title = gtk::Label::new(Some("Clients"));
+    pub fn new() -> Rc<Self> {
+        let title = gtk::Label::new(Some(crate::lang::tn("cl.title")));
         title.add_css_class("hw-h1");
         title.set_xalign(0.0);
 
-        let sub = gtk::Label::new(Some(
-            "Gefundene WoW-Installationen. Der Pfad gilt für alle Addon-Aktionen; gelesen wird nur, \
-             solange du nichts änderst.",
-        ));
+        let sub = gtk::Label::new(Some(crate::lang::tn("cl.sub")));
         sub.add_css_class("hw-sub");
         sub.set_xalign(0.0);
         sub.set_wrap(true);
@@ -42,6 +48,25 @@ impl ClientsView {
         // so bekommt jede Karte genau die halbe Breite, auch wenn nur eine da
         // ist - eine einzelne Karte ueber die volle Fensterbreite sieht aus wie
         // ein Versehen.
+        // Zusammenfassung des Scans als **eine Zeile** unter der Liste.
+        // Bewusst kein eingebetteter Bildschirm: der brachte eigene Ueberschrift,
+        // eigenen Scroller und hat die Karten verschoben.
+        let scan_summary = gtk::Label::new(Some(crate::lang::tn("cl.noScan")));
+        scan_summary.add_css_class("hw-dim2");
+        scan_summary.set_xalign(0.0);
+        scan_summary.set_hexpand(true);
+        scan_summary.set_ellipsize(gtk::pango::EllipsizeMode::End);
+
+        let rescan = gtk::Button::with_label(crate::lang::tn("cl.rescan"));
+        rescan.add_css_class("hw-btn");
+        rescan.set_tooltip_text(Some(crate::lang::tn("cl.rescan.hint")));
+        crate::theme::pointer(&rescan);
+
+        let scan_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        scan_row.set_margin_top(16);
+        scan_row.append(&scan_summary);
+        scan_row.append(&rescan);
+
         let grid = gtk::Grid::new();
         grid.set_column_homogeneous(true);
         grid.set_column_spacing(14);
@@ -59,6 +84,7 @@ impl ClientsView {
         body.append(&sub);
         body.append(&empty);
         body.append(&grid);
+        body.append(&scan_row);
 
         let root = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -67,12 +93,63 @@ impl ClientsView {
             .build();
         root.add_css_class("hw-pane");
 
-        Self {
+        Rc::new(Self {
             root,
+            title: title.clone(),
+            sub: sub.clone(),
+            data: std::cell::RefCell::new(None),
+            scan_summary,
+            rescan,
+            on_rescan: std::rc::Rc::new(std::cell::RefCell::new(None)),
             grid,
             empty,
             on_open_flavor: std::rc::Rc::new(std::cell::RefCell::new(None)),
+        })
+    }
+
+    /// Setzt die Zusammenfassung des letzten Scans und schaltet den Knopf.
+    pub fn set_scan_summary(&self, text: &str, running: bool) {
+        self.scan_summary.set_text(text);
+        self.scan_summary.set_tooltip_text(Some(text));
+        self.rescan.set_sensitive(!running);
+        self.rescan.set_label(if running {
+            crate::lang::tn("cl.running")
+        } else {
+            crate::lang::tn("cl.rescan")
+        });
+    }
+
+    /// Rueckruf des Knopfs „Erneut scannen".
+    /// Zieht die festen Texte auf eine Sprache nach und baut die Karten neu,
+    /// weil deren Texte beim Zeichnen entstehen.
+    pub fn retranslate(self: &Rc<Self>) {
+        self.title.set_text(crate::lang::tn("cl.title"));
+        self.sub.set_text(crate::lang::tn("cl.sub"));
+        self.rescan.set_label(crate::lang::tn("cl.rescan"));
+        self.rescan
+            .set_tooltip_text(Some(crate::lang::tn("cl.rescan.hint")));
+        // Erst die Ausleihe beenden, dann neu bauen: `set_data` schreibt in
+        // dasselbe Feld, und zwei Ausleihen gleichzeitig lassen das Programm
+        // abbrechen (gemessen: „RefCell already borrowed" beim Start).
+        let data = self.data.borrow().clone();
+        if let Some(data) = data {
+            self.set_data(&data);
         }
+    }
+
+    pub fn set_on_rescan<F: Fn() + 'static>(self: &Rc<Self>, f: F) {
+        *self.on_rescan.borrow_mut() = Some(Box::new(f));
+        let weak = Rc::downgrade(self);
+        self.rescan.connect_clicked(move |_| {
+            let Some(view) = weak.upgrade() else {
+                return;
+            };
+            let callback = view.on_rescan.borrow_mut().take();
+            if let Some(callback) = callback {
+                callback();
+                *view.on_rescan.borrow_mut() = Some(callback);
+            }
+        });
     }
 
     pub fn widget(&self) -> &gtk::Widget {
@@ -83,7 +160,9 @@ impl ClientsView {
         *self.on_open_flavor.borrow_mut() = Some(Box::new(f));
     }
 
-    pub fn set_data(&self, data: &ScanData) {
+    pub fn set_data(&self, data: &std::rc::Rc<ScanData>) {
+        // Fuer den Sprachwechsel: Karten werden aus denselben Daten neu gebaut.
+        *self.data.borrow_mut() = Some(std::rc::Rc::clone(data));
         while let Some(child) = self.grid.first_child() {
             self.grid.remove(&child);
         }
@@ -109,13 +188,10 @@ fn empty_state() -> gtk::Box {
     let box_ = gtk::Box::new(gtk::Orientation::Vertical, 6);
     box_.add_css_class("hw-card");
     box_.set_margin_bottom(14);
-    let title = gtk::Label::new(Some("Keine WoW-Installation gefunden"));
+    let title = gtk::Label::new(Some(crate::lang::tn("cl.none.title")));
     title.add_css_class("hw-note-title");
     title.set_xalign(0.0);
-    let text = gtk::Label::new(Some(
-        "Hexwerk hat in den bekannten Präfixen kein Spielverzeichnis mit `_retail_` oder \
-         `_classic_era_` gefunden. Der Scan-Bildschirm zeigt je Herkunft, wo gesucht wurde.",
-    ));
+    let text = gtk::Label::new(Some(crate::lang::tn("cl.none.text")));
     text.add_css_class("hw-dim");
     text.set_xalign(0.0);
     text.set_wrap(true);
@@ -171,9 +247,7 @@ fn card(
         flavors.append(&flavor_row(flavor, client_index, flavor_index, on_open));
     }
     if client.flavors.is_empty() {
-        let none = gtk::Label::new(Some(
-            "Kein `_…_`-Ordner mit Interface/AddOns in diesem Pfad.",
-        ));
+        let none = gtk::Label::new(Some(crate::lang::tn("cl.no.flavor")));
         none.add_css_class("hw-path");
         none.set_xalign(0.0);
         none.set_wrap(true);
@@ -227,9 +301,9 @@ fn flavor_row(
 
     let count = flavor.addon_count();
     let count_label = gtk::Label::new(Some(&if count == 1 {
-        "1 Addon".to_string()
+        crate::lang::tn("cl.addon.one").to_string()
     } else {
-        format!("{count} Addons")
+        crate::lang::tn("cl.addons").replacen("{}", &count.to_string(), 1)
     }));
     count_label.add_css_class("hw-chip");
     count_label.add_css_class(if count > 0 { "sig" } else { "off" });
@@ -257,14 +331,11 @@ fn hint_card() -> gtk::Box {
     card.add_css_class("hw-card-dashed");
     card.set_valign(gtk::Align::Start);
 
-    let title = gtk::Label::new(Some("Weitere Herkünfte"));
+    let title = gtk::Label::new(Some(crate::lang::tn("cl.more.title")));
     title.add_css_class("hw-note-title");
     title.set_xalign(0.0);
 
-    let text = gtk::Label::new(Some(
-        "Lutris, Bottles, PortProton und ein beliebiger Ordner mit `_retail_` werden mitgesucht. \
-         Findet eine Herkunft nichts, fehlt sie hier; der Scan-Bildschirm nennt den Grund.",
-    ));
+    let text = gtk::Label::new(Some(crate::lang::tn("cl.more.text")));
     text.add_css_class("hw-path");
     text.set_xalign(0.0);
     text.set_wrap(true);
@@ -273,10 +344,4 @@ fn hint_card() -> gtk::Box {
     card.append(&title);
     card.append(&text);
     card
-}
-
-impl Default for ClientsView {
-    fn default() -> Self {
-        Self::new()
-    }
 }

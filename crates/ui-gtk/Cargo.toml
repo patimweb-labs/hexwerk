@@ -22,6 +22,7 @@ hexwerk = { package = "hexwerk-core", path = "../core" }
 hexwerk-sources = { path = "../sources" }
 hexwerk-index = { path = "../index" }
 hexwerk-install = { path = "../install" }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }
 adw = { package = "libadwaita", version = "0.7", features = ["v1_6"] }
 glib = "0.20"
@@ -29,6 +30,8 @@ glib = "0.20"
 # async-channel traegt ihre Ergebnisse zurueck in die MainContext (glib 0.20
 # hat MainContext::channel entfernt).
 async-channel = "2.5"
+# Adresse installieren: ein ZIP von Hand geladen.
+ureq = { version = "2", features = ["json"] }
 
 [workspace]
 members = []

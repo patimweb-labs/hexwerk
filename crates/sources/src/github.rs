@@ -20,7 +20,6 @@ use crate::keys::Secret;
 use crate::merge::{Entry, Release};
 use crate::{AddonSource, Source, SourceError, SourceHealth};
 
-const API: &str = "https://api.github.com";
 const PER_PAGE: u32 = 30;
 
 pub struct GitHubSource {
@@ -64,7 +63,8 @@ impl GitHubSource {
     /// Letztes Release eines Repos (`owner/name`). Öffentlich, weil die
     /// Detailansicht genau eine Abfrage braucht und nicht die ganze Suche.
     pub fn latest_release(&self, full_name: &str) -> Result<Option<Release>, SourceError> {
-        let url = format!("{API}/repos/{full_name}/releases/latest");
+        let api = crate::endpoints::base(Source::GitHub);
+        let url = format!("{api}/repos/{full_name}/releases/latest");
         let cache_key = format!("github:latest:{full_name}");
         let body = self.cache.cached(&cache_key, TTL_DETAILS, || {
             let request = self.authorized(Request::get(&url));
@@ -77,8 +77,9 @@ impl GitHubSource {
 
     fn search_json(&self, query: &str, page: u32) -> Result<serde_json::Value, SourceError> {
         let q = format!("{}{}", query.trim(), self.query_suffix);
+        let api = crate::endpoints::base(Source::GitHub);
         let url = format!(
-            "{API}/search/repositories?q={}&sort=stars&order=desc&per_page={PER_PAGE}&page={}",
+            "{api}/search/repositories?q={}&sort=stars&order=desc&per_page={PER_PAGE}&page={}",
             crate::http::urlencode(&q),
             page + 1
         );
@@ -175,14 +176,23 @@ impl AddonSource for GitHubSource {
     }
 
     fn download(&self, release: &Release) -> Result<Vec<u8>, SourceError> {
+        self.download_with(release, &mut |_, _| {})
+    }
+
+    fn download_with(
+        &self,
+        release: &Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
         let request = self
             .authorized(Request::get(&release.download_url))
             .header("accept", "application/octet-stream");
-        let response = self.http.request(&request)?;
-        if let Some(err) = response.error(&release.download_url) {
-            return Err(err);
-        }
-        Ok(response.body)
+        crate::download_via_http(
+            self.http.as_ref(),
+            &request,
+            &release.download_url,
+            progress,
+        )
     }
 }
 
@@ -223,6 +233,9 @@ fn entry_from_repo(repo: Repo, release: Option<Release>) -> Entry {
         };
     }
     Entry {
+        // GitHub liefert über die Suche kein Bild; das Avatar des Owners wäre
+        // kein Addon-Bild. Deshalb leer statt geraten.
+        screenshots: Vec::new(),
         // Name des Repos statt Name des Addons: das `.toc` im ZIP sagt erst beim
         // Herunterladen, wie das Addon wirklich heißt (PLAN.md §13.4).
         key: format!("gh:{}", repo.full_name.to_lowercase()),

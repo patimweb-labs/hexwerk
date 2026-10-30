@@ -15,7 +15,6 @@ use crate::keys::Secret;
 use crate::merge::{id_key, Entry, Release};
 use crate::{AddonSource, Source, SourceError, SourceHealth};
 
-const API: &str = "https://api.curseforge.com/v1";
 /// `gameId` 1 = World of Warcraft in der CurseForge-API.
 const GAME_WOW: u32 = 1;
 const PAGE_SIZE: u32 = 25;
@@ -49,8 +48,10 @@ impl CurseForgeSource {
     }
 
     fn url(&self, query: &str, page: u32) -> String {
+        // Basisadresse aus den Einstellungen, sonst die Vorgabe.
+        let api = crate::endpoints::base(Source::CurseForge);
         let mut url = format!(
-            "{API}/mods/search?gameId={GAME_WOW}&searchFilter={}&pageSize={PAGE_SIZE}&index={}&sortField=6&sortOrder=desc",
+            "{api}/mods/search?gameId={GAME_WOW}&searchFilter={}&pageSize={PAGE_SIZE}&index={}&sortField=6&sortOrder=desc",
             crate::http::urlencode(query.trim()),
             page * PAGE_SIZE
         );
@@ -94,6 +95,7 @@ impl AddonSource for CurseForgeSource {
         if self.key.is_none() {
             return Err(SourceError::Disabled);
         }
+        let api = crate::endpoints::base(Source::CurseForge);
         let url = self.url(query, page);
         let cache_key = format!("curse:search:{}:{}", query.trim(), page);
         let body = self.cache.cached(&cache_key, TTL_SEARCH, || {
@@ -104,10 +106,10 @@ impl AddonSource for CurseForgeSource {
                 // der Klartext der Antwort nennt es, der Schlüssel steht dort nie.
                 return Err(SourceError::Http {
                     status: 403,
-                    url: API.to_string(),
+                    url: api.clone(),
                 });
             }
-            if let Some(err) = response.error(API) {
+            if let Some(err) = response.error(&api) {
                 return Err(err);
             }
             Ok(response.body)
@@ -118,15 +120,24 @@ impl AddonSource for CurseForgeSource {
     }
 
     fn download(&self, release: &Release) -> Result<Vec<u8>, SourceError> {
+        self.download_with(release, &mut |_, _| {})
+    }
+
+    fn download_with(
+        &self,
+        release: &Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
         if release.download_url.is_empty() {
             return Err(SourceError::NotFound);
         }
         let request = self.authed(Request::get(&release.download_url))?;
-        let response = self.http.request(&request)?;
-        if let Some(err) = response.error(&release.download_url) {
-            return Err(err);
-        }
-        Ok(response.body)
+        crate::download_via_http(
+            self.http.as_ref(),
+            &request,
+            &release.download_url,
+            progress,
+        )
     }
 }
 
@@ -153,7 +164,38 @@ struct Mod {
     #[serde(default)]
     links: Links,
     #[serde(default)]
+    logo: Option<Shot>,
+    #[serde(default)]
+    screenshots: Vec<Shot>,
+    #[serde(default)]
     latest_files: Vec<ModFile>,
+}
+
+/// Ein Bild zu einem Mod: CurseForge liefert je Eintrag eine `thumbnailUrl`
+/// (klein, immer da) und eine `url` (gross). Genommen wird die grosse, damit
+/// die Detailseite etwas zeigt; fehlt sie, das Vorschaubild.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Shot {
+    #[serde(default)]
+    url: String,
+    #[serde(default)]
+    thumbnail_url: String,
+}
+
+impl Shot {
+    fn best(&self) -> Option<String> {
+        let pick = if self.url.trim().is_empty() {
+            self.thumbnail_url.trim()
+        } else {
+            self.url.trim()
+        };
+        if pick.is_empty() {
+            None
+        } else {
+            Some(pick.to_string())
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,6 +229,49 @@ struct ModFile {
     file_length: Option<u64>,
     #[serde(default)]
     download_url: Option<String>,
+    /// Spielversionen der Datei, z. B. `["11.0.2", "1.15.5"]`. Daraus wird die
+    /// Interface-Nummer gerechnet; die API nennt sie nicht selbst.
+    #[serde(default)]
+    game_versions: Vec<String>,
+}
+
+/// Rechnet `11.0.2` in `110002` um, wie es die `.toc` verlangt.
+///
+/// Nur echte Fassungen zaehlen: die API mischt Woerter wie `Retail` oder
+/// `Classic` under die Liste, und daraus laesst sich keine Nummer bilden.
+fn interface_numbers(game_versions: &[String]) -> Vec<u32> {
+    let mut out = Vec::new();
+    for value in game_versions {
+        let parts: Vec<&str> = value.trim().split('.').collect();
+        if parts.len() < 2 || parts.len() > 3 {
+            continue;
+        }
+        let mut numbers = Vec::new();
+        let mut ok = true;
+        for part in &parts {
+            match part.parse::<u32>() {
+                Ok(number) => numbers.push(number),
+                Err(_) => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if !ok {
+            continue;
+        }
+        let major = numbers[0];
+        let minor = numbers.get(1).copied().unwrap_or(0);
+        let patch = numbers.get(2).copied().unwrap_or(0);
+        if major == 0 {
+            continue;
+        }
+        let interface = major * 10_000 + minor * 100 + patch;
+        if !out.contains(&interface) {
+            out.push(interface);
+        }
+    }
+    out
 }
 
 fn entry_from_mod(mod_: Mod) -> Entry {
@@ -207,11 +292,30 @@ fn entry_from_mod(mod_: Mod) -> Entry {
         released_at: file.file_date.clone(),
         download_url: download_url_of(file),
         size_bytes: file.file_length,
-        // `gameVersions` der API sind Spielversionen („11.0.2"), keine
-        // Interface-Nummern; der `.toc` im ZIP liefert die echten.
-        interface_numbers: Vec::new(),
+        // Aus `gameVersions` gerechnet, damit der Versionsfilter im Katalog
+        // ueberhaupt Treffer hat. Der `.toc` im ZIP kann genauer sein, wird
+        // aber erst beim Installieren gelesen.
+        interface_numbers: interface_numbers(&file.game_versions),
     });
+    // Logo zuerst, dann die Screenshots: dieselbe Reihenfolge, in der die
+    // Detailseite sie zeigt. Hoechstens fuenf, mehr passt nicht in die Leiste
+    // und die restlichen zwei laden nur Traffic.
+    let mut shots: Vec<String> = mod_
+        .logo
+        .as_ref()
+        .and_then(Shot::best)
+        .into_iter()
+        .collect();
+    for shot in &mod_.screenshots {
+        if shots.len() >= 5 {
+            break;
+        }
+        if let Some(url) = shot.best() {
+            shots.push(url);
+        }
+    }
     Entry {
+        screenshots: shots,
         key: id_key(Source::CurseForge, &mod_.id.to_string()),
         name: mod_.name,
         author,

@@ -183,12 +183,27 @@ impl Index {
                     entry.name.trim().to_string()
                 };
 
+                // Bilder sammeln statt ersetzen: dasselbe Addon kommt aus
+                // mehreren Quellen, und die neueste Fassung gewinnt zwar bei der
+                // Version, aber Bilder einer aelteren Fassung oder einer
+                // zweiten Quelle bleiben sehenswert. Neue zuerst, dann die
+                // bekannten, ohne Doppel, hoechstens acht.
+                let known: String = tx
+                    .query_row(
+                        "SELECT screenshots_json FROM addons WHERE key = ?1",
+                        [&key],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or_else(|_| "[]".to_string());
+                let merged_shots = merge_screenshots(&known, &entry.screenshots);
+
                 // `RETURNING id`: ein Schreibvorgang statt „upsert, dann
                 // nachfragen“.
                 let addon_id: i64 = tx
                     .query_row(
-                        "INSERT INTO addons (key, name, author, summary, homepage, category, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                        "INSERT INTO addons (key, name, author, summary, homepage, category,
+                                            screenshots_json, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                          ON CONFLICT(key) DO UPDATE SET
                              name = excluded.name,
                              author = CASE WHEN excluded.author <> ''
@@ -197,6 +212,9 @@ impl Index {
                                             THEN excluded.summary ELSE addons.summary END,
                              homepage = COALESCE(excluded.homepage, addons.homepage),
                              category = COALESCE(excluded.category, addons.category),
+                             -- Der Wert ist oben schon vereinigt worden (neu plus
+                             -- bekannt); hier wird er nur uebernommen.
+                             screenshots_json = excluded.screenshots_json,
                              updated_at = excluded.updated_at
                          RETURNING id",
                         params![
@@ -206,6 +224,7 @@ impl Index {
                             entry.summary,
                             entry.homepage,
                             entry.category,
+                            serde_json::to_string(&merged_shots).unwrap_or_else(|_| "[]".into()),
                             now,
                         ],
                         |row| row.get(0),
@@ -308,7 +327,7 @@ impl Index {
     /// staerkste Signal), dann Name aus dem `.toc`, dann Ordnername. Ohne
     /// Treffer bleibt `addon_id` NULL — lieber unverknuepft als falsch
     /// verknuepft, denn daran haengt die Update-Pruefung.
-    fn link_installed(&mut self) -> Result<usize, String> {
+    pub fn link_installed(&mut self) -> Result<usize, String> {
         let tx = self.conn_mut().transaction().map_err(db_err("Zuordnung"))?;
 
         let mut by_name: HashMap<String, i64> = HashMap::new();
@@ -422,6 +441,27 @@ fn match_installed(
         }
     }
     by_name.get(&util::norm(folder)).copied()
+}
+
+/// Vereinigt bekannte und neue Bildadressen.
+///
+/// Reihenfolge: neue zuerst (die aktuelle Fassung ist der beste Beleg), dann die
+/// schon bekannten; Duplikate fallen raus. Acht Adressen reichen fuer die
+/// Detailseite und die Galerie, mehr waeren nur Ballast im Index.
+fn merge_screenshots(known_json: &str, fresh: &[String]) -> Vec<String> {
+    let known: Vec<String> = serde_json::from_str(known_json).unwrap_or_default();
+    let mut out: Vec<String> = Vec::new();
+    for url in fresh.iter().chain(known.iter()) {
+        let url = url.trim();
+        if url.is_empty() || out.iter().any(|seen| seen == url) {
+            continue;
+        }
+        out.push(url.to_string());
+        if out.len() >= 8 {
+            break;
+        }
+    }
+    out
 }
 
 /// Anzeige-Version je Quelle, wie sie gerade im Index steht.

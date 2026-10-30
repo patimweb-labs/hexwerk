@@ -513,7 +513,10 @@ fn registry_probe_meldet_je_quelle_einen_zustand() {
         Box::new(WowInterfaceSource::new(http, cache)),
     ]);
     let report = registry.probe_all();
-    assert_eq!(report.len(), 5, "alle fünf Quellen im Bericht");
+    // GitHub und Tukui sind entfernt; im Bericht stehen die laufenden Quellen
+    // (hier: Tukui als eingesetzte Quelle) plus die drei bekannten ohne
+    // Schluessel.
+    assert_eq!(report.len(), 4, "laufende plus eingetragene Quellen");
     let by = |s: Source| report.iter().find(|h| h.source == s).unwrap();
     assert_eq!(by(Source::Tukui).ok, Some(true));
     assert!(by(Source::Tukui).detail.contains("HTTP 200"));

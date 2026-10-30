@@ -16,7 +16,6 @@ use crate::http::{Http, Request};
 use crate::merge::{id_key, Entry, Release};
 use crate::{AddonSource, Source, SourceError, SourceHealth};
 
-const LIST_URL: &str = "https://api.tukui.org/v1/addons";
 const PAGE_SIZE: usize = 25;
 
 /// Ein Eintrag der Gesamtliste, so wie Tukui ihn liefert.
@@ -69,6 +68,8 @@ impl TukuiAddon {
             interface_numbers: Vec::new(),
         };
         Entry {
+            // Tukui liefert keine Bilder über seine API.
+            screenshots: Vec::new(),
             key,
             name: self.name,
             author: self.author,
@@ -97,8 +98,9 @@ impl TukuiSource {
     /// Gesamtliste, aus dem Cache oder frisch.
     pub fn addons(&self) -> Result<Vec<TukuiAddon>, SourceError> {
         let body = self.cache.cached("tukui:addons", TTL_LIST, || {
-            let response = self.http.request(&Request::get(LIST_URL))?;
-            if let Some(err) = response.error(LIST_URL) {
+            let list_url = format!("{}/addons", crate::endpoints::base(Source::Tukui));
+            let response = self.http.request(&Request::get(&list_url))?;
+            if let Some(err) = response.error(&list_url) {
                 return Err(err);
             }
             Ok(response.body)
@@ -146,14 +148,23 @@ impl AddonSource for TukuiSource {
     }
 
     fn download(&self, release: &Release) -> Result<Vec<u8>, SourceError> {
+        self.download_with(release, &mut |_, _| {})
+    }
+
+    fn download_with(
+        &self,
+        release: &Release,
+        progress: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<Vec<u8>, SourceError> {
         if release.download_url.is_empty() {
             return Err(SourceError::NotFound);
         }
-        let response = self.http.request(&Request::get(&release.download_url))?;
-        if let Some(err) = response.error(&release.download_url) {
-            return Err(err);
-        }
-        Ok(response.body)
+        crate::download_via_http(
+            self.http.as_ref(),
+            &Request::get(&release.download_url),
+            &release.download_url,
+            progress,
+        )
     }
 }
 

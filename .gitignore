@@ -12,3 +12,4 @@ __pycache__/
 
 # Heruntergeladenes Werkzeug (flatpak/update-sources.sh laedt es bei Bedarf)
 flatpak/.flatpak-cargo-generator.py
+.secrets/
