@@ -14,8 +14,9 @@ Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
   PortProton und jeden Ordner, den du selbst auswählst.
 * Alle Client-Versionen: Retail, Classic, Classic Era, Anniversary, Forever und
   die PTR-Varianten, jede mit eigener Addon-Liste.
-* Katalog aus mehreren Quellen. Dasselbe Addon aus mehreren Märkten ist ein
-  Eintrag mit den Versionen je Quelle.
+* Katalog aus mehreren Quellen, ohne Zugangsdaten über 7.800 Einträge
+  (WoWInterface 7.766, Tukui 24, GitHub nach Stichwort). Dasselbe Addon aus
+  mehreren Märkten ist ein Eintrag mit den Versionen je Quelle.
 * Suche über einen lokalen Index (SQLite mit FTS5), damit das Fenster auch ohne
   Netz und während eines Scans bedienbar bleibt.
 * Addons werden erkannt, nicht eingetragen: über die Projektkennungen in der

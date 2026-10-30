@@ -56,6 +56,14 @@ podman exec -w /work -e HOME=/root hexwerk-build bash tools/ux_check.sh /tmp/ux
 `--security-opt label=disable` statt `:z`, weil ein Relabel das Spielverzeichnis
 auf dem Host verändern würde.
 
+## Datenpfad im Flatpak
+
+Im Sandkasten zeigt `XDG_DATA_HOME` nach `~/.var/app/de.weppelmann.Hexwerk/data`. Läge der
+Papierkorb dort, wäre er beim Deinstallieren der App weg und die Kommandozeile auf dem Host
+fände ihn nicht. `hexwerk::data_root()` benutzt deshalb im Flatpak bewusst das echte
+`~/.local/share/hexwerk`, denselben Ort wie die Kommandozeile. Reihenfolge:
+`HEXWERK_DATA_DIR`, dann im Flatpak das echte Home, dann `XDG_DATA_HOME`.
+
 ## Verzeichnisse zur Laufzeit
 
 | Zweck | Pfad |

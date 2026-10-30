@@ -83,6 +83,11 @@ gilt als passend, wenn seine Interface-Nummer in der Menge steht.
 | CurseForge | API-Key, Vergabe an Einzelentwickler gebunden | vorbereitet, standardmäßig aus |
 | WowUp-Hub | offen, kein SLA | nur Fingerprint-Abgleich als Beschleuniger, nicht als Pflicht |
 
+Quellen mit Gesamtbestand (Tukui, WoWInterface) werden **seitenweise** gelesen, bis eine
+Seite kürzer als die Seitengröße zurückkommt. Nur Seite 0 zu lesen war der Grund, warum der
+Katalog anfangs 57 statt 7.858 Einträge hatte. GitHub bleibt bei wenigen Seiten, weil ohne
+Token 60 Anfragen je Stunde erlaubt sind.
+
 **Merge:** Schlüssel eines Katalogeintrags ist zuerst die externe Projekt-ID (aus `.toc`:
 `X-WoWI-ID`, `X-Tukui-Project-ID`, `X-Curse-Project-ID`, `X-Wago-ID`), sonst der normalisierte
 Name + Autor. Treffer werden zu **einem** Eintrag mit `sources[]`; je Quelle Version, Datum,
