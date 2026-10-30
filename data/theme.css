@@ -726,3 +726,21 @@ dropdown > button:disabled,
 entry:disabled {
   opacity: 0.65;
 }
+
+/* Ecken eckig: GTK4 zeichnet die Fensterecken bei Client-Side-Dekoration
+   selbst und rundet sie nach Adwaita-Vorgabe. Das passt nicht zur kantigen
+   Blueprint-Optik, deshalb hier ausdruecklich auf 0. */
+window.hw-window,
+window.hw-window.csd,
+window.hw-window > contents,
+window.hw-window > contents > .top-bar,
+window.hw-window headerbar,
+window.hw-window .titlebar,
+window.hw-window .hw-header {
+  border-radius: 0;
+}
+
+/* Die Wortmarke steht neben dem Logo, deshalb kein eigener Abstand mehr. */
+.hw-brand {
+  padding-left: 2px;
+}

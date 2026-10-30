@@ -194,7 +194,14 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     rail_header.set_show_end_title_buttons(false);
     let wordmark = gtk::Label::new(Some("HEXWERK"));
     wordmark.add_css_class("hw-wordmark");
-    rail_header.set_title_widget(Some(&wordmark));
+    // Logo und Wortmarke zusammen: das Icon liegt eingebettet im Binary, damit
+    // das Fenster zur Laufzeit keine Datei braucht (im Flatpak waere das ein
+    // eigener Pfad, der stimmen muss).
+    let brand_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    brand_row.add_css_class("hw-brand");
+    brand_row.append(&brand_icon(22));
+    brand_row.append(&wordmark);
+    rail_header.set_title_widget(Some(&brand_row));
 
     let sidebar_view = adw::ToolbarView::new();
     sidebar_view.add_top_bar(&rail_header);
@@ -864,4 +871,22 @@ fn source_line(name: &str) -> (gtk::Box, gtk::Label) {
     line.append(&key);
     line.append(&value);
     (line, value)
+}
+
+/// Das App-Logo als Bild. Die PNG-Fassung ist eingebettet; SVG kann GTK nicht
+/// direkt als Textur laden, und eine Datei zur Laufzeit wuerde im Flatpak einen
+/// weiteren Pfad voraussetzen, der stimmen muss.
+fn brand_icon(px: i32) -> gtk::Image {
+    const LOGO: &[u8] =
+        include_bytes!("../../../data/icons/hicolor/64x64/apps/de.weppelmann.Hexwerk.png");
+    let image = gtk::Image::new();
+    let bytes = glib::Bytes::from_static(LOGO);
+    match gtk::gdk::Texture::from_bytes(&bytes) {
+        Ok(texture) => image.set_paintable(Some(&texture)),
+        // Ohne Textur bleibt ein leerer Platz; das ist besser als ein Absturz
+        // beim Start, und der Fehler steht im Protokoll.
+        Err(err) => eprintln!("hexwerk: Logo nicht lesbar: {err}"),
+    }
+    image.set_pixel_size(px);
+    image
 }
