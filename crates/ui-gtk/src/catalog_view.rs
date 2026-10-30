@@ -28,6 +28,9 @@ const SEARCH_HINT: &str = "Suche: Name, Autor, Beschreibung …";
 type SearchCallback = Box<dyn Fn(Filters)>;
 type OpenCallback = Box<dyn Fn(i64)>;
 
+/// Einheitliche Hoehe aller Karten im Katalog.
+const CARD_HEIGHT: i32 = 156;
+
 pub struct CatalogView {
     root: gtk::ScrolledWindow,
     search: gtk::SearchEntry,
@@ -446,7 +449,11 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
     let card = gtk::Button::new();
     card.add_css_class("hw-card");
     card.add_css_class("hw-card-clickable");
-    card.set_valign(gtk::Align::Start);
+    // Feste Hoehe fuer jede Karte: ein Katalog, in dem jede Karte anders hoch
+    // ist, laesst sich nicht ueberfliegen. Wer mehr lesen will, oeffnet die
+    // Detailseite; dort steht die vollstaendige Beschreibung.
+    card.set_valign(gtk::Align::Fill);
+    card.set_size_request(-1, CARD_HEIGHT);
     card.update_property(&[gtk::accessible::Property::Label(item.name.as_str())]);
 
     let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
@@ -492,13 +499,18 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
     });
     text.set_xalign(0.0);
     text.set_wrap(true);
-    text.set_lines(3);
+    // Zwei Zeilen reichen zum Einordnen; der Rest gehoert in die Detailansicht.
+    text.set_lines(2);
     text.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    text.set_valign(gtk::Align::Start);
     content.append(&text);
 
     let chips = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     chips.set_margin_top(2);
-    for release in &item.sources {
+    // Hoechstens drei Quellen je Karte, der Rest als "+n". Sonst schiebt eine
+    // Quelle mit vielen Eintraegen die Karte ueber die feste Hoehe hinaus.
+    let mehr = item.sources.len().saturating_sub(3);
+    for release in item.sources.iter().take(3) {
         let version = if release.version.trim().is_empty() {
             "keine Version".to_string()
         } else {
@@ -522,6 +534,13 @@ fn card(item: &CatalogueItem, weak: Weak<CatalogView>) -> gtk::Button {
         if release.download_url.trim().is_empty() {
             chip.add_css_class("off");
         }
+        chips.append(&chip);
+    }
+    if mehr > 0 {
+        let chip = gtk::Label::new(Some(&format!("+{mehr}")));
+        chip.add_css_class("hw-chip");
+        chip.add_css_class("off");
+        chip.set_tooltip_text(Some("weitere Quellen in der Detailansicht"));
         chips.append(&chip);
     }
     if item.sources.is_empty() {
