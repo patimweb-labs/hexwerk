@@ -186,3 +186,29 @@ parallel dazu. Der Rahmen (`Cargo.toml` je Crate, `lib.rs` mit den öffentlichen
    aus dem `.toc`-Namen, nicht aus dem ZIP.
 5. **Multi-Client**: dasselbe Addon mit verschiedenen Builds je Client; Installation immer
    client-scharf, nie „für alle".
+
+## 14. Geplant: Addons leeren (Clear)
+
+Wunsch: mit einem Griff bei null anfangen, ohne im Dateimanager zu wühlen. Das ist die
+gefährlichste Aktion im Programm, deshalb mit Rückweg.
+
+Verhalten:
+
+1. Ziel ist immer genau ein Client-Ordner (`_retail_`, `_classic_era_` und so weiter), nie
+   das ganze Spielverzeichnis und nie alle Clients auf einmal.
+2. Vor dem Leeren entsteht eine Sicherung als ZIP unter `~/.local/share/hexwerk/backup` mit
+   Zeitstempel und Client-Namen. Danach wandern die Ordner in den Papierkorb
+   (`~/.local/share/hexwerk/trash`), nicht in die Tonne. Beides ist vorhanden
+   (`crates/install/backup.rs`, `crates/install/trash.rs`).
+3. Bestätigung im Fenster verlangt das Eintippen des Client-Ordners (etwa `_classic_era_`).
+   Ein Klick auf „Ja" ist zu billig für eine Aktion, die 2,6 GB Addons verschiebt.
+4. Ergebnis als Bericht: Anzahl Ordner, Größe, Pfad der Sicherung, Pfad des Papierkorbs.
+5. Index: Einträge des Clients werden neu erfasst, die Katalogdaten bleiben. `SaveVariables`
+   (WTF-Ordner) wird nicht angefasst, weil dort die Einstellungen der Addons liegen.
+6. Kommandozeile bekommt dasselbe als `hexwerk clear --client <id> --yes`, damit man es in
+   einem Skript benutzen kann, mit derselben Sicherung und demselben Papierkorb.
+7. Rückweg: `hexwerk restore <papierkorb-eintrag>` gibt es bereits; ein Eintrag „Rückgängig"
+   direkt nach dem Leeren im Fenster ist Teil desselben Arbeitspakets.
+
+Abgrenzung: „Addons leeren" heißt nicht „Spiel reparieren" und nicht „WTF löschen". Wer
+wirklich alles wegwerfen will, löscht die Sicherung selbst.

@@ -121,8 +121,14 @@ Daten aus den Quellen.
 | Oberfläche | fünf Bildschirme, Dunkel und Hell, Katalog und Detail aus dem Index |
 | Flatpak | Manifest und CI vorhanden, Bau lokal mit Attrappen-Binaries geprüft |
 
-Offen: Veröffentlichung als Flatpak, Addon-Profile (schaltbare Sammlungen),
-Bilder in der Detailansicht aus den Quellen, Nachladen beim Scrollen im Katalog.
+Offen:
+
+* Addons leeren (Clear): ein Client-Ordner auf Wunsch zurück auf null, mit Sicherung,
+  Papierkorb und Rückgängig. Beschreibung in [`PLAN.md`](PLAN.md), Abschnitt 14.
+* Veröffentlichung als Flatpak.
+* Addon-Profile (schaltbare Sammlungen).
+* Bilder in der Detailansicht aus den Quellen.
+* Nachladen beim Scrollen im Katalog.
 
 ## Lizenz
 
