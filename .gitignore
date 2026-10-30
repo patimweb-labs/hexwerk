@@ -1,0 +1,7 @@
+/target
+**/target/
+/prebuilt/
+/build-dir*/
+/.flatpak-builder
+.flatpak-*.log
+*.rs.bk

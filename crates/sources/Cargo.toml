@@ -1,0 +1,9 @@
+[package]
+name = "hexwerk-sources"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Hexwerk: Addon-Quellen (GitHub, Tukui, WoWInterface, Wago, CurseForge) und Merge"
+
+[dependencies]
+hexwerk = { package = "hexwerk-core", path = "../core" }
