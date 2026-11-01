@@ -1,3 +1,86 @@
+window.hw-dark {
+  --hw-bg: #090C10;
+  --hw-panel: #0E1319;
+  --hw-panel2: #131A22;
+  --hw-line: #1F2831;
+  --hw-ink: #E9E5DC;
+  --hw-dim: #98A3AF;
+  --hw-dim2: #78838F;
+  --hw-signal: #F2A63B;
+  --hw-signal-dim: #8C520C;
+  --hw-signal-wash: rgba(242, 166, 59, 0.08);
+  --hw-sel: rgba(242, 166, 59, 0.06);
+  --hw-warn: #FFC873;
+  --hw-warn-line: #5A4520;
+  --hw-bad: #E0715C;
+  --hw-bad-line: #5A2A24;
+  --hw-blue: #7FA8D9;
+  --hw-blue-line: #24364C;
+  --hw-grid: rgba(242, 166, 59, 0.035);
+  --hw-rail: #07090C;
+  --hw-head: #0B0F14;
+  --hw-cell: #16202B;
+  --hw-banner-glow: rgba(242, 166, 59, 0.16);
+  /* Bildbetrachter und Ueberlagerungen: eigene Flaeche, weil dort Bilder
+     stehen und kein Text der Seite. In beiden Paletten dunkel, damit ein
+     Screenshot nicht auf hellem Grund schwimmt. */
+  --hw-viewer-bg: #05070A;
+  --hw-overlay-bg: rgba(4, 8, 16, 0.62);
+  --hw-overlay-bg-strong: rgba(4, 8, 16, 0.88);
+  --hw-overlay-ink: #FFFFFF;
+  --hw-overlay-line: rgba(255, 255, 255, 0.35);
+  --hw-overlay-line-weak: rgba(255, 255, 255, 0.12);
+  --hw-overlay-shadow: rgba(0, 0, 0, 0.55);
+  --hw-overlay-ink-dim: rgba(255, 255, 255, 0.55);
+  --hw-overlay-fill: rgba(255, 255, 255, 0.10);
+  --hw-overlay-line-strong: rgba(255, 255, 255, 0.28);
+  --hw-overlay-fill-hover: rgba(255, 255, 255, 0.20);
+  --hw-signal-strong: rgba(242, 166, 59, 0.55);
+  --hw-signal-halo: rgba(242, 166, 59, 0.12);
+  --hw-bad-wash: rgba(224, 113, 92, 0.08);
+}
+
+window.hw-light {
+  --hw-bg: #F6F2EA;
+  --hw-panel: #FFFDF8;
+  --hw-panel2: #EFE9DE;
+  --hw-line: #DED6C6;
+  --hw-ink: #14181D;
+  --hw-dim: #5A6470;
+  --hw-dim2: #78838F;
+  --hw-signal: #A96410;
+  --hw-signal-dim: #C9862C;
+  --hw-signal-wash: rgba(169, 100, 16, 0.07);
+  --hw-sel: rgba(169, 100, 16, 0.07);
+  --hw-warn: #8A5A00;
+  --hw-warn-line: #D9B267;
+  --hw-bad: #A8321E;
+  --hw-bad-line: #E0B4B0;
+  --hw-blue: #1F55B8;
+  --hw-blue-line: #B7C8E8;
+  --hw-grid: rgba(169, 100, 16, 0.05);
+  --hw-rail: #EFE9DE;
+  --hw-head: #FFFDF8;
+  --hw-cell: #E9E2D4;
+  /* Heller Grund braucht mehr Farbe, damit der Verlauf im Banner sichtbar
+     bleibt - 0.16 auf #F6F2EA waere praktisch unsichtbar. */
+  --hw-banner-glow: rgba(169, 100, 16, 0.18);
+  --hw-viewer-bg: #10151D;
+  --hw-overlay-bg: rgba(4, 8, 16, 0.62);
+  --hw-overlay-bg-strong: rgba(4, 8, 16, 0.88);
+  --hw-overlay-ink: #FFFFFF;
+  --hw-overlay-line: rgba(255, 255, 255, 0.35);
+  --hw-overlay-line-weak: rgba(255, 255, 255, 0.12);
+  --hw-overlay-shadow: rgba(0, 0, 0, 0.55);
+  --hw-overlay-ink-dim: rgba(255, 255, 255, 0.55);
+  --hw-overlay-fill: rgba(255, 255, 255, 0.10);
+  --hw-overlay-line-strong: rgba(255, 255, 255, 0.28);
+  --hw-overlay-fill-hover: rgba(255, 255, 255, 0.20);
+  --hw-signal-strong: rgba(169, 100, 16, 0.55);
+  --hw-signal-halo: rgba(169, 100, 16, 0.12);
+  --hw-bad-wash: rgba(168, 50, 30, 0.08);
+}
+
 /* Hexwerk — Farben, Formen, Raster.
  *
  * Aufbau: Die Farbwerte stehen als CSS-Variablen auf dem Fenster, einmal je
@@ -10,100 +93,18 @@
  * Rahmen 1px. Das Raster im Hintergrund sind zwei Verlaeufe (senkrecht und
  * waagerecht) mit 32px-Kachel, wie im Entwurf.
  *
- * Schrift: Monospace. Die Liste nennt zuerst JetBrains Mono (Entwurf), dann die
- * beiden Schriften, die auf einem nackten Fedora/GNOME garantiert da sind.
+ * Schrift: IBM Plex Sans fuer Text, Archivo fuer Ueberschriften und Wortmarke,
+ * IBM Plex Mono fuer Zahlen und Codes - dieselben Schriften wie auf
+ * patrick.weppelmann.ddnss.de. Farben und Schrift sind von dort uebernommen.
  */
 
 window.hw-window {
-  font-family: "JetBrains Mono", "Adwaita Mono", "DejaVu Sans Mono", monospace;
+  font-family: "IBM Plex Sans", "Adwaita Sans", "Cantarell", sans-serif;
   font-size: 14px;
 }
 
 /* ---- Palette dunkel (Entwurf) ---- */
-window.hw-dark {
-  --hw-bg: #060A12;
-  --hw-panel: #0A111C;
-  --hw-panel2: #0C1523;
-  --hw-line: #16233A;
-  --hw-ink: #DCE6F5;
-  --hw-dim: #7C8CA6;
-  --hw-dim2: #54637A;
-  --hw-signal: #39DD93;
-  --hw-signal-dim: #1E6B4C;
-  --hw-signal-wash: rgba(57, 221, 147, 0.08);
-  --hw-sel: rgba(57, 221, 147, 0.06);
-  --hw-warn: #F2B344;
-  --hw-warn-line: #5A4520;
-  --hw-bad: #E2657A;
-  --hw-bad-line: #5A2630;
-  --hw-blue: #4C8DFF;
-  --hw-blue-line: #20365A;
-  --hw-grid: rgba(57, 221, 147, 0.035);
-  --hw-rail: #070D16;
-  --hw-head: #080E18;
-  --hw-cell: #0C1626;
-  --hw-banner-glow: rgba(57, 221, 147, 0.16);
-  /* Bildbetrachter und Ueberlagerungen: eigene Flaeche, weil dort Bilder
-     stehen und kein Text der Seite. In beiden Paletten dunkel, damit ein
-     Screenshot nicht auf hellem Grund schwimmt. */
-  --hw-viewer-bg: #05080F;
-  --hw-overlay-bg: rgba(4, 8, 16, 0.62);
-  --hw-overlay-bg-strong: rgba(4, 8, 16, 0.88);
-  --hw-overlay-ink: #FFFFFF;
-  --hw-overlay-line: rgba(255, 255, 255, 0.35);
-  --hw-overlay-line-weak: rgba(255, 255, 255, 0.12);
-  --hw-overlay-shadow: rgba(0, 0, 0, 0.55);
-  --hw-overlay-ink-dim: rgba(255, 255, 255, 0.55);
-  --hw-overlay-fill: rgba(255, 255, 255, 0.10);
-  --hw-overlay-line-strong: rgba(255, 255, 255, 0.28);
-  --hw-overlay-fill-hover: rgba(255, 255, 255, 0.20);
-  --hw-signal-strong: rgba(57, 221, 147, 0.55);
-  --hw-signal-halo: rgba(57, 221, 147, 0.12);
-  --hw-bad-wash: rgba(226, 101, 122, 0.08);
-}
-
 /* ---- Palette hell (gleiche Geometrie, andere Werte) ---- */
-window.hw-light {
-  --hw-bg: #F5F7FB;
-  --hw-panel: #FFFFFF;
-  --hw-panel2: #F0F3F8;
-  --hw-line: #D7DEE9;
-  --hw-ink: #0B1520;
-  --hw-dim: #55637A;
-  --hw-dim2: #8492A6;
-  --hw-signal: #0B7A52;
-  --hw-signal-dim: #8FC9B4;
-  --hw-signal-wash: rgba(11, 122, 82, 0.07);
-  --hw-sel: rgba(11, 122, 82, 0.07);
-  --hw-warn: #8A5A00;
-  --hw-warn-line: #D9B267;
-  --hw-bad: #A32238;
-  --hw-bad-line: #E0B4BC;
-  --hw-blue: #1F55B8;
-  --hw-blue-line: #B7C8E8;
-  --hw-grid: rgba(11, 122, 82, 0.055);
-  --hw-rail: #EEF1F7;
-  --hw-head: #FFFFFF;
-  --hw-cell: #E9EEF6;
-  /* Heller Grund braucht mehr Farbe, damit der Verlauf im Banner sichtbar
-     bleibt - 0.16 auf #F5F7FB waere praktisch unsichtbar. */
-  --hw-banner-glow: rgba(11, 122, 82, 0.18);
-  --hw-viewer-bg: #10151D;
-  --hw-overlay-bg: rgba(4, 8, 16, 0.62);
-  --hw-overlay-bg-strong: rgba(4, 8, 16, 0.88);
-  --hw-overlay-ink: #FFFFFF;
-  --hw-overlay-line: rgba(255, 255, 255, 0.35);
-  --hw-overlay-line-weak: rgba(255, 255, 255, 0.12);
-  --hw-overlay-shadow: rgba(0, 0, 0, 0.55);
-  --hw-overlay-ink-dim: rgba(255, 255, 255, 0.55);
-  --hw-overlay-fill: rgba(255, 255, 255, 0.10);
-  --hw-overlay-line-strong: rgba(255, 255, 255, 0.28);
-  --hw-overlay-fill-hover: rgba(255, 255, 255, 0.20);
-  --hw-signal-strong: rgba(11, 122, 82, 0.55);
-  --hw-signal-halo: rgba(11, 122, 82, 0.12);
-  --hw-bad-wash: rgba(163, 34, 56, 0.08);
-}
-
 /* ---- Grundflaechen ---- */
 window.hw-window {
   background-color: var(--hw-bg);
@@ -167,12 +168,14 @@ headerbar.hw-header {
 
 /* Werte rechts in einer Zeile (etwa Version im Programm-Abschnitt). */
 .hw-cell-value {
+  font-family: "IBM Plex Mono", monospace;
   color: var(--hw-ink);
   font-family: monospace;
   font-size: 12px;
 }
 
 .hw-wordmark {
+  font-family: "Archivo", "IBM Plex Sans", sans-serif;
   color: var(--hw-signal);
   font-size: 13px;
   letter-spacing: 4px;
@@ -180,6 +183,7 @@ headerbar.hw-header {
 }
 
 .hw-section {
+  font-family: "Archivo", "IBM Plex Sans", sans-serif;
   color: var(--hw-dim2);
   font-size: 12px;
   letter-spacing: 1.5px;
@@ -252,6 +256,7 @@ button.hw-nav-item.on .hw-nav-count {
 
 /* ---- Kopf und Fliesstext einer Seite ---- */
 .hw-h1 {
+  font-family: "Archivo", "IBM Plex Sans", sans-serif;
   color: var(--hw-ink);
   font-size: 18px;
   font-weight: 600;
@@ -872,7 +877,7 @@ button.hw-card:hover {
   border-color: var(--hw-signal-dim);
 }
 
-/* Kontrast in der hellen Palette: der Tabellenkopf war bei #8492A6 auf Weiss
+/* Kontrast in der hellen Palette: der Tabellenkopf war bei #78838F auf Weiss
    kaum zu lesen, deaktivierte Knoepfe bei 0.5 Deckkraft ebenso wenig. */
 columnview.hw-table header button {
   color: var(--hw-dim);
