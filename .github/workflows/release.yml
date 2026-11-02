@@ -195,10 +195,10 @@ jobs:
       - name: Oberflaeche bauen
         shell: bash
         run: |
-          npm --prefix weppelmann-ui install --no-audit --no-fund
-          npm --prefix weppelmann-ui run tokens
-          npm --prefix ui ci
-          npm --prefix ui run build
+          # cd statt --prefix: unter Windows loeste --prefix relativ zum
+          # Arbeitsverzeichnis auf und npm suchte package.json im Repo-Root.
+          (cd weppelmann-ui && npm install --no-audit --no-fund && npm run tokens)
+          (cd ui && npm ci && npm run build)
       - name: Kommandozeile bauen
         shell: bash
         run: cargo build --release --locked --bin hexwerk
@@ -264,10 +264,10 @@ jobs:
           node-version: "22"
       - name: Oberflaeche bauen
         run: |
-          npm --prefix weppelmann-ui install --no-audit --no-fund
-          npm --prefix weppelmann-ui run tokens
-          npm --prefix ui ci
-          npm --prefix ui run build
+          # cd statt --prefix: unter Windows loeste --prefix relativ zum
+          # Arbeitsverzeichnis auf und npm suchte package.json im Repo-Root.
+          (cd weppelmann-ui && npm install --no-audit --no-fund && npm run tokens)
+          (cd ui && npm ci && npm run build)
       - name: Kommandozeile bauen (arm64 + x86_64)
         run: |
           cargo build --release --locked --bin hexwerk --target aarch64-apple-darwin
