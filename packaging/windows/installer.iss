@@ -22,7 +22,8 @@ DefaultDirName={autopf}\Hexwerk
 DefaultGroupName=Hexwerk
 DisableProgramGroupPage=yes
 LicenseFile=..\..\LICENSE
-OutputDir={#SourceDir}\..\..\..\dist
+; vier Ebenen hoch: release -> target -> desktop -> crates -> Repo-Wurzel
+OutputDir={#SourceDir}\..\..\..\..\dist
 OutputBaseFilename=hexwerk-{#AppVersion}-windows-x86_64-setup
 SetupIconFile=..\..\assets\windows\hexwerk.ico
 UninstallDisplayIcon={app}\hexwerk-desktop.exe

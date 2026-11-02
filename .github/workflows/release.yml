@@ -222,12 +222,15 @@ jobs:
       - name: Installer (Inno Setup)
         shell: pwsh
         run: |
+          # Das .iss erwartet beide Binaries in einem Ordner; die Kommandozeile
+          # liegt im Wurzel-target, das Fenster im eigenen target des Crates.
+          Copy-Item target\release\hexwerk.exe crates\desktop\target\release\
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
             choco install innosetup -y --no-progress
           }
           & $iscc "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\crates\desktop\target\release" packaging\windows\installer.iss
-          Move-Item "crates\desktop\target\release\..\..\..\dist\*-setup.exe" dist\ -ErrorAction SilentlyContinue
+          # Das .iss schreibt selbst nach dist/ in der Repo-Wurzel.
           Get-ChildItem dist
       - uses: actions/upload-artifact@v4
         with:
