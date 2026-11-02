@@ -446,7 +446,6 @@ pub(crate) fn db_err(what: &'static str) -> impl Fn(rusqlite::Error) -> String {
     move |e| format!("{what}: {e}")
 }
 
-
 /// Uebernehmen eines angehaengten Snapshots (`snap`) in den eigenen Index.
 ///
 /// Vorhandene Werte gewinnen: ein eigener Lauf ueber eine Quelle kennt mehr

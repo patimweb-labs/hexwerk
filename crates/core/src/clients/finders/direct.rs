@@ -134,7 +134,11 @@ fn roots_flattened(roots: &[PathBuf]) -> Vec<PathBuf> {
         let Ok(eintraege) = std::fs::read_dir(root) else {
             continue;
         };
-        let mut kinder: Vec<PathBuf> = eintraege.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+        let mut kinder: Vec<PathBuf> = eintraege
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
         kinder.sort();
         out.extend(kinder);
     }
@@ -160,7 +164,12 @@ fn label_for_game(game_dir: &Path) -> String {
         .parent()
         .and_then(|p| p.file_name())
         .and_then(|s| s.to_str())
-        .filter(|s| !s.is_empty() && *s != "Applications" && *s != "Program Files" && *s != "Program Files (x86)")
+        .filter(|s| {
+            !s.is_empty()
+                && *s != "Applications"
+                && *s != "Program Files"
+                && *s != "Program Files (x86)"
+        })
         .map(|s| format!("{s} · World of Warcraft"))
         .unwrap_or_else(|| "World of Warcraft".to_string())
 }

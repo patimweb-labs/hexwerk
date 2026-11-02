@@ -75,7 +75,10 @@ fn crossover_flasche_ist_ein_wine_praefix() {
     assert_eq!(found.len(), 1);
     let c = &found[0];
     assert_eq!(c.origin, Origin::CrossOver);
-    assert_eq!(c.label, "WoW", "der Flaschenname ist das, was der Nutzer sieht");
+    assert_eq!(
+        c.label, "WoW",
+        "der Flaschenname ist das, was der Nutzer sieht"
+    );
     assert_eq!(c.prefix, t.path("Bottles/WoW"), "Praefix ist die Flasche");
     assert_eq!(c.flavors[0].flavor, Flavor::Retail);
 }

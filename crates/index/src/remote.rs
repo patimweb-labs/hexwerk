@@ -137,8 +137,7 @@ impl RemoteCatalog {
             .call()
             .map_err(|err| format!("Katalog nicht abrufbar ({url}): {err}"))?;
         let mut reader = response.into_reader();
-        let mut file =
-            std::fs::File::create(target).map_err(|err| format!("Zieldatei: {err}"))?;
+        let mut file = std::fs::File::create(target).map_err(|err| format!("Zieldatei: {err}"))?;
         std::io::copy(&mut reader, &mut file).map_err(|err| format!("Schreiben: {err}"))?;
         Ok(())
     }
