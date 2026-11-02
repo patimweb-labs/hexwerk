@@ -84,6 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
       - id: pruefen
         run: |
@@ -105,6 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -172,6 +174,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
       # Beide Binaries kommen fertig gebaut aus dem Tarball-Job - im
       # Flatpak-Build gibt es kein cargo.

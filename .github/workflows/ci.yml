@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -40,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -53,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Tests
@@ -63,6 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked --bin hexwerk
@@ -89,6 +97,8 @@ jobs:
             gtk4-devel libadwaita-devel pkgconf-pkg-config \
             cargo rust rustfmt clippy git
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: crates/ui-gtk
@@ -110,6 +120,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Werkzeuge
         run: |
           sudo apt-get update -qq
@@ -163,6 +175,8 @@ jobs:
       quellen: ${{ steps.pruefen.outputs.quellen }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - id: pruefen
         run: |
           if [ -f flatpak/new-sources.json ]; then
@@ -187,6 +201,8 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       # Die Action liest Runtime, SDK und sdk-extensions aus dem Manifest und
       # installiert sie aus Flathub; gebaut wird danach im Sandkasten.
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6

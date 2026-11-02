@@ -1,0 +1,3 @@
+[submodule "weppelmann-ui"]
+	path = weppelmann-ui
+	url = https://github.com/Smotherer007/weppelmann-ui.git

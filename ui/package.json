@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@weppelmann/components": "file:../../weppelmann-ui/packages/components",
-    "@weppelmann/tokens": "file:../../weppelmann-ui/packages/tokens",
+    "@weppelmann/components": "file:../weppelmann-ui/packages/components",
+    "@weppelmann/tokens": "file:../weppelmann-ui/packages/tokens",
     "vue": "^3.5.0",
-    "@weppelmann/icons": "file:../../weppelmann-ui/packages/icons"
+    "@weppelmann/icons": "file:../weppelmann-ui/packages/icons"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",

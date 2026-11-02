@@ -217,7 +217,7 @@ export function schliesseDetail() {
 
 /** Welcher Bildschirm sichtbar ist. Die Detailseite haengt an einer Auswahl,
  *  nicht an der Leiste — sie wird aus Katalog oder Installiert geoeffnet. */
-export const ansicht = ref<"clients" | "installiert" | "katalog" | "detail" | "einstellungen">("einstellungen");
+export const ansicht = ref<"clients" | "installiert" | "katalog" | "detail" | "einstellungen">("katalog");
 
 /** Zaehler in der Leiste. */
 export const zaehler = reactive({ clients: 0, installiert: 0, katalog: 0 });
