@@ -136,7 +136,10 @@ jobs:
       # Nur das Fenster-Crate: das GTK-Crate (crates/ui-gtk) ist abgeloest und
       # zieht libadwaita nach, das auf dem Runner fehlt.
       - name: Fenster bauen
-        run: cargo build --release --locked --features custom-protocol -p hexwerk-desktop
+        # crates/desktop ist ein eigener Workspace (Tauri zieht WebKit nach),
+        # deshalb von dort bauen statt mit -p aus dem Wurzel-Workspace.
+        working-directory: crates/desktop
+        run: cargo build --release --features custom-protocol
       - name: Paket schnüren
         run: |
           mkdir -p dist
