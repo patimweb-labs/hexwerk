@@ -17,3 +17,9 @@ flatpak/.flatpak-cargo-generator.py
 # Pakete und das lokale Flatpak-Repository gehoeren nicht ins Repo
 /repo/
 /*.flatpak
+
+# Oberflaeche (Tauri)
+/ui/node_modules
+/ui/dist
+/ui/gen
+*.tsbuildinfo

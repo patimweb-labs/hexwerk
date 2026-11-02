@@ -1,0 +1,32 @@
+[package]
+name = "hexwerk-desktop"
+version = "0.2.2"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Hexwerk: Fenster (Tauri 2), uebersetzt Befehle in die Logik-Crates"
+
+[[bin]]
+name = "hexwerk-desktop"
+path = "src/main.rs"
+
+[lib]
+name = "hexwerk_desktop"
+path = "src/lib.rs"
+
+# Die Oberflaeche haengt an allen vier Logik-Crates. Was rechnet, liegt dort und
+# ist dort getestet - dieses Crate uebersetzt nur zwischen Fenster und Logik.
+[dependencies]
+hexwerk = { package = "hexwerk-core", path = "../core" }
+hexwerk-sources = { path = "../sources" }
+hexwerk-index = { path = "../index" }
+hexwerk-install = { path = "../install" }
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[workspace]
+members = []

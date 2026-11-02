@@ -1,0 +1,10 @@
+/* Flaeche des Fensters. Kein Rahmen, keine Abstaende: die Ansichten bringen
+   ihren eigenen Aufbau mit. */
+html, body, #app { height: 100%; margin: 0; }
+body {
+  background: var(--wp-color-bg-canvas);
+  color: var(--wp-color-text-default);
+  font-family: var(--wp-font-family-sans);
+  overflow: hidden;
+}
+* { box-sizing: border-box; }
