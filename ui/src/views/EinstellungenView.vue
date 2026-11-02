@@ -6,7 +6,7 @@
 // Schlüssel, keine Rangfolge einzelner Märkte.
 import { computed, onMounted } from "vue";
 import * as UI from "@weppelmann/components";
-import { einstellungen, ladeEinstellungen, speichereEinstellungen } from "../store";
+import { einstellungen, info, ladeEinstellungen, speichereEinstellungen, stand } from "../store";
 
 const sprachen = [
   { value: "de", label: "Deutsch" },
@@ -21,15 +21,6 @@ const themen = [
 ];
 
 const werte = computed(() => einstellungen.werte);
-
-const adresse = computed({
-  get: () => werte.value?.urls?.catalog ?? "",
-  set: (v: string) => { if (werte.value) werte.value.urls.catalog = v; },
-});
-const schluessel = computed({
-  get: () => werte.value?.keys?.catalog ?? "",
-  set: (v: string) => { if (werte.value) werte.value.keys.catalog = v; },
-});
 
 onMounted(ladeEinstellungen);
 </script>
@@ -52,32 +43,25 @@ onMounted(ladeEinstellungen);
           {{ t.label }}
         </button>
       </div>
+
+      <label class="schalter">
+        <input type="checkbox" :checked="werte.nav === 'compact'"
+               @change="werte.nav = ($event.target as HTMLInputElement).checked ? 'compact' : 'full'" />
+        <span>Kompakte Leiste, nur Symbole</span>
+      </label>
     </section>
 
     <section class="block">
-      <h3>Katalogdienst</h3>
-      <p class="hint">
-        Der Katalog kommt als Ganzes von diesem Dienst; die App hält keinen
-        Schlüssel für die einzelnen Märkte. Leer lassen heißt: die eingebaute
-        Adresse verwenden.
-      </p>
-      <div class="feld">
-        <span class="feld__label">Adresse</span>
-        <UI.WpInput v-model="adresse" placeholder="https://hexwerk-api.weppelmann.eu" />
-      </div>
-      <div class="feld">
-        <span class="feld__label">Schlüssel</span>
-        <UI.WpInput v-model="schluessel" placeholder="Schlüssel" />
-      </div>
+      <h3>Datei</h3>
+      <p class="pfad">{{ info.settings_pfad || "wird beim Speichern angelegt" }}</p>
     </section>
 
     <section class="block">
-      <h3>Ablage</h3>
+      <h3>Programm</h3>
       <dl class="fakten">
-        <dt>Index</dt><dd>~/.local/share/hexwerk/index.db</dd>
-        <dt>Einstellungen</dt><dd>~/.config/hexwerk/settings.json</dd>
+        <dt>Version</dt><dd>{{ info.version }}</dd>
+        <dt>Katalog</dt><dd>{{ stand(info.catalog_version) }}</dd>
       </dl>
-      <p class="hint">Dieselbe Datei wie bei der alten Oberfläche — ein Wechsel setzt nichts zurück.</p>
     </section>
 
     <div class="fuss">
@@ -101,6 +85,8 @@ onMounted(ladeEinstellungen);
 .feld { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--wp-space-2); }
 .feld__label { font-family: var(--wp-font-family-mono); font-size: 10px; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--wp-color-text-faint); }
+.schalter { display: flex; align-items: center; gap: var(--wp-space-2); font-size: var(--wp-font-size-sm); color: var(--wp-color-text-muted); }
+.pfad { margin: 0; font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); word-break: break-all; }
 .fakten { display: grid; grid-template-columns: 120px 1fr; gap: 2px var(--wp-space-2); margin: 0; font-size: var(--wp-font-size-xs); }
 .fakten dt { color: var(--wp-color-text-faint); }
 .fakten dd { margin: 0; font-family: var(--wp-font-family-mono); }

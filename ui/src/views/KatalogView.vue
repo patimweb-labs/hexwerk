@@ -7,7 +7,7 @@
 // die Kurzbeschreibung — und die entscheidet, ob man ein Addon öffnen will.
 import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
-import { katalog, ladeKatalog, oeffneDetail, suchen, sync } from "../store";
+import { katalog, ladeKatalog, oeffneDetail, quellenName, suchen, sync } from "../store";
 
 const eingabe = ref("");
 const quelle = ref("");
@@ -15,7 +15,7 @@ const version = ref("");
 
 const quellenFilter = computed(() => [
   { value: "", label: "Alle Quellen" },
-  ...(katalog.stats?.per_source ?? []).map(([name, n]) => ({ value: name, label: `${name} (${n})` })),
+  ...(katalog.stats?.per_source ?? []).map(([name, n]) => ({ value: name, label: `${quellenName(name)} (${n})` })),
 ]);
 const versionsFilter = [
   { value: "", label: "Alle Versionen" },
@@ -67,12 +67,12 @@ onMounted(() => suchen(""));
           <span class="karte__titel">{{ item.name }}</span>
         </span>
         <span class="karte__meta">
-          {{ item.author }} · {{ item.latest?.source ?? "—" }}
+          {{ item.author }} · {{ item.latest ? quellenName(item.latest.source) : "—" }}
           <template v-if="item.sources.length"> · {{ item.sources.length }} Quelle{{ item.sources.length === 1 ? "" : "n" }}</template>
         </span>
         <span class="karte__text">{{ item.summary || "Keine Angabe" }}</span>
         <span class="karte__badges">
-          <span v-if="item.latest" class="badge">{{ item.latest.source }} {{ item.latest.version }}</span>
+          <span v-if="item.latest" class="badge">{{ quellenName(item.latest.source) }} {{ item.latest.version }}</span>
         </span>
       </button>
     </div>

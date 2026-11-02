@@ -367,10 +367,9 @@ pub fn settings_set(settings: crate::settings::Settings) -> Result<(), String> {
 
 // ------------------------------------------------------------ Katalog holen
 
-/// Vorgabe fuer den Katalogdienst. Die Adresse und der Schluessel stehen hier,
-/// weil die App selbst keinen CurseForge-Zugang hat: sie fragt den Dienst, und
-/// der Dienst fragt die Quellen. Beides laesst sich in den Einstellungen
-/// ueberschreiben (`urls.catalog`, `keys.catalog`).
+/// Der Katalogdienst. Fest eingebaut: die App hat keinen eigenen Zugang zu den
+/// Maerkten, sondern fragt diesen Dienst. Eine einstellbare Adresse gab es
+/// frueher — sie ist entfallen, weil es nur diesen einen Dienst gibt.
 pub const CATALOG_URL: &str = "https://hexwerk-api.weppelmann.eu";
 pub const CATALOG_KEY: &str = "3rp4y4t5zyexg8rcaej84tbpp44sx2bc";
 
@@ -394,21 +393,6 @@ pub struct SyncErgebnis {
 #[tauri::command]
 pub async fn catalog_sync() -> Result<SyncErgebnis, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let einstellungen = crate::settings::Settings::load();
-        let base = einstellungen
-            .urls
-            .get("catalog")
-            .cloned()
-            .unwrap_or_else(|| CATALOG_URL.to_string());
-        let key = einstellungen
-            .keys
-            .get("catalog")
-            .cloned()
-            .unwrap_or_else(|| CATALOG_KEY.to_string());
-        if key.trim().is_empty() {
-            return Err("kein Katalogschluessel hinterlegt".to_string());
-        }
-
         let pfad = hexwerk_index::Index::default_path();
         let mut idx = hexwerk_index::Index::open(&pfad)?;
         let cache = pfad
@@ -416,7 +400,7 @@ pub async fn catalog_sync() -> Result<SyncErgebnis, String> {
             .map(|d| d.join("catalog"))
             .unwrap_or_else(|| std::path::PathBuf::from("catalog"));
 
-        let remote = hexwerk_index::RemoteCatalog::new(&base, &key);
+        let remote = hexwerk_index::RemoteCatalog::new(CATALOG_URL, CATALOG_KEY);
         let (version, neu) = match remote.sync(&mut idx, &cache, false)? {
             hexwerk_index::SyncOutcome::UpToDate { version } => (version, false),
             hexwerk_index::SyncOutcome::Imported { version, .. } => (version, true),
@@ -426,4 +410,31 @@ pub async fn catalog_sync() -> Result<SyncErgebnis, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+
+// -------------------------------------------------------------- Programm-Info
+
+/// Wo die Einstellungen liegen und welche Fassung laeuft.
+#[derive(Serialize)]
+pub struct Info {
+    pub version: String,
+    pub settings_pfad: String,
+    /// Stand des Katalogs aus dem Index-Merker (leer, wenn nie geholt).
+    pub catalog_version: String,
+}
+
+#[tauri::command]
+pub fn app_info() -> Info {
+    let catalog_version = index()
+        .ok()
+        .and_then(|idx| idx.meta("catalog_version").ok().flatten())
+        .unwrap_or_default();
+    Info {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        settings_pfad: crate::settings::pfad()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
+        catalog_version,
+    }
 }

@@ -132,3 +132,13 @@ export interface SyncErgebnis {
 export function catalogSync(): Promise<SyncErgebnis> {
   return invoke<SyncErgebnis>("catalog_sync");
 }
+
+export interface Info {
+  version: string;
+  settings_pfad: string;
+  catalog_version: string;
+}
+
+export function appInfo(): Promise<Info> {
+  return invoke<Info>("app_info");
+}

@@ -8,7 +8,7 @@
 import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconBrand, IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
-import { ansicht, bytes, gewaehlt, katalog, ladeStats, lastScan, rescan, state } from "./store";
+import { ansicht, bytes, gewaehlt, katalog, ladeStats, lastScan, quellenName, rescan, state } from "./store";
 import ClientsView from "./views/ClientsView.vue";
 import InstalliertView from "./views/InstalliertView.vue";
 import KatalogView from "./views/KatalogView.vue";
@@ -92,7 +92,7 @@ onMounted(() => {
       <div class="quellen">
         <div v-for="q in quellen" :key="q.name" class="quelle">
           <span class="quelle__punkt" :class="q.ok ? 'is-ok' : 'is-off'" />
-          <span class="quelle__name">{{ q.name }}</span>
+          <span class="quelle__name">{{ quellenName(q.name) }}</span>
           <span class="quelle__zahl">{{ q.anzahl }}</span>
         </div>
         <p v-if="quellen.length === 0" class="quellen__leer">noch nicht geholt</p>

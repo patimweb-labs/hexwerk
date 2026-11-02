@@ -1,7 +1,7 @@
 // Ein Ort fuer den Zustand. Die Ansichten lesen hier und rufen Aktionen auf —
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
-import { catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings } from "./api";
+import { appInfo, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings, type Info } from "./api";
 
 export const state = reactive<{
   clients: Client[];
@@ -144,9 +144,12 @@ export const einstellungen = reactive<{
   fehler: string | null;
 }>({ werte: null, gespeichert: false, fehler: null });
 
+export const info = reactive<Info>({ version: "", settings_pfad: "", catalog_version: "" });
+
 export async function ladeEinstellungen() {
   try {
     einstellungen.werte = await settingsGet();
+    Object.assign(info, await appInfo());
   } catch (fehler) {
     einstellungen.fehler = String(fehler);
   }
@@ -218,4 +221,23 @@ export async function ladeStats() {
   } catch {
     /* Index noch nicht da: die Leiste zeigt dann eben nichts */
   }
+}
+
+/** Anzeigename einer Quelle: der Index speichert Kurzkennungen. */
+export function quellenName(kennung: string): string {
+  const namen: Record<string, string> = {
+    curseforge: "CurseForge",
+    wowi: "WoWInterface",
+    wago: "Wago",
+    tukui: "Tukui",
+    github: "GitHub",
+  };
+  return namen[kennung] ?? kennung;
+}
+
+/** Katalogstand als Datum: der Index merkt sich einen Unix-Zeitstempel. */
+export function stand(version: string): string {
+  const zahl = Number(version);
+  if (!Number.isFinite(zahl) || zahl < 1_000_000_000) return version || "noch nicht geholt";
+  return new Date(zahl * 1000).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
