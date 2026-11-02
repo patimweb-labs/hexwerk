@@ -36,6 +36,11 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.0" date="2026-11-02">
+      <description>
+        <p>Oberfläche auf Tauri 2 und Vue 3 umgestellt. Detailseite mit Bildergalerie, Reitern und Installationsstand je Spielordner. Vier Sprachen, drei Farbschemata, gemeinsame Bausteine mit den anderen Apps.</p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-10-30">
       <description>
         <p>Katalog kommt fertig vom Dienst, Installieren aus ZIP und von einer Adresse, erkannte Fremdinstallationen, Zeichen folgt der Farbe des Themas.</p>
