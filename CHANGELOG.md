@@ -1,5 +1,13 @@
 # Änderungen
 
+## [0.4.2](https://github.com/patimweb-labs/hexwerk/compare/v0.4.1...v0.4.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **flatpak:** Binaries wieder aus dem Tarball-Job nehmen ([#3](https://github.com/patimweb-labs/hexwerk/issues/3)) ([4a1f54c](https://github.com/patimweb-labs/hexwerk/commit/4a1f54cfbbf05a0ca83002c6ceac06c314ba961b))
+* **icons:** Zeichen aus dem Raster ueber markenwerk erzeugen ([#5](https://github.com/patimweb-labs/hexwerk/issues/5)) ([0ad8005](https://github.com/patimweb-labs/hexwerk/commit/0ad8005fca54a5bc43b24f3df2b566adca1a2dfc))
+
 ## 0.4.1 — 2026-11-02
 
 **Behoben**
@@ -62,4 +70,3 @@ crosspoint (`weppelmann-ui`).
 - Der Scan schreibt die gefundenen Clients in den Index — vorher wusste die
   Detailseite nichts von Installationen.
 - Fenster schließt die Aufnahme, statt im Hintergrund weiterzulaufen.
-
