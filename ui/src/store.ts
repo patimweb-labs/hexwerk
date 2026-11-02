@@ -47,10 +47,12 @@ export function client(): Client | undefined {
 }
 
 export function bytes(n: number): string {
+  // Deutsche Schreibweise: Komma als Dezimaltrenner, KB/MB/GB gross.
+  const zahl = (wert: number, stellen: number) => wert.toFixed(stellen).replace(".", ",");
   if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
-  if (n < 1024 ** 3) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 ** 3).toFixed(2)} GB`;
+  if (n < 1024 * 1024) return `${zahl(n / 1024, 1)} KB`;
+  if (n < 1024 ** 3) return `${zahl(n / 1024 / 1024, 1)} MB`;
+  return `${zahl(n / 1024 ** 3, 2)} GB`;
 }
 
 // ------------------------------------------------------------------ Katalog
@@ -166,18 +168,20 @@ export async function speichereEinstellungen() {
 
 export const sync = reactive<{
   laeuft: boolean;
-  bericht: [string, string][];
+  bericht: string;
   fehler: string | null;
-}>({ laeuft: false, bericht: [], fehler: null });
+}>({ laeuft: false, bericht: "", fehler: null });
 
-/** Quellen abfragen und den Index ergaenzen. */
-export async function ladeKatalog(pages = 400) {
+/** Katalog vom Dienst holen und anzeigen. */
+export async function ladeKatalog() {
   sync.laeuft = true;
   sync.fehler = null;
-  sync.bericht = [];
+  sync.bericht = "";
   try {
-    const ergebnis = await catalogSync(pages);
-    sync.bericht = ergebnis.quellen;
+    const e = await catalogSync();
+    sync.bericht = e.neu
+      ? `Katalog ${e.version} übernommen · ${e.eintraege} Einträge`
+      : `Katalog ${e.version} war aktuell · ${e.eintraege} Einträge`;
     katalog.stats = await catalogStats();
     await suchen(katalog.suche);
   } catch (fehler) {

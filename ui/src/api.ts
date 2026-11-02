@@ -123,11 +123,12 @@ export function settingsSet(settings: Settings): Promise<void> {
 }
 
 export interface SyncErgebnis {
+  version: string;
   eintraege: number;
-  quellen: [string, string][];
+  neu: boolean;
 }
 
-/** Katalog aus den Quellen nachladen (dauert; wenige Seiten zum Pruefen). */
-export function catalogSync(pages?: number): Promise<SyncErgebnis> {
-  return invoke<SyncErgebnis>("catalog_sync", { pages });
+/** Katalog vom Dienst holen: Manifest prüfen, bei neuem Stand übernehmen. */
+export function catalogSync(): Promise<SyncErgebnis> {
+  return invoke<SyncErgebnis>("catalog_sync");
 }

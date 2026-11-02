@@ -18,10 +18,9 @@ const gesamt = computed(() => state.clients.reduce(
     <!-- Titel und Untertitel stehen im Kopfbereich des Fensters (App.vue). -->
     <header class="cl__kopf">
       <p class="cl__sub">
-        {{ state.clients.length }} gefunden · {{ state.addonCount }} Addons · {{ bytes(gesamt) }} belegt
-        <template v-if="lastScan"> · zuletzt {{ lastScan.toLocaleTimeString("de-DE") }}</template>
+        Gefundene WoW-Installationen. Der Pfad gilt für alle Addon-Aktionen;
+        gelesen wird nur, solange du nichts änderst.
       </p>
-      <UI.WpButton label="Neu scannen" size="sm" :state="state.loading ? 'busy' : 'default'" @press="rescan" />
     </header>
 
     <UI.WpEmptyState v-if="state.clients.length === 0 && !state.loading"
@@ -31,33 +30,39 @@ const gesamt = computed(() => state.clients.reduce(
     <div class="cl__liste">
       <article v-for="c in state.clients" :key="c.id" class="karte">
         <div class="karte__kopf">
+          <span class="karte__zeichen" aria-hidden="true">{{ c.label.slice(0, 1).toUpperCase() }}</span>
           <h3 class="karte__name">{{ c.label }}</h3>
-          <UI.WpBadge tone="neutral" :label="c.origin" />
+          <span class="karte__spacer" />
+          <UI.WpBadge tone="neutral" :label="c.origin.toUpperCase()" />
         </div>
 
-        <dl class="karte__fakten">
-          <dt>Präfix</dt><dd :title="c.prefix">{{ c.prefix }}</dd>
-          <dt>Spielordner</dt><dd :title="c.game_dir">{{ c.game_dir }}</dd>
-        </dl>
+        <p class="karte__pfad" :title="c.prefix">~{{ c.prefix.replace(/^\/home\/[^/]+/, "") }}</p>
 
-        <table class="ordner">
-          <thead>
-            <tr><th>Ordner</th><th class="r">Interface</th><th class="r">Addons</th><th class="r">Platz</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="f in c.flavors" :key="f.dir_name">
-              <td>
-                <span class="ordner__name">{{ f.label }}</span>
-                <span class="ordner__pfad" :title="f.addons_dir">{{ f.addons_dir }}</span>
-              </td>
-              <td class="r mono">{{ f.interface.join(", ") || "—" }}</td>
-              <td class="r mono">{{ f.addons.length }}</td>
-              <td class="r mono">{{ bytes(f.size_bytes) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-for="f in c.flavors" :key="f.dir_name" class="ordner">
+          <span class="ordner__name">{{ f.dir_name }}</span>
+          <span class="ordner__iface">{{ f.interface.join(" · ") || "—" }}</span>
+          <span class="karte__spacer" />
+          <UI.WpBadge tone="ok" :label="`${f.addons.length} Addon${f.addons.length === 1 ? '' : 's'}`" />
+          <span class="ordner__size">{{ bytes(f.size_bytes) }}</span>
+        </div>
       </article>
     </div>
+
+    <!-- Was sonst noch gesucht wird; findet eine Herkunft nichts, fehlt sie hier. -->
+    <section class="hinweis">
+      <h3 class="hinweis__titel">Weitere Herkünfte</h3>
+      <p class="hinweis__text">
+        Lutris, Bottles, PortProton und ein beliebiger Ordner mit <code>_retail_</code> werden
+        mitgesucht. Findet eine Herkunft nichts, fehlt sie hier; die Scan-Seite nennt den Grund.
+      </p>
+    </section>
+
+    <footer class="cl__fuss">
+      <span class="cl__zaehler">
+        Herkünfte {{ state.notes.length }} · Clients {{ state.clients.length }} · Addons {{ state.addonCount }}
+      </span>
+      <UI.WpButton label="Erneut scannen" size="sm" :state="state.loading ? 'busy' : 'default'" @press="rescan" />
+    </footer>
   </div>
 </template>
 
@@ -70,14 +75,19 @@ const gesamt = computed(() => state.clients.reduce(
 .karte { padding: var(--wp-space-3); background: var(--wp-color-bg-panel); border: var(--wp-size-border) solid var(--wp-color-border-subtle); }
 .karte__kopf { display: flex; align-items: center; gap: var(--wp-space-2); margin-bottom: var(--wp-space-2); }
 .karte__name { margin: 0; font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-lg); }
-.karte__fakten { display: grid; grid-template-columns: 110px 1fr; gap: 2px var(--wp-space-2); margin: 0 0 var(--wp-space-2); font-size: var(--wp-font-size-xs); }
-.karte__fakten dt { color: var(--wp-color-text-faint); }
-.karte__fakten dd { margin: 0; font-family: var(--wp-font-family-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ordner { width: 100%; border-collapse: collapse; font-size: var(--wp-font-size-xs); }
-.ordner th { text-align: left; padding: 4px var(--wp-space-2); color: var(--wp-color-text-faint); font-weight: normal; border-bottom: var(--wp-size-border) solid var(--wp-color-border-subtle); }
-.ordner td { padding: 4px var(--wp-space-2); border-bottom: var(--wp-size-border) solid var(--wp-color-border-subtle); vertical-align: top; }
-.ordner .r { text-align: right; }
-.ordner .mono { font-family: var(--wp-font-family-mono); }
+.karte__zeichen { width: 22px; height: 22px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--wp-color-bg-input); border: var(--wp-size-border) solid var(--wp-color-border-strong);
+  font-family: var(--wp-font-family-mono); font-size: 11px; color: var(--wp-color-text-muted); }
+.karte__spacer { flex: 1; }
+.karte__pfad { margin: 0 0 var(--wp-space-2); font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
+.ordner { display: flex; align-items: center; gap: var(--wp-space-2); padding: 3px 0; border-top: var(--wp-size-border) solid var(--wp-color-border-subtle); }
+.ordner__iface { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
+.ordner__size { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-muted); }
+.hinweis { padding: var(--wp-space-3); border: var(--wp-size-border) dashed var(--wp-color-border-subtle); }
+.hinweis__titel { margin: 0 0 4px; font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-sm); }
+.hinweis__text { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-text-muted); }
+.hinweis code { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-default); }
+.cl__fuss { display: flex; align-items: center; justify-content: space-between; gap: var(--wp-space-3); margin-top: auto; padding-top: var(--wp-space-3); }
+.cl__zaehler { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-sm); color: var(--wp-color-text-muted); }
 .ordner__name { display: block; color: var(--wp-color-text-default); }
-.ordner__pfad { display: block; font-family: var(--wp-font-family-mono); color: var(--wp-color-text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
 </style>

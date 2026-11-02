@@ -82,6 +82,12 @@ onMounted(() => {
         </button>
       </nav>
 
+      <p class="abschnitt">Bestand</p>
+      <div class="bestand">
+        <div class="bestand__zeile"><span>Addons</span><span class="bestand__zahl">{{ state.addonCount }}</span></div>
+        <div class="bestand__zeile"><span>Herkünfte</span><span class="bestand__zahl">{{ state.notes.length }}</span></div>
+      </div>
+
       <p class="abschnitt">Quellen</p>
       <div class="quellen">
         <div v-for="q in quellen" :key="q.name" class="quelle">
@@ -153,6 +159,9 @@ onMounted(() => {
 .nav__icon { color: var(--wp-color-text-faint); }
 .nav__label { flex: 1; }
 .nav__zahl { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
+.bestand { display: flex; flex-direction: column; gap: 1px; padding: 0 var(--wp-space-3); }
+.bestand__zeile { display: flex; justify-content: space-between; gap: var(--wp-space-2); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-muted); }
+.bestand__zahl { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-faint); }
 .quellen { display: flex; flex-direction: column; gap: 1px; padding: 0 var(--wp-space-3); }
 .quelle { display: flex; align-items: center; gap: var(--wp-space-2); font-size: var(--wp-font-size-xs); }
 .quelle__punkt { width: 6px; height: 6px; flex: none; }

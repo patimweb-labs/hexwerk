@@ -365,88 +365,64 @@ pub fn settings_set(settings: crate::settings::Settings) -> Result<(), String> {
 }
 
 
-// ------------------------------------------------------------ Katalog fuellen
+// ------------------------------------------------------------ Katalog holen
 
-/// Was ein Quellenlauf ergeben hat.
+/// Vorgabe fuer den Katalogdienst. Die Adresse und der Schluessel stehen hier,
+/// weil die App selbst keinen CurseForge-Zugang hat: sie fragt den Dienst, und
+/// der Dienst fragt die Quellen. Beides laesst sich in den Einstellungen
+/// ueberschreiben (`urls.catalog`, `keys.catalog`).
+pub const CATALOG_URL: &str = "https://hexwerk-api.weppelmann.eu";
+pub const CATALOG_KEY: &str = "3rp4y4t5zyexg8rcaej84tbpp44sx2bc";
+
+/// Was ein Katalogabruf ergeben hat.
 #[derive(Serialize)]
 pub struct SyncErgebnis {
+    /// Stand des Katalogs (Version aus dem Manifest).
+    pub version: String,
+    /// Eintraege im Index danach.
     pub eintraege: usize,
-    /// Je Quelle: wie viele Eintraege, oder warum nicht.
-    pub quellen: Vec<(String, String)>,
+    /// Wurde etwas uebernommen oder war der Stand schon da?
+    pub neu: bool,
 }
 
-/// Den Katalog aus den Quellen nachladen.
+/// Den Katalog vom Dienst holen.
 ///
-/// Ablauf wie in der GTK-Oberflaeche: Index oeffnen, Clients einlesen, dann je
-/// Quelle seitenweise suchen, alles zusammenfuehren und in den Index schreiben.
-/// Das dauert Minuten (WoWInterface hat ueber 7.700 Eintraege, 25 je Seite) —
-/// deshalb `pages`: zum Pruefen wenige Seiten, im Betrieb die Vorgabe.
+/// Ablauf (siehe `hexwerk_index::remote`): Manifest lesen, mit der bekannten
+/// Version vergleichen, sonst den gepackten Katalog laden, Pruefsumme pruefen
+/// und die Zeilen in den lokalen Index uebernehmen. Was der Index aus eigenen
+/// Laeufen weiss, bleibt erhalten.
 #[tauri::command]
-pub async fn catalog_sync(pages: Option<u32>) -> Result<SyncErgebnis, String> {
+pub async fn catalog_sync() -> Result<SyncErgebnis, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        use std::sync::Arc;
-        use hexwerk_sources::{Cache, KeyProvider, Registry, UreqHttp};
-
-        let max_pages = pages.unwrap_or(400).max(1);
-        let pfad = hexwerk_index::Index::default_path();
-        let mut idx = hexwerk_index::Index::open(&pfad)?;
-
-        let discovery = hexwerk::discover(&[]);
-        idx.sync_clients(&discovery)?;
-
-        let keys = KeyProvider::default_provider();
-        let http: Arc<dyn hexwerk_sources::Http> = Arc::new(UreqHttp::new());
-        let registry = Registry::build(&keys, http, Cache::open_default());
-
-        let mut entries = Vec::new();
-        let mut quellen = Vec::new();
-        for source in registry.sources() {
-            // Nur GitHub braucht einen Suchbegriff; die anderen listen ihren
-            // Bestand auch bei leerem Begriff.
-            let query = match source.id() {
-                hexwerk_sources::Source::GitHub => "wow",
-                _ => "",
-            };
-            let mut page = 0;
-            let mut total = 0usize;
-            let mut fehler: Option<String> = None;
-            loop {
-                match source.search(query, page) {
-                    Ok(mut gefunden) => {
-                        let anzahl = gefunden.len();
-                        total += anzahl;
-                        entries.append(&mut gefunden);
-                        if anzahl == 0 || anzahl < 25 || page + 1 >= max_pages {
-                            break;
-                        }
-                        page += 1;
-                    }
-                    Err(e) => {
-                        fehler = Some(e.to_string());
-                        break;
-                    }
-                }
-            }
-            let beschreibung = match fehler {
-                Some(e) if total == 0 => format!("nicht gelesen: {e}"),
-                Some(e) => format!("{total} Eintraege, dann abgebrochen: {e}"),
-                None => format!("{total} Eintraege"),
-            };
-            quellen.push((hexwerk_index::source_key(source.id()).to_string(), beschreibung));
+        let einstellungen = crate::settings::Settings::load();
+        let base = einstellungen
+            .urls
+            .get("catalog")
+            .cloned()
+            .unwrap_or_else(|| CATALOG_URL.to_string());
+        let key = einstellungen
+            .keys
+            .get("catalog")
+            .cloned()
+            .unwrap_or_else(|| CATALOG_KEY.to_string());
+        if key.trim().is_empty() {
+            return Err("kein Katalogschluessel hinterlegt".to_string());
         }
 
-        // Rangfolge aus den Einstellungen: bei mehreren Quellen gewinnt die obere.
-        let rang = crate::settings::Settings::load().source_priority;
-        let prioritaet = hexwerk_sources::merge::Priority::new(
-            rang.iter()
-                .filter_map(|k| hexwerk_index::source_from_key(k))
-                .collect(),
-        );
-        let zusammengefuehrt = hexwerk_sources::merge::merge_with(entries, &prioritaet);
-        let eintraege = zusammengefuehrt.len();
-        idx.sync_catalogue(&zusammengefuehrt)?;
+        let pfad = hexwerk_index::Index::default_path();
+        let mut idx = hexwerk_index::Index::open(&pfad)?;
+        let cache = pfad
+            .parent()
+            .map(|d| d.join("catalog"))
+            .unwrap_or_else(|| std::path::PathBuf::from("catalog"));
 
-        Ok(SyncErgebnis { eintraege, quellen })
+        let remote = hexwerk_index::RemoteCatalog::new(&base, &key);
+        let (version, neu) = match remote.sync(&mut idx, &cache, false)? {
+            hexwerk_index::SyncOutcome::UpToDate { version } => (version, false),
+            hexwerk_index::SyncOutcome::Imported { version, .. } => (version, true),
+        };
+        let eintraege = idx.stats().map(|s| s.catalogue).unwrap_or(0);
+        Ok(SyncErgebnis { version, eintraege, neu })
     })
     .await
     .map_err(|e| e.to_string())?

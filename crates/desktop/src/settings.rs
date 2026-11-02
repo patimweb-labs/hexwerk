@@ -14,11 +14,14 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// Die Quellen, die es gibt. GitHub und Tukui sind aus `registry.rs` entfernt
+/// (GitHub ohne Token zu stark gedrosselt, Tukui fuehrt nur eigene Addons) —
+/// sie duerfen hier nicht auftauchen, sonst steht eine Rangfolge fuer Quellen,
+/// die niemand abfragt.
+pub const VORHANDEN: [&str; 3] = ["curseforge", "wowi", "wago"];
+
 fn prioritaet() -> Vec<String> {
-    ["curseforge", "wowi", "tukui", "github", "wago"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
+    VORHANDEN.iter().map(|s| s.to_string()).collect()
 }
 
 fn sprache() -> String {
@@ -82,7 +85,14 @@ impl Settings {
     pub fn load() -> Self {
         let Some(pfad) = pfad() else { return Self::default() };
         let Ok(text) = std::fs::read_to_string(&pfad) else { return Self::default() };
-        serde_json::from_str(&text).unwrap_or_default()
+        let mut werte: Self = serde_json::from_str(&text).unwrap_or_default();
+        // Alte Dateien nennen Quellen, die inzwischen entfernt sind. Sie werden
+        // hier fallen gelassen, statt in der Oberflaeche zu erscheinen.
+        werte.source_priority.retain(|k| VORHANDEN.contains(&k.as_str()));
+        if werte.source_priority.is_empty() {
+            werte.source_priority = prioritaet();
+        }
+        werte
     }
 
     pub fn save(&self) -> Result<(), String> {
