@@ -1,5 +1,23 @@
 # Änderungen
 
+## 0.4.1 — 2026-11-02
+
+**Behoben**
+
+- Flatpak: Das Manifest baute die eingefrorene GTK-Oberfläche (`crates/ui-gtk`,
+  letzter Stand 0.2.2) statt der Tauri-App — deshalb zeigten alle Pakete, auch
+  das Release 0.4.0, die alte Oberfläche. Es baut jetzt `crates/desktop` mit
+  `--features custom-protocol` und dem Vue-Frontend aus `ui/dist`.
+- Die alte GTK-Oberfläche ist entfernt: `crates/ui-gtk`, das Feature `ui`, das
+  Binary `hexwerk-gtk` und der zugehörige CI-Job.
+- Flatpak-Quellen aus beiden Lockfiles (Kommandozeile und Desktop) erzeugt.
+
+**Dokumentation**
+
+- `AGENTS.md` in allen Weppelmann-Apps, `docs/architektur.md` und
+  `docs/datenfluss.md` vereinheitlicht; README mit Installation, Screenshots
+  und Abschnitt zu Daten und Datenschutz.
+
 ## 0.4.0 — 2026-11-02
 
 **Neu**

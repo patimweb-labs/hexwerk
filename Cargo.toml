@@ -1,6 +1,6 @@
 [package]
 name = "hexwerk"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Hexwerk: Addon-Manager fuer World of Warcraft unter Linux und Proton"
 license = "GPL-3.0-or-later"

@@ -1,6 +1,6 @@
 [package]
 name = "hexwerk-desktop"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "Hexwerk: Fenster (Tauri 2), uebersetzt Befehle in die Logik-Crates"
