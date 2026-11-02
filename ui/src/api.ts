@@ -121,3 +121,13 @@ export function settingsGet(): Promise<Settings> {
 export function settingsSet(settings: Settings): Promise<void> {
   return invoke<void>("settings_set", { settings });
 }
+
+export interface SyncErgebnis {
+  eintraege: number;
+  quellen: [string, string][];
+}
+
+/** Katalog aus den Quellen nachladen (dauert; wenige Seiten zum Pruefen). */
+export function catalogSync(pages?: number): Promise<SyncErgebnis> {
+  return invoke<SyncErgebnis>("catalog_sync", { pages });
+}

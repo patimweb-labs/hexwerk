@@ -1,7 +1,7 @@
 // Ein Ort fuer den Zustand. Die Ansichten lesen hier und rufen Aktionen auf —
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
-import { catalogSearch, catalogStats, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings } from "./api";
+import { catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings } from "./api";
 
 export const state = reactive<{
   clients: Client[];
@@ -159,5 +159,30 @@ export async function speichereEinstellungen() {
     window.setTimeout(() => (einstellungen.gespeichert = false), 2000);
   } catch (fehler) {
     einstellungen.fehler = String(fehler);
+  }
+}
+
+// ------------------------------------------------------------ Katalog fuellen
+
+export const sync = reactive<{
+  laeuft: boolean;
+  bericht: [string, string][];
+  fehler: string | null;
+}>({ laeuft: false, bericht: [], fehler: null });
+
+/** Quellen abfragen und den Index ergaenzen. */
+export async function ladeKatalog(pages = 400) {
+  sync.laeuft = true;
+  sync.fehler = null;
+  sync.bericht = [];
+  try {
+    const ergebnis = await catalogSync(pages);
+    sync.bericht = ergebnis.quellen;
+    katalog.stats = await catalogStats();
+    await suchen(katalog.suche);
+  } catch (fehler) {
+    sync.fehler = String(fehler);
+  } finally {
+    sync.laeuft = false;
   }
 }

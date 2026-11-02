@@ -4,7 +4,7 @@
 import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconSearch } from "@weppelmann/icons";
-import { bytes, gewaehlt, installiere, installation, katalog, suchen, ziele } from "../store";
+import { bytes, gewaehlt, installiere, installation, katalog, ladeKatalog, suchen, sync, ziele } from "../store";
 
 const eingabe = ref("");
 const spalten = [
@@ -54,11 +54,16 @@ onMounted(() => suchen(""));
     <div class="kat__suche">
       <UI.WpInput v-model="eingabe" placeholder="Addon suchen …" @keyup.enter="starte" />
       <UI.WpButton label="Suchen" :icon="IconSearch" size="sm" @press="starte" />
+      <UI.WpButton label="Katalog holen" size="sm" variant="secondary"
+                   :state="sync.laeuft ? 'busy' : 'default'" @press="ladeKatalog()" />
       <span class="kat__stats" v-if="katalog.stats">
         {{ katalog.stats.catalogue }} im Katalog · {{ katalog.stats.installed }} installiert ·
         {{ katalog.stats.updates }} Updates
       </span>
     </div>
+
+    <p v-if="sync.fehler" class="fehler">{{ sync.fehler }}</p>
+    <p v-for="q in sync.bericht" :key="q[0]" class="quelle-zeile">{{ q[0] }}: {{ q[1] }}</p>
 
     <div class="kat__body">
       <div class="kat__liste">
@@ -144,4 +149,5 @@ onMounted(() => suchen(""));
 .ziel :deep(.wp-select), .ziel :deep(.wp-formfield) { flex: 1; min-width: 0; }
 .fehler { margin: var(--wp-space-2) 0 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-error); }
 .erfolg { margin: var(--wp-space-2) 0 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-ok); }
+.quelle-zeile { margin: 0; font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 </style>

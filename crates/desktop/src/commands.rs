@@ -363,3 +363,91 @@ pub fn settings_get() -> crate::settings::Settings {
 pub fn settings_set(settings: crate::settings::Settings) -> Result<(), String> {
     settings.save()
 }
+
+
+// ------------------------------------------------------------ Katalog fuellen
+
+/// Was ein Quellenlauf ergeben hat.
+#[derive(Serialize)]
+pub struct SyncErgebnis {
+    pub eintraege: usize,
+    /// Je Quelle: wie viele Eintraege, oder warum nicht.
+    pub quellen: Vec<(String, String)>,
+}
+
+/// Den Katalog aus den Quellen nachladen.
+///
+/// Ablauf wie in der GTK-Oberflaeche: Index oeffnen, Clients einlesen, dann je
+/// Quelle seitenweise suchen, alles zusammenfuehren und in den Index schreiben.
+/// Das dauert Minuten (WoWInterface hat ueber 7.700 Eintraege, 25 je Seite) —
+/// deshalb `pages`: zum Pruefen wenige Seiten, im Betrieb die Vorgabe.
+#[tauri::command]
+pub async fn catalog_sync(pages: Option<u32>) -> Result<SyncErgebnis, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::sync::Arc;
+        use hexwerk_sources::{Cache, KeyProvider, Registry, UreqHttp};
+
+        let max_pages = pages.unwrap_or(400).max(1);
+        let pfad = hexwerk_index::Index::default_path();
+        let mut idx = hexwerk_index::Index::open(&pfad)?;
+
+        let discovery = hexwerk::discover(&[]);
+        idx.sync_clients(&discovery)?;
+
+        let keys = KeyProvider::default_provider();
+        let http: Arc<dyn hexwerk_sources::Http> = Arc::new(UreqHttp::new());
+        let registry = Registry::build(&keys, http, Cache::open_default());
+
+        let mut entries = Vec::new();
+        let mut quellen = Vec::new();
+        for source in registry.sources() {
+            // Nur GitHub braucht einen Suchbegriff; die anderen listen ihren
+            // Bestand auch bei leerem Begriff.
+            let query = match source.id() {
+                hexwerk_sources::Source::GitHub => "wow",
+                _ => "",
+            };
+            let mut page = 0;
+            let mut total = 0usize;
+            let mut fehler: Option<String> = None;
+            loop {
+                match source.search(query, page) {
+                    Ok(mut gefunden) => {
+                        let anzahl = gefunden.len();
+                        total += anzahl;
+                        entries.append(&mut gefunden);
+                        if anzahl == 0 || anzahl < 25 || page + 1 >= max_pages {
+                            break;
+                        }
+                        page += 1;
+                    }
+                    Err(e) => {
+                        fehler = Some(e.to_string());
+                        break;
+                    }
+                }
+            }
+            let beschreibung = match fehler {
+                Some(e) if total == 0 => format!("nicht gelesen: {e}"),
+                Some(e) => format!("{total} Eintraege, dann abgebrochen: {e}"),
+                None => format!("{total} Eintraege"),
+            };
+            quellen.push((hexwerk_index::source_key(source.id()).to_string(), beschreibung));
+        }
+
+        // Rangfolge aus den Einstellungen: bei mehreren Quellen gewinnt die obere.
+        let rang = crate::settings::Settings::load().source_priority;
+        let prioritaet = hexwerk_sources::merge::Priority::new(
+            rang.iter()
+                .filter_map(|k| hexwerk_index::source_from_key(k))
+                .collect(),
+        );
+        let zusammengefuehrt = hexwerk_sources::merge::merge_with(entries, &prioritaet);
+        let eintraege = zusammengefuehrt.len();
+        idx.sync_catalogue(&zusammengefuehrt)?;
+
+        Ok(SyncErgebnis { eintraege, quellen })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
