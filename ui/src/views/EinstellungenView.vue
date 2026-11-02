@@ -4,10 +4,10 @@
 // Die Quellen werden zentral über den Dienst gesteuert — die App fragt nur
 // Manifest und Katalog ab. Deshalb steht hier die Adresse des Dienstes und der
 // Schlüssel, keine Rangfolge einzelner Märkte.
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { SPRACHEN, t } from "../i18n";
-import { einstellungen, info, ladeEinstellungen, speichereEinstellungen, stand } from "../store";
+import { einstellungen, info, katalog, ladeEinstellungen, ladeKatalog, leereKatalog, speichereEinstellungen, stand, sync } from "../store";
 
 const sprachen = SPRACHEN;
 const themenMitText = [
@@ -17,6 +17,9 @@ const themenMitText = [
 ];
 
 const werte = computed(() => einstellungen.werte);
+
+/** Rueckfrage vor dem Leeren: der Katalog ist offline nach einem Klick. */
+const frageLeeren = ref(false);
 
 // Die Einstellungen koennen noch unterwegs sein (null). Die drei Setzer halten
 // das an einer Stelle fest, statt es in jedem Handler zu wiederholen.
@@ -46,6 +49,23 @@ onMounted(ladeEinstellungen);
                      @update:model-value="setzeLeiste" />
     </section>
 
+    <!-- Katalog: Stand, aktiver Sync und bewusstes Leeren. Beides steht hier
+         und nicht im Katalog selbst, damit die Ansicht zum Suchen da bleibt. -->
+    <section class="block">
+      <h3>{{ t("set.catalog") }}</h3>
+      <p class="pfad">
+        {{ t("set.catalog.stand", katalog.stats?.catalogue ?? 0, stand(info.catalog_version)) }}
+      </p>
+      <div class="knopfreihe">
+        <UI.WpButton :label="t('set.sync')" variant="secondary"
+                     :state="sync.laeuft ? 'busy' : 'default'" @press="ladeKatalog()" />
+        <UI.WpButton :label="t('set.clear')" variant="danger"
+                     :state="sync.laeuft ? 'disabled' : 'default'" @press="frageLeeren = true" />
+      </div>
+      <p v-if="sync.bericht" class="pfad">{{ sync.bericht }}</p>
+      <p v-if="sync.fehler" class="fehler">{{ sync.fehler }}</p>
+    </section>
+
     <section class="block">
       <h3>{{ t("set.file") }}</h3>
       <p class="pfad">{{ info.settings_pfad || "wird beim Speichern angelegt" }}</p>
@@ -58,6 +78,12 @@ onMounted(ladeEinstellungen);
         <dt>{{ t("set.version.catalog") }}</dt><dd>{{ stand(info.catalog_version) }}</dd>
       </dl>
     </section>
+
+    <UI.WpDialog :open="frageLeeren" :title="t('set.clear.title')" tone="error"
+                 :description="t('set.clear.text', katalog.stats?.catalogue ?? 0)"
+                 :confirm-label="t('set.clear.confirm')" :cancel-label="t('set.install.cancel')"
+                 @update:open="frageLeeren = $event"
+                 @confirm="leereKatalog()" />
 
     <div class="fuss">
       <UI.WpButton :label="t('set.save')" variant="primary" @press="speichereEinstellungen" />

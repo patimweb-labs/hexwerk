@@ -2,7 +2,7 @@
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
 import { setSprache, sprache, t } from "./i18n";
-import { appInfo, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings, type Info } from "./api";
+import { appInfo, katalogLeeren, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings, type Info } from "./api";
 
 export const state = reactive<{
   clients: Client[];
@@ -323,4 +323,21 @@ export function zeigeMeldung(titel: string, ton: "info" | "ok" | "warn" | "error
   meldung.value = { ton, titel };
   window.clearTimeout(meldungTimer);
   meldungTimer = window.setTimeout(() => (meldung.value = null), 4000);
+}
+
+/**
+ * Katalog leeren (Einstellungen).
+ *
+ * Danach stehen Katalog und Quellen auf null, und die Ansicht zeigt das auch —
+ * ohne Neustart, weil `stats` neu geholt und die Suche wiederholt wird.
+ */
+export async function leereKatalog(): Promise<void> {
+  try {
+    const ergebnis = await katalogLeeren();
+    katalog.stats = await catalogStats();
+    await suchen(katalog.suche);
+    zeigeMeldung(t("set.cleared", ergebnis.vorher), "ok");
+  } catch (fehler) {
+    zeigeMeldung(String(fehler), "error");
+  }
 }

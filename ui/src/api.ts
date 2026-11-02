@@ -172,3 +172,13 @@ export function zurueckholen(name: string): Promise<string> {
 export function installiertIn(addonsDir: string, folder: string): Promise<string | null> {
   return invoke<string | null>("installiert_in", { addonsDir, folder });
 }
+
+export interface LeerErgebnis {
+  vorher: number;
+  dateien: number;
+}
+
+/** Katalog und Index leeren, dazu den gepackten Snapshot im Cache. */
+export function katalogLeeren(): Promise<LeerErgebnis> {
+  return invoke<LeerErgebnis>("katalog_leeren");
+}

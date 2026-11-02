@@ -13,7 +13,7 @@ import { computed, onMounted } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
 import { t } from "./i18n";
-import { ansicht, einstellungen, gewaehlt, installation, katalog, ladeStats, lastScan, meldung, quellenName, rescan, state, sync, thema, wendeThema } from "./store";
+import { ansicht, einstellungen, gewaehlt, installation, katalog, ladeKatalog, ladeStats, lastScan, meldung, quellenName, rescan, state, sync, thema, wendeThema } from "./store";
 import ClientsView from "./views/ClientsView.vue";
 import InstalliertView from "./views/InstalliertView.vue";
 import KatalogView from "./views/KatalogView.vue";
@@ -86,6 +86,11 @@ onMounted(() => {
   rescan();
   // Die Leiste zeigt Katalogzahl und Quellen, bevor jemand den Katalog oeffnet.
   ladeStats();
+  // Der Katalog wird beim Start im Hintergrund ergaenzt - wie in der
+  // GTK-Fassung. Ohne diesen Aufruf bliebe die App auf dem Stand des letzten
+  // Laufs stehen: `ladeKatalog` hatte nach dem Entfernen des Knopfes keinen
+  // Aufrufer mehr.
+  ladeKatalog();
 });
 </script>
 
@@ -146,7 +151,8 @@ onMounted(() => {
       <UI.WpStatusBar brand="HEXWERK" :state="zustand"
                       :counts="t('st.kw.counts', katalog.stats?.catalogue ?? 0, state.addonCount, state.clients.length)">
         <template #lead>
-          <UI.WpSpinner v-if="beschaeftigt" size="sm" />
+          <!-- Laeuft, solange Scan, Katalog oder Installation arbeiten. -->
+          <UI.WpNyan :active="beschaeftigt" :label="laeuft" />
           <span v-if="beschaeftigt" class="fuss__zahl">{{ laeuft }}</span>
         </template>
       </UI.WpStatusBar>

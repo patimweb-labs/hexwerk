@@ -1031,11 +1031,47 @@
     "es": "Clave",
     "fr": "Cle"
   },
+  "set.catalog.stand": {
+    "de": "{} Einträge · Version {}",
+    "en": "{} entries · version {}",
+    "es": "{} entradas · versión {}",
+    "fr": "{} entrées · version {}"
+  },
   "set.catalog.url": {
     "de": "Adresse",
     "en": "Address",
     "es": "Direccion",
     "fr": "Adresse"
+  },
+  "set.clear": {
+    "de": "Katalog leeren",
+    "en": "Clear catalogue",
+    "es": "Vaciar catálogo",
+    "fr": "Vider le catalogue"
+  },
+  "set.clear.confirm": {
+    "de": "Leeren",
+    "en": "Clear",
+    "es": "Vaciar",
+    "fr": "Vider"
+  },
+  "set.clear.text": {
+    "de": "Alle {} Einträge und der gepackte Snapshot werden entfernt. Der nächste Sync lädt den Katalog neu; installierte Addons bleiben unberührt.",
+    "en": "All {} entries and the packed snapshot are removed. The next sync reloads the catalogue; installed addons are not touched.",
+    "es": "Se eliminan las {} entradas y el snapshot empaquetado. La próxima sincronización recarga el catálogo; los addons instalados no se tocan.",
+    "fr": "Les {} entrées et l'instantané compacté sont supprimés. La prochaine synchronisation recharge le catalogue ; les addons installés restent intacts."
+  },
+  "set.clear.title": {
+    "de": "Katalog leeren?",
+    "en": "Clear the catalogue?",
+    "es": "¿Vaciar el catálogo?",
+    "fr": "Vider le catalogue ?"
+  },
+  "set.cleared": {
+    "de": "Katalog geleert · {} Einträge entfernt",
+    "en": "Catalogue cleared · {} entries removed",
+    "es": "Catálogo vaciado · {} entradas eliminadas",
+    "fr": "Catalogue vidé · {} entrées supprimées"
   },
   "set.col.entries": {
     "de": "Eintraege",
@@ -1186,6 +1222,12 @@
     "en": "Language, appearance and where the settings live.",
     "es": "Idioma, aspecto y ubicación de los ajustes.",
     "fr": "Langue, apparence et emplacement des réglages."
+  },
+  "set.sync": {
+    "de": "Jetzt synchronisieren",
+    "en": "Sync now",
+    "es": "Sincronizar ahora",
+    "fr": "Synchroniser"
   },
   "set.title": {
     "de": "Einstellungen",

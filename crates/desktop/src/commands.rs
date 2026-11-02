@@ -603,3 +603,43 @@ pub fn installiert_in(addons_dir: String, folder: String) -> Option<String> {
         .find(|a| a.folder == folder)
         .map(|a| a.version.unwrap_or_default())
 }
+
+
+// ------------------------------------------------------------ Katalog leeren
+
+/// Was das Leeren hinterlaesst: wie viel weg ist und ob der Cache mitging.
+#[derive(Serialize)]
+pub struct LeerErgebnis {
+    pub vorher: usize,
+    pub dateien: usize,
+}
+
+/// Katalog und Index leeren (Einstellungen: „Katalog leeren").
+///
+/// Geleert wird ueber `Index::clear`, nicht durch Loeschen der Datei: die App
+/// haelt den Index offen, und eine offene SQLite-Datei verschwindet unter
+/// Windows nicht. Zusaetzlich fliegt der gepackte Snapshot aus dem Cache,
+/// damit der naechste Sync wirklich frisch laedt statt den alten Stand
+/// wiederherzustellen.
+#[tauri::command]
+pub fn katalog_leeren() -> Result<LeerErgebnis, String> {
+    let mut index = hexwerk_index::Index::open(&hexwerk_index::Index::default_path())?;
+    let vorher = index.stats().map(|s| s.catalogue as usize).unwrap_or(0);
+    index.clear()?;
+
+    let cache = hexwerk::data_root().join("catalog");
+    let mut dateien = 0;
+    if let Ok(eintraege) = std::fs::read_dir(&cache) {
+        for eintrag in eintraege.flatten() {
+            let pfad = eintrag.path();
+            let ist_snapshot = pfad
+                .file_name()
+                .map(|n| n.to_string_lossy().starts_with("catalog.sqlite"))
+                .unwrap_or(false);
+            if ist_snapshot && std::fs::remove_file(&pfad).is_ok() {
+                dateien += 1;
+            }
+        }
+    }
+    Ok(LeerErgebnis { vorher, dateien })
+}

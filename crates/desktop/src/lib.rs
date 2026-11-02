@@ -25,6 +25,7 @@ pub fn run() {
             commands::oeffne_url,
             commands::zurueckholen,
             commands::installiert_in,
+            commands::katalog_leeren,
             commands::deinstalliere,
         ])
         .run(tauri::generate_context!())

@@ -1,5 +1,24 @@
 # Änderungen
 
+## 0.4.0 — 2026-11-02
+
+**Neu**
+
+- Windows und macOS: World of Warcraft wird in `%ProgramFiles%`/`%ProgramFiles(x86)%`
+  und in CrossOver- bzw. Whisky-Flaschen gefunden, dazu die native
+  macOS-Installation in `/Applications`.
+- Einstellungen: „Jetzt synchronisieren" und „Katalog leeren" (mit Rückfrage;
+  der gepackte Snapshot im Cache geht mit).
+- Der Katalog wird beim Start im Hintergrund ergänzt — vorher fehlte der Aufruf,
+  nachdem der Knopf aus der Katalogansicht entfernt worden war.
+- Die Nyan-Cat aus der GTK-Fassung ist zurück: sie läuft in der Fußzeile,
+  solange Scan, Katalog oder Installation arbeiten.
+
+**Besser**
+
+- Pakete für Windows (Portable-ZIP und Inno-Setup-Installer) und macOS
+  (Universal-DMG, arm64 + x86_64).
+
 ## 0.3.0 — 2026-11-02
 
 Die Oberfläche ist neu gebaut: statt GTK jetzt Tauri 2 mit Vue 3, dieselbe

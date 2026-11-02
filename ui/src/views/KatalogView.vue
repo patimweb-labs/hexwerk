@@ -7,7 +7,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { t } from "../i18n";
-import { katalog, ladeKatalog, oeffneDetail, quellenName, suchen, sync } from "../store";
+import { katalog, oeffneDetail, quellenName, suchen, sync } from "../store";
 
 const eingabe = ref("");
 /** Gewählte Quellen und Interface-Nummern; leer heißt: keine Einschränkung. */
