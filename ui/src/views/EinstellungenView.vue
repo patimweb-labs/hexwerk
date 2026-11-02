@@ -10,7 +10,7 @@ import { SPRACHEN, t } from "../i18n";
 import { einstellungen, info, ladeEinstellungen, speichereEinstellungen, stand } from "../store";
 
 const sprachen = SPRACHEN;
-const themen = [
+const themenMitText = [
   { value: "dark", label: "Dunkel" },
   { value: "light", label: "Hell" },
   { value: "mono", label: "Mono" },
@@ -18,33 +18,32 @@ const themen = [
 
 const werte = computed(() => einstellungen.werte);
 
+// Die Einstellungen koennen noch unterwegs sein (null). Die drei Setzer halten
+// das an einer Stelle fest, statt es in jedem Handler zu wiederholen.
+function setzeSprache(wert: string) {
+  if (einstellungen.werte) einstellungen.werte.language = wert;
+}
+function setzeThema(wert: string) {
+  if (einstellungen.werte) einstellungen.werte.theme = wert;
+}
+function setzeLeiste(an: boolean) {
+  if (einstellungen.werte) einstellungen.werte.nav = an ? "compact" : "full";
+}
+
 onMounted(ladeEinstellungen);
 </script>
 
 <template>
   <div class="set" v-if="werte">
     <section class="block">
-      <p class="feld__label">{{ t("set.language") }}</p>
-      <div class="knopfreihe">
-        <button v-for="s in sprachen" :key="s.value" type="button" class="knopf"
-                :class="{ 'is-active': werte.language === s.value }" @click="werte.language = s.value">
-          {{ s.label }}
-        </button>
-      </div>
+      <UI.WpToggleGroup :model-value="werte.language" :label="t('set.language')"
+                        :options="sprachen" @update:model-value="setzeSprache" />
 
-      <p class="feld__label">{{ t("set.appearance") }}</p>
-      <div class="knopfreihe">
-        <button v-for="t in themen" :key="t.value" type="button" class="knopf"
-                :class="{ 'is-active': werte.theme === t.value }" @click="werte.theme = t.value">
-          {{ t.label }}
-        </button>
-      </div>
+      <UI.WpToggleGroup :model-value="werte.theme" :label="t('set.appearance')"
+                        :options="themenMitText" @update:model-value="setzeThema" />
 
-      <label class="schalter">
-        <input type="checkbox" :checked="werte.nav === 'compact'"
-               @change="werte.nav = ($event.target as HTMLInputElement).checked ? 'compact' : 'full'" />
-        <span>{{ t("set.nav.compact") }}</span>
-      </label>
+      <UI.WpCheckbox :model-value="werte.nav === 'compact'" :label="t('set.nav.compact')"
+                     @update:model-value="setzeLeiste" />
     </section>
 
     <section class="block">

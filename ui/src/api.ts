@@ -157,3 +157,13 @@ export function fetchImages(urls: string[]): Promise<Bild[]> {
 export function oeffneUrl(url: string): Promise<void> {
   return invoke<void>("oeffne_url", { url });
 }
+
+/** Ein Addon in den Papierkorb legen (nicht löschen). Gibt den Namen im Papierkorb zurück. */
+export function deinstalliere(addonsDir: string, folder: string): Promise<string> {
+  return invoke<string>("deinstalliere", { addonsDir, folder });
+}
+
+/** Einen Papierkorb-Eintrag zurückholen. */
+export function zurueckholen(name: string): Promise<string> {
+  return invoke<string>("zurueckholen", { name });
+}

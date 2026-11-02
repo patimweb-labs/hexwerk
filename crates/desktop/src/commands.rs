@@ -539,3 +539,51 @@ pub fn oeffne_url(url: String) -> Result<(), String> {
         .map(|_| ())
         .map_err(|e| format!("{programm}: {e}"))
 }
+
+
+// --------------------------------------------------------------- Deinstallieren
+
+/// Ein Addon in den Papierkorb legen.
+///
+/// Nicht loeschen: `trash_addon` verschiebt den Ordner in den Papierkorb des
+/// Desktops und schreibt eine `.trashinfo`. Damit ist es zurueckholbar, auch
+/// ausserhalb von Hexwerk (so macht es die GTK-Fassung, app.rs:1828).
+#[tauri::command]
+pub fn deinstalliere(addons_dir: String, folder: String) -> Result<String, String> {
+    use std::path::Path;
+    let pfade = hexwerk_install::Paths::system();
+    hexwerk_install::trash_addon(Path::new(&addons_dir), &folder, &pfade)
+        .map(|eintrag| eintrag.name)
+        .map_err(|fehler| fehler.to_string())
+}
+
+/// Einen Eintrag aus dem Papierkorb zurueckholen (Rueckgaengig).
+#[tauri::command]
+pub fn zurueckholen(name: String) -> Result<String, String> {
+    let pfade = hexwerk_install::Paths::system();
+    let wurzel = &pfade.trash_root;
+    // Der Eintrag wird ueber seinen Namen in `files/` gesucht.
+    let ordner = wurzel.join("files").join(&name);
+    if !ordner.exists() {
+        return Err(format!("nicht im Papierkorb: {name}"));
+    }
+    let original = std::fs::read_to_string(wurzel.join("info").join(format!("{name}.trashinfo")))
+        .ok()
+        .and_then(|text| {
+            text.lines()
+                .find_map(|zeile| zeile.strip_prefix("Path=").map(str::to_string))
+        })
+        .map(|pfad| std::path::PathBuf::from(pfad))
+        .ok_or_else(|| "Pfad im Papierkorb-Eintrag fehlt".to_string())?;
+    let ziel = if original.is_absolute() {
+        original
+    } else {
+        hexwerk::user_data_home().join(original)
+    };
+    if let Some(eltern) = ziel.parent() {
+        let _ = std::fs::create_dir_all(eltern);
+    }
+    std::fs::rename(&ordner, &ziel).map_err(|fehler| fehler.to_string())?;
+    let _ = std::fs::remove_file(wurzel.join("info").join(format!("{name}.trashinfo")));
+    Ok(ziel.display().to_string())
+}

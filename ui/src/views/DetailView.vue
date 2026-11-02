@@ -101,10 +101,7 @@ function weiter(richtung: -1 | 1) {
     <p v-else class="dt__leer">{{ t("dt.hint.no.images") }}</p>
 
     <!-- Reiter -->
-    <div class="dt__reiter">
-      <button v-for="r in reiter" :key="r.id" type="button" class="dt__reiter-knopf"
-              :class="{ 'is-active': tab === r.id }" @click="tab = r.id">{{ r.label }}</button>
-    </div>
+    <UI.WpTabs v-model="tab" :tabs="reiter" :label="t('dt.tabs')" />
 
     <section v-if="tab === 'desc'" class="dt__bereich">
       <p class="dt__text">{{ item.summary || t("dt.summary.fallback") }}</p>
@@ -210,10 +207,6 @@ function weiter(richtung: -1 | 1) {
 .galerie__leiste { display: flex; align-items: center; gap: var(--wp-space-2); }
 .galerie__zaehler { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 
-.dt__reiter { display: flex; gap: 2px; border-bottom: var(--wp-size-border) solid var(--wp-color-border-subtle); }
-.dt__reiter-knopf { padding: 6px var(--wp-space-3); background: none; border: 0; border-bottom: 2px solid transparent;
-  color: var(--wp-color-text-muted); font: inherit; font-size: var(--wp-font-size-sm); }
-.dt__reiter-knopf.is-active { color: var(--wp-color-text-default); border-bottom-color: var(--wp-color-accent-default); }
 
 .dt__bereich { display: flex; flex-direction: column; gap: var(--wp-space-2); }
 .dt__text { margin: 0; max-width: 85ch; font-size: var(--wp-font-size-sm); color: var(--wp-color-text-muted); line-height: 1.5; }
