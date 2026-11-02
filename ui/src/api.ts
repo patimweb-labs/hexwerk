@@ -167,3 +167,8 @@ export function deinstalliere(addonsDir: string, folder: string): Promise<string
 export function zurueckholen(name: string): Promise<string> {
   return invoke<string>("zurueckholen", { name });
 }
+
+/** Ist dieses Addon im angegebenen Ziel installiert? Liefert die Version oder null. */
+export function installiertIn(addonsDir: string, folder: string): Promise<string | null> {
+  return invoke<string | null>("installiert_in", { addonsDir, folder });
+}

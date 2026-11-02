@@ -58,23 +58,19 @@ onMounted(() => suchen(""));
     </div>
 
     <div class="kat__filter">
-      <div class="gruppe">
-        <span class="gruppe__titel">{{ t("cv.sources.hint") }}</span>
+      <UI.WpFieldset :title="t('cv.sources.hint')">
         <div class="kasten">
           <UI.WpCheckbox v-for="q in quellen" :key="q[0]" :model-value="gewaehlteQuellen.has(q[0])"
                          :label="`${quellenName(q[0])} (${q[1]})`"
                          @update:model-value="schalteQuelle(q[0])" />
         </div>
-      </div>
-      <div class="gruppe" v-if="versionen.length">
-        <span class="gruppe__titel">{{ t("cv.version.hint") }}</span>
+      </UI.WpFieldset>
+      <UI.WpFieldset v-if="versionen.length" :title="t('cv.version.hint')">
         <div class="kasten">
           <UI.WpCheckbox v-for="v in versionen" :key="v[0]" :model-value="gewaehlteVersionen.has(v[0])"
-                         :label="`${v[0]} (${v[1]})`" @update:model-value="schalteVersion(v[0])" />
+                        :label="`${v[0]} (${v[1]})`" @update:model-value="schalteVersion(v[0])" />
         </div>
-      </div>
-      <UI.WpButton :label="t('cv.title')" size="sm" variant="secondary"
-                   :state="sync.laeuft ? 'busy' : 'default'" @press="ladeKatalog()" />
+      </UI.WpFieldset>
     </div>
 
     <p v-if="sync.fehler" class="fehler">{{ t("ct.sync.fail", sync.fehler) }}</p>
@@ -89,21 +85,17 @@ onMounted(() => suchen(""));
     <UI.WpEmptyState v-else-if="treffer.length === 0" :title="t('cv.empty.index')"
                      :text="t('cv.empty.filter', katalog.stats?.catalogue ?? 0)" />
     <div v-else class="raster">
-      <button v-for="item in treffer" :key="item.id" type="button" class="karte" @click="oeffneDetail(item)">
-        <span class="karte__kopf">
-          <span class="karte__titel">{{ item.name }}</span>
-        </span>
-        <span class="karte__meta">
-          {{ item.author || t("cv.unspecified") }} · {{ item.latest ? quellenName(item.latest.source) : t("cv.no.source") }}
-          <template v-if="item.sources.length > 1"> · {{ item.sources.length }} Quellen</template>
-          <template v-else-if="item.sources.length === 1"> · {{ t("cv.sources.one", quellenName(item.sources[0].source)) }}</template>
-        </span>
-        <span class="karte__text">{{ item.summary || t("dt.hint.no.summary") }}</span>
-        <span class="karte__badges">
-          <span v-if="item.latest" class="badge">{{ quellenName(item.latest.source) }} {{ item.latest.version }}</span>
-          <span v-if="item.installed.length" class="badge badge--ok">{{ t("cv.installed", item.installed[0].version ?? "?") }}</span>
-        </span>
-      </button>
+      <UI.WpChoiceCard v-for="item in treffer" :key="item.id" :title="item.name"
+                       :meta="`${item.author || t('cv.unspecified')} · ${item.latest ? quellenName(item.latest.source) : t('cv.no.source')}`"
+                       :note="item.summary || t('dt.hint.no.summary')"
+                       @press="oeffneDetail(item)">
+        <template #trailing>
+          <span class="badges">
+            <UI.WpBadge v-if="item.latest" tone="neutral" :label="`${quellenName(item.latest.source)} ${item.latest.version}`" />
+            <UI.WpBadge v-if="item.installed.length" tone="ok" :label="t('cv.installed', item.installed[0].version ?? '?')" />
+          </span>
+        </template>
+      </UI.WpChoiceCard>
     </div>
   </div>
 </template>
@@ -112,25 +104,11 @@ onMounted(() => suchen(""));
 .kat { flex: 1; min-height: 0; overflow: auto; padding: var(--wp-space-3); display: flex; flex-direction: column; gap: var(--wp-space-2); }
 .kat__suche :deep(.wp-input) { width: 100%; }
 .kat__filter { display: flex; align-items: flex-start; gap: var(--wp-space-4); flex-wrap: wrap; }
-.gruppe { display: flex; flex-direction: column; gap: 2px; }
-.gruppe__titel { font-family: var(--wp-font-family-mono); font-size: 10px; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--wp-color-text-faint); }
 .kasten { display: flex; gap: var(--wp-space-3); flex-wrap: wrap; }
 .zeile { margin: 0; font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 .fehler { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-error); }
 .raster { display: grid; grid-template-columns: 1fr 1fr; gap: var(--wp-space-3); }
-.karte { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: var(--wp-space-3);
-  background: var(--wp-color-bg-panel); border: var(--wp-size-border) solid var(--wp-color-border-subtle);
-  color: inherit; font: inherit; }
 .karte:hover { border-color: var(--wp-color-border-strong); }
-.karte__kopf { display: flex; align-items: center; gap: var(--wp-space-2); }
-.karte__titel { font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-md);
-  font-weight: var(--wp-font-weight-semibold); }
-.karte__meta { font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
-.karte__text { font-size: var(--wp-font-size-xs); color: var(--wp-color-text-muted); line-height: 1.45; }
-.karte__badges { display: flex; gap: 4px; margin-top: 2px; flex-wrap: wrap; }
-.badge { padding: 1px 6px; font-family: var(--wp-font-family-mono); font-size: 10px;
-  color: var(--wp-color-text-muted); background: var(--wp-color-bg-raised);
-  border: var(--wp-size-border) solid var(--wp-color-border-subtle); }
-.badge--ok { color: var(--wp-color-status-ok); border-color: var(--wp-color-status-ok); }
+.badges { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; max-width: 100%; }
+.badges :deep(.wp-badge) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: block; }
 </style>

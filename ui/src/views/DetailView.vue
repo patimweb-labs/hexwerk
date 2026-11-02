@@ -8,7 +8,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconChevronRight } from "@weppelmann/icons";
-import { fetchImages, oeffneUrl } from "../api";
+import { fetchImages, installiertIn, oeffneUrl } from "../api";
 import { t } from "../i18n";
 import { bytes, gewaehlt, installiere, installation, lokales, ziele } from "../store";
 
@@ -18,6 +18,30 @@ const lokal = computed(() => (item.value ? null : lokales.value));
 const zielWahl = ref("");
 const zielOptionen = computed(() => ziele().map((z) => ({ value: z.addonsDir, label: z.label })));
 
+/** Fakten des Katalogeintrags; der Schluessel ist die Beschriftung. */
+const fakten = computed(() => {
+  const e = item.value;
+  if (!e) return [];
+  return [
+    { key: t("dt.row.author"), value: e.author || t("cv.unspecified") },
+    { key: t("dt.row.category"), value: e.category || t("dt.no.category") },
+    { key: "Homepage", value: e.homepage },
+    { key: t("dt.row.interface"), value: e.latest?.interfaces.join(", "), mono: true },
+  ];
+});
+
+/** Fakten eines lokal installierten Addons ohne Katalogeintrag. */
+const faktenLokal = computed(() => {
+  const l = lokal.value;
+  if (!l) return [];
+  return [
+    { key: t("dt.cap.folder"), value: l.folder, mono: true },
+    { key: t("dt.cap.version"), value: l.version, mono: true },
+    { key: t("dt.cap.interface"), value: l.interface.join(", "), mono: true },
+    { key: t("dt.cap.size"), value: bytes(l.size_bytes), mono: true },
+  ];
+});
+
 const reiter = computed(() => [
   { id: "desc", label: t("dt.tab.desc") },
   { id: "files", label: t("dt.tab.files") },
@@ -25,6 +49,44 @@ const reiter = computed(() => [
   { id: "sources", label: t("dt.tab.sources") },
 ]);
 const tab = ref("desc");
+
+/**
+ * Stand im gewaehlten Ziel.
+ *
+ * Der Index kennt nur, was der letzte Scan gefunden hat — und meldet jedes Ziel.
+ * Deshalb wird beim Wechsel des Ziels im Zielordner nachgesehen; sonst stand
+ * nach einem Wechsel weiter „installiert", auch wenn dort nichts lag.
+ */
+const standImZiel = ref<string | null>(null);
+const zielGeprueft = ref(false);
+
+async function pruefeZiel() {
+  const eintrag = item.value;
+  const ordner = zielWahl.value || zielOptionen.value[0]?.value;
+  if (!eintrag || !ordner) { standImZiel.value = null; zielGeprueft.value = false; return; }
+  // Katalogname und Ordnername sind nicht dasselbe: der Ordner ist der Name
+  // ohne Zusatz, deshalb ueber den Katalogeintrag gehen.
+  const kandidat = eintrag.installed.find((i) => i.folder === eintrag.name)?.folder
+    ?? eintrag.installed[0]?.folder
+    ?? eintrag.name;
+  standImZiel.value = await installiertIn(ordner, kandidat);
+  zielGeprueft.value = true;
+}
+
+watch([item, zielWahl], pruefeZiel, { immediate: true });
+
+/** Anzeige: was im gewaehlten Ziel liegt. */
+const istImZiel = computed(() => (zielGeprueft.value ? standImZiel.value : null));
+
+/**
+ * Ist genau die neueste Fassung im Ziel? Dann gibt es nichts zu installieren,
+ * und der Knopf darf nicht so tun, als gaebe es etwas. Eine aeltere Fassung im
+ * Ziel laesst den Knopf aktiv — das ist ein Update.
+ */
+const schonAktuell = computed(() => {
+  const neueste = item.value?.latest?.version;
+  return Boolean(istImZiel.value && neueste && istImZiel.value === neueste);
+});
 
 /** Geladene Bilder: Adresse → data-URL. */
 const bilder = ref<Record<string, string>>({});
@@ -69,15 +131,15 @@ function weiter(richtung: -1 | 1) {
         </p>
         <p class="dt__stand">
           <UI.WpBadge v-if="item.latest" tone="neutral" :label="`${item.latest.source} ${item.latest.version}`" />
-          <UI.WpBadge v-if="item.installed.length" tone="ok" :label="t('cv.installed', item.installed[0].version ?? '?')" />
-          <UI.WpBadge v-else tone="neutral" :label="t('dt.not.installed')" />
+          <UI.WpBadge v-if="istImZiel" tone="ok" :label="t('cv.installed', istImZiel || '?')" />
+          <UI.WpBadge v-else-if="zielGeprueft" tone="neutral" :label="t('dt.not.installed')" />
         </p>
       </div>
 
       <div class="dt__ziel">
         <UI.WpSelect v-model="zielWahl" :options="zielOptionen" :label="t('dt.install.target')" />
-        <UI.WpButton :label="t('dt.install')" variant="primary"
-                     :state="installation.laeuft ? 'busy' : item.latest ? 'default' : 'disabled'"
+        <UI.WpButton :label="schonAktuell ? t('dt.installed') : t('dt.install')" variant="primary"
+                     :state="installation.laeuft ? 'busy' : !item.latest || schonAktuell ? 'disabled' : 'default'"
                      @press="installiere(item, zielWahl)" />
       </div>
     </header>
@@ -105,13 +167,11 @@ function weiter(richtung: -1 | 1) {
 
     <section v-if="tab === 'desc'" class="dt__bereich">
       <p class="dt__text">{{ item.summary || t("dt.summary.fallback") }}</p>
-      <dl class="dt__fakten">
-        <dt>{{ t("dt.row.author") }}</dt><dd>{{ item.author || t("cv.unspecified") }}</dd>
-        <dt>{{ t("dt.row.category") }}</dt><dd>{{ item.category || t("dt.no.category") }}</dd>
-        <dt>{{ t("dt.row.homepage") }}</dt>
-        <dd><UI.WpLink v-if="item.homepage" :href="item.homepage" external block :label="item.homepage" @open="oeffneUrl" /><span v-else>—</span></dd>
-        <dt>{{ t("dt.row.interface") }}</dt><dd>{{ item.latest?.interfaces.join(", ") || "—" }}</dd>
-      </dl>
+      <UI.WpFactList :facts="fakten">
+        <template #wert-Homepage>
+          <UI.WpLink v-if="item.homepage" :href="item.homepage" external block :label="item.homepage" @open="oeffneUrl" />
+        </template>
+      </UI.WpFactList>
     </section>
 
     <section v-else-if="tab === 'files'" class="dt__bereich">
@@ -154,7 +214,7 @@ function weiter(richtung: -1 | 1) {
       </table>
       <p v-else class="dt__leer">{{ t("dt.no.source.leads") }}</p>
 
-      <h3 class="dt__unter">{{ t("dt.installed") }}</h3>
+      <UI.WpSectionLabel :label="t('dt.installed')" />
       <table class="dt__tabelle" v-if="item.installed.length">
         <thead><tr><th>{{ t("dt.row.client") }}</th><th>{{ t("dt.row.folder") }}</th><th class="r">{{ t("dt.cap.version") }}</th></tr></thead>
         <tbody>
@@ -180,12 +240,7 @@ function weiter(richtung: -1 | 1) {
         </p>
       </div>
     </header>
-    <dl class="dt__fakten">
-      <dt>{{ t("dt.cap.folder") }}</dt><dd>{{ lokal.folder }}</dd>
-      <dt>{{ t("dt.cap.version") }}</dt><dd>{{ lokal.version ?? "—" }}</dd>
-      <dt>{{ t("dt.cap.interface") }}</dt><dd>{{ lokal.interface.join(", ") || "—" }}</dd>
-      <dt>{{ t("dt.cap.size") }}</dt><dd>{{ bytes(lokal.size_bytes) }}</dd>
-    </dl>
+    <UI.WpFactList :facts="faktenLokal" />
     <p class="dt__leer">{{ t("dt.empty.text") }}</p>
   </div>
 

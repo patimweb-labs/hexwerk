@@ -81,12 +81,9 @@ async function rueckgaengig() {
 <template>
   <div class="inst">
     <UI.WpSidePanel :title="t('nav.clients')" :count="state.clients.length">
-      <button v-for="(c, i) in state.clients" :key="c.id" type="button" class="client"
-              :class="{ 'is-active': i === state.selectedClient }"
-              @click="state.selectedClient = i; state.selectedFlavor = 0; zeile = null">
-        <span class="client__label">{{ c.label }}</span>
-        <span class="client__meta">{{ c.origin }} · {{ c.flavors.length }} Ordner</span>
-      </button>
+      <UI.WpChoiceCard v-for="(c, i) in state.clients" :key="c.id" :title="c.label"
+                       :meta="`${c.origin} · ${c.flavors.length} Ordner`" :active="i === state.selectedClient"
+                       @press="state.selectedClient = i; state.selectedFlavor = 0; zeile = null" />
       <UI.WpEmptyState v-if="state.clients.length === 0 && !state.loading" :title="t('cl.none.title')"
                        :text="t('cl.none.text')" />
     </UI.WpSidePanel>
@@ -124,11 +121,6 @@ async function rueckgaengig() {
 .inst__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--wp-space-2); padding: var(--wp-space-3); overflow: auto; }
 .kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--wp-space-3); }
 .aktionen { display: flex; gap: var(--wp-space-2); }
-.client { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: var(--wp-space-2);
-  background: var(--wp-color-bg-raised); border: var(--wp-size-border) solid var(--wp-color-border-subtle); color: inherit; font: inherit; }
-.client.is-active { border-color: var(--wp-color-accent-default); }
-.client__label { font-size: var(--wp-font-size-sm); }
-.client__meta { font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 .pfad { margin: 0; font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 .wahl { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 </style>

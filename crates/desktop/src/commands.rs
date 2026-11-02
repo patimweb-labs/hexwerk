@@ -587,3 +587,19 @@ pub fn zurueckholen(name: String) -> Result<String, String> {
     let _ = std::fs::remove_file(wurzel.join("info").join(format!("{name}.trashinfo")));
     Ok(ziel.display().to_string())
 }
+
+
+/// Ist dieses Addon im angegebenen Ziel installiert?
+///
+/// Gibt die Version aus der `.toc` zurueck, wenn der Ordner dort liegt.
+/// Gebraucht, weil die Detailseite sonst immer nur den ersten Fund aus dem Index
+/// zeigt — nach einem Wechsel des Ziels stand dort weiter „installiert", auch
+/// wenn das Ziel leer war.
+#[tauri::command]
+pub fn installiert_in(addons_dir: String, folder: String) -> Option<String> {
+    use std::path::Path;
+    hexwerk::scan_addons(Path::new(&addons_dir))
+        .into_iter()
+        .find(|a| a.folder == folder)
+        .map(|a| a.version.unwrap_or_default())
+}
