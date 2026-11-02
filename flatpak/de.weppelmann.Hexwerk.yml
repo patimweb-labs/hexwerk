@@ -44,32 +44,22 @@ build-options:
     CARGO_NET_OFFLINE: 'true'
 
 modules:
+  # Bauart wie im Nachbarprojekt Crosspoint: die Binaries kommen fertig aus dem
+  # Tarball-Job des Release-Workflows (dort wird die Oberflaeche gebaut und in
+  # die Binary eingebettet). Im Flatpak-Sandkasten gibt es deshalb kein cargo
+  # und kein npm - das ist Absicht, so bleibt der Bau kurz und ohne Netz.
+  #
+  # Lokal vorbereiten:
+  #   (cd ui && npm ci && npm run build)
+  #   cargo build --release --locked --bin hexwerk
+  #   (cd crates/desktop && cargo build --release --features custom-protocol)
+  #   mkdir -p prebuilt && cp target/release/hexwerk prebuilt/
+  #   cp crates/desktop/target/release/hexwerk-desktop prebuilt/
   - name: hexwerk
     buildsystem: simple
     build-commands:
-      # Cargo muss die eingefrorenen Quellen als Verzeichnis-Quelle kennen. Die
-      # Datei entsteht hier und nicht im Repo: auf dem Host würde sie den
-      # normalen Bau brechen, weil es dort kein cargo/vendor gibt.
-      - |
-        set -eu
-        mkdir -p .cargo
-        printf '%s\n' \
-          '[source.crates-io]' \
-          'replace-with = "vendored-sources"' \
-          '' \
-          '[source.vendored-sources]' \
-          'directory = "cargo/vendor"' > .cargo/config.toml
-        cat .cargo/config.toml
-      - cargo --offline fetch --locked
-      - cargo --offline build --release --locked
-      # Die Oberfläche ist die Tauri-App: Vue-Frontend aus `ui/dist` (vor dem
-      # Bau auf dem Host erzeugt: cd ui && npm ci && npm run build) plus der
-      # Rust-Host in crates/desktop mit eigener [workspace]-Tabelle. Ohne
-      # --locked, weil ihr Cargo.lock nicht aus derselben Auflösung stammt wie
-      # das der Wurzel; die Versionen liegen im eingefrorenen Quellensatz.
-      - cargo --offline build --release --manifest-path crates/desktop/Cargo.toml --features custom-protocol
-      - install -Dm755 target/release/hexwerk ${FLATPAK_DEST}/bin/hexwerk
-      - install -Dm755 crates/desktop/target/release/hexwerk-desktop ${FLATPAK_DEST}/bin/hexwerk-desktop
+      - install -Dm755 hexwerk ${FLATPAK_DEST}/bin/hexwerk
+      - install -Dm755 hexwerk-desktop ${FLATPAK_DEST}/bin/hexwerk-desktop
       - install -Dm644 data/de.weppelmann.Hexwerk.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
       - install -Dm644 packaging/linux/de.weppelmann.Hexwerk.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
       - install -Dm644 data/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
@@ -80,20 +70,23 @@ modules:
           install -Dm644 "data/icons/hicolor/${s}x${s}/apps/${FLATPAK_ID}.png" \
             "${FLATPAK_DEST}/share/icons/hicolor/${s}x${s}/apps/${FLATPAK_ID}.png"
         done
-        # Nachweis statt Hoffnung: fehlt eine Größe, bricht der Bau hier ab und
-        # nicht erst beim Nutzer.
         pngs=$(ls -1 "${FLATPAK_DEST}/share/icons/hicolor"/*/apps/${FLATPAK_ID}.png | wc -l)
         test "$pngs" -eq 7
         test -x "${FLATPAK_DEST}/bin/hexwerk"
         test -x "${FLATPAK_DEST}/bin/hexwerk-desktop"
-        echo "Installiert: 2 Binaries (CLI + Tauri-App), Desktop-Eintrag, Metainfo, 2 SVGs, ${pngs} PNG-Größen"
+        echo "Installiert: 2 Binaries (CLI + Tauri-App), Desktop-Eintrag, Metainfo, 2 SVGs, ${pngs} PNG-Groessen"
     sources:
+      - type: file
+        path: ../prebuilt/hexwerk
+      - type: file
+        path: ../prebuilt/hexwerk-desktop
       - type: dir
         path: ..
         skip:
           - target
           - build-dir
+          - build-flatpak
           - .flatpak-builder
           - .flatpak-build
           - .git
-      - new-sources.json
+          - ui/node_modules
