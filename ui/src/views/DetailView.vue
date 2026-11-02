@@ -3,6 +3,7 @@
 // Installiert; der Rueckweg steht in den Brotkrumen im Kopfbereich.
 import { computed, ref } from "vue";
 import * as UI from "@weppelmann/components";
+import { t } from "../i18n";
 import { bytes, gewaehlt, installiere, installation, ziele } from "../store";
 
 const item = computed(() => gewaehlt());
@@ -18,23 +19,23 @@ const zielOptionen = computed(() => ziele().map((z) => ({ value: z.addonsDir, la
         <p class="dt__autor">{{ item.author }}<span v-if="item.category"> · {{ item.category }}</span></p>
       </div>
       <div class="dt__ziel">
-        <UI.WpSelect v-model="zielWahl" :options="zielOptionen" label="Ziel" />
-        <UI.WpButton label="Installieren" variant="primary"
+        <UI.WpSelect v-model="zielWahl" :options="zielOptionen" :label="t('dt.install.target')" />
+        <UI.WpButton :label="t('dt.install')" variant="primary"
                      :state="installation.laeuft ? 'busy' : item.latest ? 'default' : 'disabled'"
                      @press="installiere(item, zielWahl)" />
       </div>
     </div>
 
     <p v-if="installation.fehler" class="dt__fehler">{{ installation.fehler }}</p>
-    <p v-if="installation.erfolg" class="dt__erfolg">installiert: {{ installation.erfolg }}</p>
+    <p v-if="installation.erfolg" class="dt__erfolg">{{ t("dt.installed") }}: {{ installation.erfolg }}</p>
 
     <p class="dt__text">{{ item.summary }}</p>
 
     <div class="dt__spalten">
       <section>
-        <h3 class="dt__unter">Quellen</h3>
+        <h3 class="dt__unter">{{ t("dt.sources") }}</h3>
         <table class="dt__tabelle">
-          <thead><tr><th>Quelle</th><th class="r">Version</th><th class="r">Groesse</th><th class="r">Interfaces</th></tr></thead>
+          <thead><tr><th>{{ t("set.col.source") }}</th><th class="r">{{ t("dt.cap.version") }}</th><th class="r">{{ t("dt.cap.size") }}</th><th class="r">{{ t("dt.cap.interface") }}</th></tr></thead>
           <tbody>
             <tr v-for="s in item.sources" :key="s.source">
               <td class="mono">{{ s.source }}</td>
@@ -47,9 +48,9 @@ const zielOptionen = computed(() => ziele().map((z) => ({ value: z.addonsDir, la
       </section>
 
       <section>
-        <h3 class="dt__unter">Installiert</h3>
+        <h3 class="dt__unter">{{ t("dt.installed") }}</h3>
         <table class="dt__tabelle" v-if="item.installed.length">
-          <thead><tr><th>Client</th><th>Ordner</th><th class="r">Version</th></tr></thead>
+          <thead><tr><th>{{ t("dt.row.client") }}</th><th>{{ t("dt.row.folder") }}</th><th class="r">{{ t("dt.cap.version") }}</th></tr></thead>
           <tbody>
             <tr v-for="i in item.installed" :key="i.folder">
               <td>{{ i.client_label }} · {{ i.flavor }}</td>
@@ -58,7 +59,7 @@ const zielOptionen = computed(() => ziele().map((z) => ({ value: z.addonsDir, la
             </tr>
           </tbody>
         </table>
-        <p v-else class="dt__leer">Nirgends installiert.</p>
+        <p v-else class="dt__leer">{{ t("dt.not.installed") }}</p>
       </section>
     </div>
 
@@ -66,7 +67,7 @@ const zielOptionen = computed(() => ziele().map((z) => ({ value: z.addonsDir, la
       <a :href="item.homepage" target="_blank" rel="noreferrer">{{ item.homepage }}</a>
     </p>
   </div>
-  <p v-else class="dt__leer">Kein Eintrag gewählt.</p>
+  <p v-else class="dt__leer">{{ t("dt.empty") }}</p>
 </template>
 
 <style scoped>

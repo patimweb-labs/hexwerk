@@ -1,6 +1,7 @@
 // Ein Ort fuer den Zustand. Die Ansichten lesen hier und rufen Aktionen auf —
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
+import { setSprache, sprache } from "./i18n";
 import { appInfo, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings, type Info } from "./api";
 
 export const state = reactive<{
@@ -150,6 +151,9 @@ export async function ladeEinstellungen() {
   try {
     einstellungen.werte = await settingsGet();
     Object.assign(info, await appInfo());
+    // Gespeicherte Sprache und gespeichertes Farbschema gelten ab dem ersten Bild.
+    wendeSprache(einstellungen.werte.language);
+    wendeThema(einstellungen.werte.theme);
   } catch (fehler) {
     einstellungen.fehler = String(fehler);
   }
@@ -159,6 +163,8 @@ export async function speichereEinstellungen() {
   if (!einstellungen.werte) return;
   try {
     await settingsSet(einstellungen.werte);
+    wendeSprache(einstellungen.werte.language);
+    wendeThema(einstellungen.werte.theme);
     einstellungen.gespeichert = true;
     einstellungen.fehler = null;
     window.setTimeout(() => (einstellungen.gespeichert = false), 2000);
@@ -240,4 +246,47 @@ export function stand(version: string): string {
   const zahl = Number(version);
   if (!Number.isFinite(zahl) || zahl < 1_000_000_000) return version || "noch nicht geholt";
   return new Date(zahl * 1000).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// --------------------------------------------------- Sprache und Farbschema
+
+/** Drei Themes, mehr gibt es nicht. `mono` unterscheidet Zustände über Form. */
+export type Thema = "dark" | "light" | "mono";
+export const thema = ref<Thema>("dark");
+
+/** Sprache sofort anwenden: die Texte hängen an `sprache`, Vue zeichnet neu. */
+export function wendeSprache(code: string) {
+  setSprache(code);
+  document.documentElement.lang = sprache.value;
+}
+
+/** Farbschema anwenden: die Tokens hängen an `data-theme` am Wurzelelement. */
+export function wendeThema(neu: string) {
+  thema.value = (["dark", "light", "mono"] as const).includes(neu as Thema) ? (neu as Thema) : "dark";
+  document.documentElement.dataset.theme = thema.value;
+}
+
+/**
+ * Ein Addon aus der Installiert-Liste in der Detailansicht oeffnen.
+ *
+ * Die Detailseite arbeitet mit einem Katalogeintrag; ein lokal installiertes
+ * Addon hat den aber nicht immer. Deshalb wird im Index nach dem Titel gesucht:
+ * ein Treffer oeffnet dessen Detailseite, kein Treffer meldet das ehrlich.
+ */
+export async function oeffneLokal(titel: string): Promise<boolean> {
+  try {
+    const treffer = await catalogSearch(titel, 5);
+    const passend = treffer.find((i) => i.name.toLowerCase() === titel.toLowerCase()) ?? treffer[0];
+    if (!passend) {
+      katalog.error = "Kein Katalogeintrag zu diesem Addon.";
+      return false;
+    }
+    katalog.items = [passend, ...katalog.items.filter((i) => i.id !== passend.id)];
+    katalog.gewaehlt = 0;
+    ansicht.value = "detail";
+    return true;
+  } catch (fehler) {
+    katalog.error = String(fehler);
+    return false;
+  }
 }

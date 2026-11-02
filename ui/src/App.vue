@@ -8,25 +8,28 @@
 import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconBrand, IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
-import { ansicht, bytes, gewaehlt, katalog, ladeStats, lastScan, quellenName, rescan, state } from "./store";
+import { t } from "./i18n";
+import { ansicht, gewaehlt, katalog, ladeStats, lastScan, quellenName, rescan, state, thema, wendeThema } from "./store";
 import ClientsView from "./views/ClientsView.vue";
 import InstalliertView from "./views/InstalliertView.vue";
 import KatalogView from "./views/KatalogView.vue";
 import DetailView from "./views/DetailView.vue";
 import EinstellungenView from "./views/EinstellungenView.vue";
 
-const seiten = [
-  { id: "clients", titel: "Clients", untertitel: "Gefundene WoW-Installationen", icon: IconPlug },
-  { id: "installiert", titel: "Installiert", untertitel: "Addons je Client-Ordner", icon: IconFolder },
-  { id: "katalog", titel: "Katalog", untertitel: "Suche im lokalen Index", icon: IconSearch },
-  { id: "einstellungen", titel: "Einstellungen", untertitel: "Sprache, Aussehen und Ablage", icon: IconSettings },
-] as const;
+// Titel und Untertitel kommen aus lang.rs; die Sprache schaltet sofort um,
+// weil `t()` die reaktive Sprache liest.
+const seiten = computed(() => [
+  { id: "clients", titel: t("nav.clients"), untertitel: t("page.clients.sub"), icon: IconPlug },
+  { id: "installiert", titel: t("nav.installed"), untertitel: t("page.installed.sub"), icon: IconFolder },
+  { id: "katalog", titel: t("nav.catalog"), untertitel: t("page.catalog.sub"), icon: IconSearch },
+  { id: "einstellungen", titel: t("nav.settings"), untertitel: t("page.settings.sub"), icon: IconSettings },
+] as const);
 
 const kopf = computed(() => {
   if (ansicht.value === "detail") {
-    return { titel: gewaehlt()?.name ?? "Addon-Detail", untertitel: "Quellen, Versionen, Ziel" };
+    return { titel: gewaehlt()?.name ?? t("nav.detail"), untertitel: t("page.detail.sub") };
   }
-  return seiten.find((s) => s.id === ansicht.value) ?? seiten[0];
+  return seiten.value.find((s) => s.id === ansicht.value) ?? seiten.value[0];
 });
 
 /** Zaehler je Leisten-Eintrag. */
@@ -42,18 +45,20 @@ const quellen = computed(() =>
   (katalog.stats?.per_source ?? []).map(([name, anzahl]) => ({ name, anzahl, ok: anzahl > 0 })),
 );
 
-// Drei Themes, mehr gibt es nicht (AGENTS.md §2.7).
-const thema = ref<"dark" | "light" | "mono">("dark");
+/** Drei Themes im Wechsel: dunkel, hell, mono. */
 function schalteThema() {
-  thema.value = thema.value === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = thema.value;
+  const reihe = ["dark", "light", "mono"] as const;
+  const jetzt = reihe.indexOf(thema.value);
+  wendeThema(reihe[(jetzt + 1) % reihe.length]);
 }
+const themaIcon = computed(() => (thema.value === "dark" ? IconSun : IconMoon));
+
 
 const zustand = computed(() => {
-  if (state.loading) return "scannt …";
-  if (state.error) return `Fehler: ${state.error}`;
-  if (lastScan.value) return `bereit · ${state.addonCount} Addons · ${bytes(state.clients.reduce((s, c) => s + c.flavors.reduce((x, f) => x + f.size_bytes, 0), 0))}`;
-  return "bereit";
+  if (state.loading) return t("cl.running");
+  if (state.error) return state.error;
+  if (lastScan.value) return `${t("footer.ready")} · ${t("st.ready", katalog.stats?.catalogue ?? 0)}`;
+  return t("st.footer.idle");
 });
 
 onMounted(() => {
@@ -72,7 +77,7 @@ onMounted(() => {
         <span class="marke__wort">HEXWERK</span>
       </div>
 
-      <p class="abschnitt">Ansicht</p>
+      <p class="abschnitt">{{ t("rail.view") }}</p>
       <nav class="nav">
         <button v-for="s in seiten" :key="s.id" type="button" class="nav__eintrag"
                 :class="{ 'is-active': ansicht === s.id }" @click="ansicht = s.id">
@@ -82,20 +87,20 @@ onMounted(() => {
         </button>
       </nav>
 
-      <p class="abschnitt">Bestand</p>
+      <p class="abschnitt">{{ t("rail.stock") }}</p>
       <div class="bestand">
-        <div class="bestand__zeile"><span>Addons</span><span class="bestand__zahl">{{ state.addonCount }}</span></div>
-        <div class="bestand__zeile"><span>Herkünfte</span><span class="bestand__zahl">{{ state.notes.length }}</span></div>
+        <div class="bestand__zeile"><span>{{ t("rail.addons") }}</span><span class="bestand__zahl">{{ state.addonCount }}</span></div>
+        <div class="bestand__zeile"><span>{{ t("rail.origins") }}</span><span class="bestand__zahl">{{ state.notes.length }}</span></div>
       </div>
 
-      <p class="abschnitt">Quellen</p>
+      <p class="abschnitt">{{ t("nav.sources") }}</p>
       <div class="quellen">
         <div v-for="q in quellen" :key="q.name" class="quelle">
           <span class="quelle__punkt" :class="q.ok ? 'is-ok' : 'is-off'" />
           <span class="quelle__name">{{ quellenName(q.name) }}</span>
           <span class="quelle__zahl">{{ q.anzahl }}</span>
         </div>
-        <p v-if="quellen.length === 0" class="quellen__leer">noch nicht geholt</p>
+        <p v-if="quellen.length === 0" class="quellen__leer">{{ t("st.footer.noScan") }}</p>
       </div>
     </aside>
 
@@ -113,9 +118,9 @@ onMounted(() => {
           <span class="krumen__hier">{{ gewaehlt()?.name }}</span>
         </div>
 
-        <button type="button" class="thema" :aria-label="thema === 'dark' ? 'hell' : 'dunkel'"
-                :title="thema === 'dark' ? 'Hell' : 'Dunkel'" @click="schalteThema">
-          <UI.WpIcon :icon="thema === 'dark' ? IconSun : IconMoon" size="sm" />
+        <button type="button" class="thema" :aria-label="thema"
+                :title="thema" @click="schalteThema">
+          <UI.WpIcon :icon="themaIcon" size="sm" />
         </button>
       </header>
 
@@ -130,9 +135,7 @@ onMounted(() => {
       <footer class="fuss">
         <span class="fuss__marke">HEXWERK</span>
         <span class="fuss__zustand">{{ zustand }}</span>
-        <span class="fuss__zahl">{{ state.clients.length }} Clients</span>
-        <span class="fuss__zahl">{{ state.addonCount }} Addons</span>
-        <span class="fuss__zahl">{{ katalog.stats?.catalogue ?? 0 }} im Katalog</span>
+        <span class="fuss__zahl">{{ t("st.kw.counts", katalog.stats?.catalogue ?? 0, state.addonCount, state.clients.length) }}</span>
       </footer>
     </section>
   </div>

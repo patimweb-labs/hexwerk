@@ -7,6 +7,7 @@
 // durchsuchen) passiert im Katalog und unter "Installiert".
 import { computed } from "vue";
 import * as UI from "@weppelmann/components";
+import { t } from "../i18n";
 import { bytes, lastScan, rescan, state } from "../store";
 
 const gesamt = computed(() => state.clients.reduce(
@@ -17,15 +18,11 @@ const gesamt = computed(() => state.clients.reduce(
   <div class="cl">
     <!-- Titel und Untertitel stehen im Kopfbereich des Fensters (App.vue). -->
     <header class="cl__kopf">
-      <p class="cl__sub">
-        Gefundene WoW-Installationen. Der Pfad gilt für alle Addon-Aktionen;
-        gelesen wird nur, solange du nichts änderst.
-      </p>
+      <p class="cl__sub">{{ t("cl.sub") }}</p>
     </header>
 
     <UI.WpEmptyState v-if="state.clients.length === 0 && !state.loading"
-                     title="Kein Client gefunden"
-                     text="Hexwerk sucht in Steam-Bibliotheken, Wine-Prefixes (Faugus, Heroic, Lutris, Bottles) und nach Ordnern mit World of Warcraft." />
+                     :title="t('cl.none.title')" :text="t('cl.none.text')" />
 
     <div class="cl__liste">
       <article v-for="c in state.clients" :key="c.id" class="karte">
@@ -42,7 +39,7 @@ const gesamt = computed(() => state.clients.reduce(
           <span class="ordner__name">{{ f.dir_name }}</span>
           <span class="ordner__iface">{{ f.interface.join(" · ") || "—" }}</span>
           <span class="karte__spacer" />
-          <UI.WpBadge tone="ok" :label="`${f.addons.length} Addon${f.addons.length === 1 ? '' : 's'}`" />
+          <UI.WpBadge tone="ok" :label="f.addons.length === 1 ? t('cl.addon.one') : t('cl.addons', f.addons.length)" />
           <span class="ordner__size">{{ bytes(f.size_bytes) }}</span>
         </div>
       </article>
@@ -50,18 +47,15 @@ const gesamt = computed(() => state.clients.reduce(
 
     <!-- Was sonst noch gesucht wird; findet eine Herkunft nichts, fehlt sie hier. -->
     <section class="hinweis">
-      <h3 class="hinweis__titel">Weitere Herkünfte</h3>
-      <p class="hinweis__text">
-        Lutris, Bottles, PortProton und ein beliebiger Ordner mit <code>_retail_</code> werden
-        mitgesucht. Findet eine Herkunft nichts, fehlt sie hier; die Scan-Seite nennt den Grund.
-      </p>
+      <h3 class="hinweis__titel">{{ t("cl.more.title") }}</h3>
+      <p class="hinweis__text">{{ t("cl.more.text") }}</p>
     </section>
 
     <footer class="cl__fuss">
       <span class="cl__zaehler">
-        Herkünfte {{ state.notes.length }} · Clients {{ state.clients.length }} · Addons {{ state.addonCount }}
+        {{ t("st.intros", state.notes.length, state.clients.length, state.addonCount) }}
       </span>
-      <UI.WpButton label="Erneut scannen" size="sm" :state="state.loading ? 'busy' : 'default'" @press="rescan" />
+      <UI.WpButton :label="t('cl.rescan')" size="sm" :state="state.loading ? 'busy' : 'default'" @press="rescan" />
     </footer>
   </div>
 </template>

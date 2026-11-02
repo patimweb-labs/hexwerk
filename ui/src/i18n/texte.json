@@ -1,0 +1,1304 @@
+{
+ "cl.addon.one": {
+  "de": "1 Addon",
+  "en": "1 addon",
+  "es": "1 addon",
+  "fr": "1 addon"
+ },
+ "cl.addons": {
+  "de": "{} Addons",
+  "en": "{} addons",
+  "es": "{} addons",
+  "fr": "{} addons"
+ },
+ "cl.more.text": {
+  "de": "Lutris, Bottles, PortProton und ein beliebiger Ordner mit `_retail_` werden mitgesucht. Findet eine Herkunft nichts, fehlt sie hier; die Scan-Seite nennt den Grund.",
+  "en": "Lutris, Bottles, PortProton and any folder with `_retail_` are searched too. If an origin finds nothing, it is missing here; the scan page names the reason.",
+  "es": "Tambien se buscan Lutris, Bottles, PortProton y cualquier carpeta con `_retail_`. Si un origen no encuentra nada, falta aqui; la pagina de escaneo indica el motivo.",
+  "fr": "Lutris, Bottles, PortProton et tout dossier avec `_retail_` sont aussi fouilles. Si une origine ne trouve rien, elle est absente ici; la page d analyse en donne la raison."
+ },
+ "cl.more.title": {
+  "de": "Weitere Herkünfte",
+  "en": "Other origins",
+  "es": "Otras origenes",
+  "fr": "Autres origines"
+ },
+ "cl.no.flavor": {
+  "de": "Kein `_..._`-Ordner mit Interface/AddOns in diesem Pfad.",
+  "en": "No `_..._` folder with Interface/AddOns on this path.",
+  "es": "Ninguna carpeta `_..._` con Interface/AddOns en esta ruta.",
+  "fr": "Aucun dossier `_..._` avec Interface/AddOns sur ce chemin."
+ },
+ "cl.noScan": {
+  "de": "Noch kein Scan gelaufen",
+  "en": "No scan yet",
+  "es": "Sin escaneo todavia",
+  "fr": "Aucune analyse pour le moment"
+ },
+ "cl.none.text": {
+  "de": "Hexwerk hat in den bekannten Präfixen kein Spielverzeichnis mit `_retail_` oder `_classic_era_` gefunden. Die Scan-Seite zeigt je Herkunft, wo gesucht wurde.",
+  "en": "Hexwerk found no game directory with `_retail_` or `_classic_era_` in the known prefixes. The scan page shows where it looked.",
+  "es": "Hexwerk no encontro ningun directorio del juego con `_retail_` o `_classic_era_` en los prefijos conocidos. La pagina de escaneo muestra donde se busco.",
+  "fr": "Hexwerk n a trouve aucun dossier de jeu avec `_retail_` ou `_classic_era_` dans les prefixes connus. La page d analyse indique ou la recherche a eu lieu."
+ },
+ "cl.none.title": {
+  "de": "Keine WoW-Installation gefunden",
+  "en": "No WoW installation found",
+  "es": "No se encontro ninguna instalacion de WoW",
+  "fr": "Aucune installation WoW trouvee"
+ },
+ "cl.rescan": {
+  "de": "Erneut scannen",
+  "en": "Scan again",
+  "es": "Escanear de nuevo",
+  "fr": "Relancer l analyse"
+ },
+ "cl.rescan.hint": {
+  "de": "Präfixe und Addon-Ordner neu einlesen, danach den Katalog",
+  "en": "Read prefixes and addon folders again, then the catalogue",
+  "es": "Releer prefijos y carpetas de addons, despues el catalogo",
+  "fr": "Relire les prefixes et les dossiers d addons, puis le catalogue"
+ },
+ "cl.running": {
+  "de": "läuft …",
+  "en": "running …",
+  "es": "en curso …",
+  "fr": "en cours …"
+ },
+ "cl.sub": {
+  "de": "Gefundene WoW-Installationen. Der Pfad gilt für alle Addon-Aktionen; gelesen wird nur, solange du nichts änderst.",
+  "en": "Detected WoW installations. The path applies to every addon action; Hexwerk only reads unless you change something.",
+  "es": "Instalaciones de WoW encontradas. La ruta vale para todas las acciones de addons; solo se lee mientras no cambies nada.",
+  "fr": "Installations WoW trouvees. Le chemin vaut pour toutes les actions sur les addons; la lecture seule s applique tant que rien n est modifie."
+ },
+ "cl.title": {
+  "de": "Clients",
+  "en": "Clients",
+  "es": "Clientes",
+  "fr": "Clients"
+ },
+ "ct.sync.done": {
+  "de": "Katalog vom Dienst: {} Einträge",
+  "en": "Catalogue from the service: {} entries",
+  "es": "Catalogo del servicio: {} entradas",
+  "fr": "Catalogue du service : {} entrees"
+ },
+ "ct.sync.fail": {
+  "de": "Katalog nicht geholt: {}",
+  "en": "Catalogue not fetched: {}",
+  "es": "Catalogo no obtenido: {}",
+  "fr": "Catalogue non recupere : {}"
+ },
+ "cv.allSources": {
+  "de": "Alle Quellen",
+  "en": "All sources",
+  "es": "Todas las fuentes",
+  "fr": "Toutes les sources"
+ },
+ "cv.allVersions": {
+  "de": "Alle Versionen",
+  "en": "All versions",
+  "es": "Todas las versiones",
+  "fr": "Toutes les versions"
+ },
+ "cv.building": {
+  "de": "Katalog wird aufgebaut …",
+  "en": "Building the catalogue …",
+  "es": "Construyendo el catalogo …",
+  "fr": "Construction du catalogue …"
+ },
+ "cv.count": {
+  "de": "{} von {} Einträgen",
+  "en": "{} of {} entries",
+  "es": "{} de {} entradas",
+  "fr": "{} sur {} entrees"
+ },
+ "cv.count.first": {
+  "de": "erste Seite, Suche verfeinern",
+  "en": "first page, refine the search",
+  "es": "primera pagina, afinar la busqueda",
+  "fr": "premiere page, affiner la recherche"
+ },
+ "cv.count.search": {
+  "de": "Suche: {}",
+  "en": "Search: {}",
+  "es": "Busqueda: {}",
+  "fr": "Recherche : {}"
+ },
+ "cv.count.zero": {
+  "de": "0 Einträge",
+  "en": "0 entries",
+  "es": "0 entradas",
+  "fr": "0 entrees"
+ },
+ "cv.empty.filter": {
+  "de": "Kein Eintrag passt zu den gewählten Quellen. Es sind {} Einträge im Index.",
+  "en": "No entry matches the chosen sources. The index holds {} entries.",
+  "es": "Ninguna entrada coincide con las fuentes elegidas. El indice tiene {} entradas.",
+  "fr": "Aucune entree ne correspond aux sources choisies. L index contient {} entrees."
+ },
+ "cv.empty.index": {
+  "de": "Der Index enthält keine Katalogeinträge",
+  "en": "The index holds no catalogue entries",
+  "es": "El indice no tiene entradas",
+  "fr": "L index ne contient aucune entree"
+ },
+ "cv.error.head": {
+  "de": "Der Index lässt sich nicht lesen",
+  "en": "The index cannot be read",
+  "es": "No se puede leer el indice",
+  "fr": "L index ne peut pas etre lu"
+ },
+ "cv.filter.only": {
+  "de": "Nur Einträge, die {} als Quelle haben",
+  "en": "Only entries with {} as source",
+  "es": "Solo entradas con {} como fuente",
+  "fr": "Seulement les entrees avec {} comme source"
+ },
+ "cv.fitness": {
+  "de": "keine Fassung erkannt, der Scan liest die Spielversion aus .build.info",
+  "en": "no release detected, the scan reads the game version from .build.info",
+  "es": "ninguna version detectada, el escaneo lee la version del juego en .build.info",
+  "fr": "aucune version detectee, l analyse lit la version du jeu dans .build.info"
+ },
+ "cv.index.error": {
+  "de": "Index nicht lesbar",
+  "en": "Index not readable",
+  "es": "Indice ilegible",
+  "fr": "Index illisible"
+ },
+ "cv.installed": {
+  "de": "installiert {}",
+  "en": "installed {}",
+  "es": "instalado {}",
+  "fr": "installe {}"
+ },
+ "cv.installed.multi": {
+  "de": "installiert {} · {} Clients",
+  "en": "installed {} · {} clients",
+  "es": "instalado {} · {} clientes",
+  "fr": "installe {} · {} clients"
+ },
+ "cv.more.sources": {
+  "de": "weitere Quellen in der Detailansicht",
+  "en": "more sources on the detail page",
+  "es": "mas fuentes en la vista de detalle",
+  "fr": "autres sources dans le detail"
+ },
+ "cv.no.client": {
+  "de": "Kein Client-Ordner gefunden",
+  "en": "No client folder found",
+  "es": "No se encontro ninguna carpeta de cliente",
+  "fr": "Aucun dossier client trouve"
+ },
+ "cv.no.download": {
+  "de": "{}: diese Quelle nennt keine Download-Adresse.",
+  "en": "{}: this source names no download address.",
+  "es": "{}: esta fuente no indica direccion de descarga.",
+  "fr": "{}: cette source ne donne aucune adresse de telechargement."
+ },
+ "cv.no.hit": {
+  "de": "Kein Treffer für {}. Gesucht wird über Name, Autor und Kurztext: {} Einträge sind im Index.",
+  "en": "No hit for {}. The search covers name, author and short text: {} entries are in the index.",
+  "es": "Sin resultados para {}. La busqueda cubre nombre, autor y texto corto: {} entradas en el indice.",
+  "fr": "Aucun resultat pour {}. La recherche couvre le nom, l auteur et le texte court : {} entrees dans l index."
+ },
+ "cv.no.source": {
+  "de": "ohne Quelle",
+  "en": "no source",
+  "es": "sin fuente",
+  "fr": "sans source"
+ },
+ "cv.no.version": {
+  "de": "keine Version",
+  "en": "no version",
+  "es": "sin version",
+  "fr": "aucune version"
+ },
+ "cv.open": {
+  "de": "Details öffnen",
+  "en": "Open details",
+  "es": "Abrir el detalle",
+  "fr": "Ouvrir le detail"
+ },
+ "cv.search.hint": {
+  "de": "Suche: Name, Autor, Beschreibung …",
+  "en": "Search: name, author, description …",
+  "es": "Buscar: nombre, autor, descripcion …",
+  "fr": "Rechercher: nom, auteur, description …"
+ },
+ "cv.sources.hint": {
+  "de": "Mehrere Quellen gleichzeitig waehlbar",
+  "en": "Several sources can be chosen at once",
+  "es": "Se pueden elegir varias fuentes",
+  "fr": "Plusieurs sources au choix"
+ },
+ "cv.sources.on": {
+  "de": "Quellen: {}",
+  "en": "Sources: {}",
+  "es": "Fuentes: {}",
+  "fr": "Sources : {}"
+ },
+ "cv.sources.one": {
+  "de": "{} · 1 Quelle",
+  "en": "{} · 1 source",
+  "es": "{} · 1 fuente",
+  "fr": "{} · 1 source"
+ },
+ "cv.sub": {
+  "de": "Dasselbe Addon aus mehreren Märkten ist ein Eintrag. Suche und Filter laufen über den lokalen Index, nie über das Netz.",
+  "en": "The same addon from several markets is one entry. Search and filters run over the local index, never over the network.",
+  "es": "El mismo addon de varios mercados es una entrada. La busqueda y los filtros usan el indice local, nunca la red.",
+  "fr": "Le meme addon de plusieurs marches est une entree. La recherche et les filtres passent par l index local, jamais par le reseau."
+ },
+ "cv.title": {
+  "de": "Katalog",
+  "en": "Catalogue",
+  "es": "Catalogo",
+  "fr": "Catalogue"
+ },
+ "cv.unspecified": {
+  "de": "keine Angabe",
+  "en": "not specified",
+  "es": "sin dato",
+  "fr": "non precise"
+ },
+ "cv.version.hint": {
+  "de": "Nur Eintraege fuer diese Fassung; die Interface-Nummer ist der gemeinsame Nenner aller Quellen",
+  "en": "Only entries for this release; the interface number is what every source agrees on",
+  "es": "Solo entradas para esta version; el numero de interfaz es lo comun a todas las fuentes",
+  "fr": "Seulement les entrees pour cette version; le numero d interface est commun a toutes les sources"
+ },
+ "cv.version.on": {
+  "de": "Version: {} (Interface {})",
+  "en": "Version: {} (interface {})",
+  "es": "Version: {} (interface {})",
+  "fr": "Version : {} (interface {})"
+ },
+ "cv.wow.version": {
+  "de": "WOW-VERSION",
+  "en": "WOW VERSION",
+  "es": "VERSION DE WOW",
+  "fr": "VERSION DE WOW"
+ },
+ "drop.done": {
+  "de": "installiert",
+  "en": "installed",
+  "es": "instalado",
+  "fr": "installe"
+ },
+ "drop.downloading": {
+  "de": "Adresse wird geladen",
+  "en": "Loading the address",
+  "es": "Cargando la direccion",
+  "fr": "Chargement de l adresse"
+ },
+ "drop.no.scan": {
+  "de": "Noch kein Scan gelaufen, Ziel unbekannt",
+  "en": "No scan yet, target unknown",
+  "es": "Sin escaneo todavia, destino desconocido",
+  "fr": "Aucune analyse, cible inconnue"
+ },
+ "drop.no.target": {
+  "de": "Kein Client-Ordner passt zu dieser Addon-Fassung",
+  "en": "No client folder matches this addon version",
+  "es": "Ninguna carpeta de cliente coincide con esta version",
+  "fr": "Aucun dossier client ne correspond a cette version"
+ },
+ "drop.no.toc": {
+  "de": "Kein Addon erkannt: im ZIP fehlt eine .toc",
+  "en": "No addon detected: the ZIP has no .toc",
+  "es": "Ningun addon detectado: al ZIP le falta un .toc",
+  "fr": "Aucun addon detecte : le ZIP n a pas de .toc"
+ },
+ "drop.only.zip": {
+  "de": "Nur ZIP-Dateien oder eine Adresse",
+  "en": "Only ZIP files or an address",
+  "es": "Solo archivos ZIP o una direccion",
+  "fr": "Seulement des fichiers ZIP ou une adresse"
+ },
+ "dt.cap.folder": {
+  "de": "ADDON-ORDNER",
+  "en": "ADDON FOLDER",
+  "es": "CARPETA DE ADDON",
+  "fr": "DOSSIER ADDON"
+ },
+ "dt.cap.interface": {
+  "de": "INTERFACE",
+  "en": "INTERFACE",
+  "es": "INTERFACE",
+  "fr": "INTERFACE"
+ },
+ "dt.cap.size": {
+  "de": "GRÖSSE",
+  "en": "SIZE",
+  "es": "TAMAÑO",
+  "fr": "TAILLE"
+ },
+ "dt.cap.version": {
+  "de": "VERSION",
+  "en": "VERSION",
+  "es": "VERSION",
+  "fr": "VERSION"
+ },
+ "dt.close": {
+  "de": "Schließen",
+  "en": "Close",
+  "es": "Cerrar",
+  "fr": "Fermer"
+ },
+ "dt.current.source": {
+  "de": "aktuelle Quelle",
+  "en": "current source",
+  "es": "fuente actual",
+  "fr": "source actuelle"
+ },
+ "dt.empty": {
+  "de": "Kein Eintrag gewählt",
+  "en": "No entry selected",
+  "es": "Ninguna entrada seleccionada",
+  "fr": "Aucune entree selectionnee"
+ },
+ "dt.empty.head": {
+  "de": "Kein Eintrag gewählt",
+  "en": "No entry selected",
+  "es": "Ninguna entrada elegida",
+  "fr": "Aucune entree choisie"
+ },
+ "dt.empty.text": {
+  "de": "Öffne eine Karte im Katalog oder ein Addon unter Installiert, dann steht hier, was bekannt ist.",
+  "en": "Open a card in the catalogue or an addon under Installed, then what is known appears here.",
+  "es": "Abre una tarjeta del catalogo o un addon en Instalados y aqui aparece lo que se sabe.",
+  "fr": "Ouvre une carte du catalogue ou un addon sous Installes, ce qui est connu apparait ici."
+ },
+ "dt.esc": {
+  "de": "Esc schließt den Betrachter",
+  "en": "Esc closes the viewer",
+  "es": "Esc cierra el visor",
+  "fr": "Echap ferme la visionneuse"
+ },
+ "dt.hint.choose.release": {
+  "de": "Wähle ein Release.",
+  "en": "Choose a release.",
+  "es": "Elige una version.",
+  "fr": "Choisis une version."
+ },
+ "dt.hint.choose.target": {
+  "de": "Wähle einen Ziel-Client-Ordner.",
+  "en": "Choose a target client folder.",
+  "es": "Elige una carpeta de cliente destino.",
+  "fr": "Choisis un dossier client cible."
+ },
+ "dt.hint.image": {
+  "de": "Bild aus der Quelle, ein Klick öffnet es groß",
+  "en": "Image from the source, one click opens it large",
+  "es": "Imagen de la fuente, un clic la abre en grande",
+  "fr": "Image de la source, un clic l ouvre en grand"
+ },
+ "dt.hint.loading.image": {
+  "de": "Bild wird geladen …",
+  "en": "Loading image …",
+  "es": "Cargando imagen …",
+  "fr": "Chargement de l image …"
+ },
+ "dt.hint.no.client": {
+  "de": "Kein Ziel-Client gefunden, der Scan sucht die Präfixe, dann lässt sich hier wählen.",
+  "en": "No target client found, the scan looks up the prefixes, then you can choose here.",
+  "es": "No se encontro cliente destino, el escaneo busca los prefijos y luego puedes elegir aqui.",
+  "fr": "Aucun client cible trouve, l analyse cherche les prefixes, ensuite le choix est possible ici."
+ },
+ "dt.hint.no.images": {
+  "de": "Keine Bilder, diese Quelle liefert keine",
+  "en": "No images, this source has none",
+  "es": "Sin imagenes, esta fuente no tiene",
+  "fr": "Aucune image, cette source n en fournit pas"
+ },
+ "dt.hint.no.summary": {
+  "de": "Die Quelle liefert keinen Kurztext zu diesem Addon. Hexwerk erfindet keinen.",
+  "en": "The source gives no short text for this addon. Hexwerk invents none.",
+  "es": "La fuente no da texto corto para este addon. Hexwerk no inventa ninguno.",
+  "fr": "La source ne donne aucun texte court pour cet addon. Hexwerk n en invente pas."
+ },
+ "dt.hint.release": {
+  "de": "Release, das geladen wird",
+  "en": "Release that is downloaded",
+  "es": "Version que se descarga",
+  "fr": "Version qui est telechargee"
+ },
+ "dt.hint.target": {
+  "de": "Addon-Ordner, in den installiert wird",
+  "en": "Addon folder to install into",
+  "es": "Carpeta de addon donde se instala",
+  "fr": "Dossier d addon ou installer"
+ },
+ "dt.in.no.client": {
+  "de": "in keinem Client-Ordner",
+  "en": "in no client folder",
+  "es": "en ninguna carpeta de cliente",
+  "fr": "dans aucun dossier client"
+ },
+ "dt.index.no.release": {
+  "de": "Der Index kennt für dieses Addon keine Veröffentlichung mit Download-Adresse.",
+  "en": "The index knows no release with a download address for this addon.",
+  "es": "El indice no conoce ninguna version con direccion de descarga para este addon.",
+  "fr": "L index ne connait aucune version avec adresse de telechargement pour cet addon."
+ },
+ "dt.install": {
+  "de": "Installieren",
+  "en": "Install",
+  "es": "Instalar",
+  "fr": "Installer"
+ },
+ "dt.install.target": {
+  "de": "INSTALLATIONSZIEL",
+  "en": "INSTALL TARGET",
+  "es": "DESTINO DE INSTALACION",
+  "fr": "CIBLE D INSTALLATION"
+ },
+ "dt.installed": {
+  "de": "installiert",
+  "en": "installed",
+  "es": "instalado",
+  "fr": "installe"
+ },
+ "dt.local.installed": {
+  "de": "lokal installiert",
+  "en": "installed locally",
+  "es": "instalado localmente",
+  "fr": "installe localement"
+ },
+ "dt.next": {
+  "de": "Nächstes Bild (Pfeil rechts)",
+  "en": "Next image (right arrow)",
+  "es": "Imagen siguiente (flecha derecha)",
+  "fr": "Image suivante (fleche droite)"
+ },
+ "dt.no.catalogue": {
+  "de": "kein Katalogeintrag",
+  "en": "no catalogue entry",
+  "es": "sin entrada de catalogo",
+  "fr": "aucune entree de catalogue"
+ },
+ "dt.no.category": {
+  "de": "keine Kategorie",
+  "en": "no category",
+  "es": "sin categoria",
+  "fr": "aucune categorie"
+ },
+ "dt.no.date": {
+  "de": "kein Datum",
+  "en": "no date",
+  "es": "sin fecha",
+  "fr": "aucune date"
+ },
+ "dt.no.download": {
+  "de": "keine Download-Adresse",
+  "en": "no download address",
+  "es": "sin direccion de descarga",
+  "fr": "aucune adresse de telechargement"
+ },
+ "dt.no.download.install": {
+  "de": "{} nennt für diese Version keine Download-Adresse, Installation nicht möglich.",
+  "en": "{} names no download address for this version, install not possible.",
+  "es": "{} no indica direccion de descarga para esta version, instalacion imposible.",
+  "fr": "{} ne donne aucune adresse de telechargement pour cette version, installation impossible."
+ },
+ "dt.no.project.id": {
+  "de": "keine Projekt-ID",
+  "en": "no project ID",
+  "es": "sin ID de proyecto",
+  "fr": "aucun ID de projet"
+ },
+ "dt.no.size": {
+  "de": "keine Größe",
+  "en": "no size",
+  "es": "sin tamaño",
+  "fr": "aucune taille"
+ },
+ "dt.no.source.id": {
+  "de": "keine Quell-ID",
+  "en": "no source ID",
+  "es": "sin ID de fuente",
+  "fr": "aucun ID de source"
+ },
+ "dt.no.source.leads": {
+  "de": "Keine Quelle führt dieses Addon. Es kam über einen anderen Weg in den Index.",
+  "en": "No source lists this addon. It reached the index another way.",
+  "es": "Ninguna fuente lista este addon. Llego al indice por otro camino.",
+  "fr": "Aucune source ne liste cet addon. Il est arrive dans l index autrement."
+ },
+ "dt.not.installed": {
+  "de": "nicht installiert",
+  "en": "not installed",
+  "es": "no instalado",
+  "fr": "non installe"
+ },
+ "dt.notes.hint": {
+  "de": "Text aus `## Notes-{}` der .toc, nicht übersetzt, nicht umgeschrieben.",
+  "en": "Text from `## Notes-{}` in the .toc, not translated, not rewritten.",
+  "es": "Texto de `## Notes-{}` del .toc, sin traducir, sin reescribir.",
+  "fr": "Texte de `## Notes-{}` du .toc, non traduit, non reecrit."
+ },
+ "dt.notes.langs": {
+  "de": "Weitere Sprachen in der .toc: {}",
+  "en": "More languages in the .toc: {}",
+  "es": "Mas idiomas en el .toc: {}",
+  "fr": "Autres langues dans le .toc : {}"
+ },
+ "dt.prev": {
+  "de": "Vorheriges Bild (Pfeil links)",
+  "en": "Previous image (left arrow)",
+  "es": "Imagen anterior (flecha izquierda)",
+  "fr": "Image precedente (fleche gauche)"
+ },
+ "dt.preview": {
+  "de": "VORSCHAU {}",
+  "en": "PREVIEW {}",
+  "es": "VISTA {}",
+  "fr": "APERCU {}"
+ },
+ "dt.published": {
+  "de": "veröffentlicht {}",
+  "en": "published {}",
+  "es": "publicado {}",
+  "fr": "publie {}"
+ },
+ "dt.row.author": {
+  "de": "Autor",
+  "en": "Author",
+  "es": "Autor",
+  "fr": "Auteur"
+ },
+ "dt.row.category": {
+  "de": "Kategorie",
+  "en": "Category",
+  "es": "Categoria",
+  "fr": "Categorie"
+ },
+ "dt.row.client": {
+  "de": "Client",
+  "en": "Client",
+  "es": "Cliente",
+  "fr": "Client"
+ },
+ "dt.row.disk": {
+  "de": "Größe auf der Platte",
+  "en": "Size on disk",
+  "es": "Tamaño en disco",
+  "fr": "Taille sur le disque"
+ },
+ "dt.row.folder": {
+  "de": "Ordner",
+  "en": "Folder",
+  "es": "Carpeta",
+  "fr": "Dossier"
+ },
+ "dt.row.homepage": {
+  "de": "Homepage",
+  "en": "Homepage",
+  "es": "Sitio web",
+  "fr": "Page d accueil"
+ },
+ "dt.row.interface": {
+  "de": "Interface",
+  "en": "Interface",
+  "es": "Interface",
+  "fr": "Interface"
+ },
+ "dt.row.key": {
+  "de": "Schlüssel",
+  "en": "Key",
+  "es": "Clave",
+  "fr": "Cle"
+ },
+ "dt.sec.key": {
+  "de": "KENNUNG",
+  "en": "IDENTIFIERS",
+  "es": "IDENTIFICADORES",
+  "fr": "IDENTIFIANTS"
+ },
+ "dt.sources": {
+  "de": "QUELLEN",
+  "en": "SOURCES",
+  "es": "FUENTES",
+  "fr": "SOURCES"
+ },
+ "dt.sources.hint": {
+  "de": "Je Quelle die höchste bekannte Version. Der Katalog zeigt eine Karte pro Addon, auch wenn mehrere Märkte dasselbe Projekt führen.",
+  "en": "Per source the highest known version. The catalogue shows one card per addon, even when several markets carry the same project.",
+  "es": "Por fuente la version mas alta conocida. El catalogo muestra una tarjeta por addon, aunque varios mercados tengan el mismo proyecto.",
+  "fr": "Par source la version connue la plus haute. Le catalogue montre une carte par addon, meme si plusieurs marches portent le meme projet."
+ },
+ "dt.summary.fallback": {
+  "de": "Die Quelle liefert keinen Kurztext zu diesem Addon. Hexwerk erfindet keinen.",
+  "en": "The source gives no short text for this addon. Hexwerk invents none.",
+  "es": "La fuente no da texto corto para este addon. Hexwerk no inventa ninguno.",
+  "fr": "La source ne donne aucun texte court pour cet addon. Hexwerk n en invente pas."
+ },
+ "dt.tab.desc": {
+  "de": "Beschreibung",
+  "en": "Description",
+  "es": "Descripcion",
+  "fr": "Description"
+ },
+ "dt.tab.files": {
+  "de": "Dateien",
+  "en": "Files",
+  "es": "Archivos",
+  "fr": "Fichiers"
+ },
+ "dt.tab.log": {
+  "de": "Changelog",
+  "en": "Changelog",
+  "es": "Cambios",
+  "fr": "Changelog"
+ },
+ "dt.tab.shots": {
+  "de": "Screenshots",
+  "en": "Screenshots",
+  "es": "Capturas",
+  "fr": "Captures"
+ },
+ "dt.tab.sources": {
+  "de": "Quellen",
+  "en": "Sources",
+  "es": "Fuentes",
+  "fr": "Sources"
+ },
+ "dt.target": {
+  "de": "INSTALLATIONSZIEL",
+  "en": "INSTALL TARGET",
+  "es": "DESTINO",
+  "fr": "CIBLE"
+ },
+ "dt.this.source": {
+  "de": "Diese Quelle",
+  "en": "This source",
+  "es": "Esta fuente",
+  "fr": "Cette source"
+ },
+ "dt.unsure": {
+  "de": "{} · Eignung ungeprüft",
+  "en": "{} · fit not verified",
+  "es": "{} · idoneidad sin verificar",
+  "fr": "{} · compatibilite non verifiee"
+ },
+ "footer.ready": {
+  "de": "bereit",
+  "en": "ready",
+  "es": "listo",
+  "fr": "prêt"
+ },
+ "iv.clear": {
+  "de": "Addons leeren…",
+  "en": "Clear addons…",
+  "es": "Vaciar addons…",
+  "fr": "Vider les addons…"
+ },
+ "iv.col.addon": {
+  "de": "Addon",
+  "en": "Addon",
+  "es": "Addon",
+  "fr": "Addon"
+ },
+ "iv.col.interface": {
+  "de": "Interface",
+  "en": "Interface",
+  "es": "Interface",
+  "fr": "Interface"
+ },
+ "iv.col.source": {
+  "de": "Quelle",
+  "en": "Source",
+  "es": "Fuente",
+  "fr": "Source"
+ },
+ "iv.col.status": {
+  "de": "Status",
+  "en": "Status",
+  "es": "Estado",
+  "fr": "Etat"
+ },
+ "iv.col.version": {
+  "de": "Version",
+  "en": "Version",
+  "es": "Version",
+  "fr": "Version"
+ },
+ "iv.count": {
+  "de": "{} Zeilen · {} ausgewählt · {} Updates",
+  "en": "{} rows · {} selected · {} updates",
+  "es": "{} filas · {} seleccionadas · {} actualizaciones",
+  "fr": "{} lignes · {} selectionnees · {} mises a jour"
+ },
+ "iv.empty.hint": {
+  "de": "Sobald ein Scan einen Ordner mit `Interface/AddOns` findet, stehen die Addons hier.",
+  "en": "As soon as a scan finds a folder with `Interface/AddOns`, the addons appear here.",
+  "es": "Cuando un escaneo encuentre una carpeta con `Interface/AddOns`, los addons aparecen aqui.",
+  "fr": "Des qu une analyse trouve un dossier avec `Interface/AddOns`, les addons apparaissent ici."
+ },
+ "iv.empty.title": {
+  "de": "Kein Client-Ordner mit Addons",
+  "en": "No client folder with addons",
+  "es": "Ninguna carpeta de cliente con addons",
+  "fr": "Aucun dossier client avec addons"
+ },
+ "iv.filter.all": {
+  "de": "Alle",
+  "en": "All",
+  "es": "Todas",
+  "fr": "Toutes"
+ },
+ "iv.filter.updates": {
+  "de": "Updates verfügbar",
+  "en": "updates available",
+  "es": "actualizaciones disponibles",
+  "fr": "mises a jour disponibles"
+ },
+ "iv.filter.with": {
+  "de": "mit Quell-ID",
+  "en": "with source ID",
+  "es": "con ID de fuente",
+  "fr": "avec ID de source"
+ },
+ "iv.filter.without": {
+  "de": "ohne Quell-ID",
+  "en": "without source ID",
+  "es": "sin ID de fuente",
+  "fr": "sans ID de source"
+ },
+ "iv.hint.unknown": {
+  "de": "„unbekannt“ heißt: die TOC-Datei nennt keine Quell-ID. Solche Ordner bleiben unangetastet, Hexwerk löscht nichts, was es nicht sicher zuordnen kann.",
+  "en": "unknown means the TOC file names no source ID. Such folders stay untouched, Hexwerk deletes nothing it cannot map for sure.",
+  "es": "desconocido significa que el archivo TOC no indica ID de fuente. Esas carpetas quedan intactas, Hexwerk no borra nada que no pueda asignar con seguridad.",
+  "fr": "inconnu signifie que le fichier TOC ne nomme aucun ID de source. Ces dossiers restent intacts, Hexwerk ne supprime rien qu il ne peut pas attribuer avec certitude."
+ },
+ "iv.install": {
+  "de": "Installieren…",
+  "en": "Install…",
+  "es": "Instalar…",
+  "fr": "Installer…"
+ },
+ "iv.install.cancel": {
+  "de": "Abbrechen",
+  "en": "Cancel",
+  "es": "Cancelar",
+  "fr": "Annuler"
+ },
+ "iv.install.ok": {
+  "de": "Installieren",
+  "en": "Install",
+  "es": "Instalar",
+  "fr": "Installer"
+ },
+ "iv.install.url": {
+  "de": "Adresse…",
+  "en": "Address…",
+  "es": "Direccion…",
+  "fr": "Adresse…"
+ },
+ "iv.remove": {
+  "de": "Deinstallieren…",
+  "en": "Uninstall…",
+  "es": "Desinstalar…",
+  "fr": "Desinstaller…"
+ },
+ "iv.sub": {
+  "de": "Alle Zeilen stammen aus den TOC-Dateien im Addon-Ordner. Doppelklick öffnet die Detailansicht.",
+  "en": "Every row comes from the TOC files in the addon folder. Double click opens the detail page.",
+  "es": "Todas las filas vienen de los archivos TOC de la carpeta de addons. Doble clic abre el detalle.",
+  "fr": "Chaque ligne vient des fichiers TOC du dossier d addons. Un double clic ouvre le detail."
+ },
+ "iv.target": {
+  "de": "ZIEL-CLIENT",
+  "en": "TARGET CLIENT",
+  "es": "CLIENTE DESTINO",
+  "fr": "CLIENT CIBLE"
+ },
+ "iv.title": {
+  "de": "Installiert",
+  "en": "Installed",
+  "es": "Instalados",
+  "fr": "Installes"
+ },
+ "iv.update.all": {
+  "de": "Updates installieren…",
+  "en": "Install updates…",
+  "es": "Instalar actualizaciones…",
+  "fr": "Installer les mises a jour…"
+ },
+ "iv.update.none": {
+  "de": "keine Updates",
+  "en": "no updates",
+  "es": "sin actualizaciones",
+  "fr": "aucune mise a jour"
+ },
+ "iv.url.title": {
+  "de": "Addon von einer Adresse installieren",
+  "en": "Install an addon from an address",
+  "es": "Instalar un addon desde una direccion",
+  "fr": "Installer un addon depuis une adresse"
+ },
+ "nav.catalog": {
+  "de": "Katalog",
+  "en": "Catalogue",
+  "es": "Catálogo",
+  "fr": "Catalogue"
+ },
+ "nav.clients": {
+  "de": "Clients",
+  "en": "Clients",
+  "es": "Clientes",
+  "fr": "Clients"
+ },
+ "nav.detail": {
+  "de": "Addon-Detail",
+  "en": "Addon detail",
+  "es": "Detalle del addon",
+  "fr": "Detail de l addon"
+ },
+ "nav.installed": {
+  "de": "Installiert",
+  "en": "Installed",
+  "es": "Instalados",
+  "fr": "Installés"
+ },
+ "nav.scan": {
+  "de": "Scan",
+  "en": "Scan",
+  "es": "Análisis",
+  "fr": "Analyse"
+ },
+ "nav.settings": {
+  "de": "Einstellungen",
+  "en": "Settings",
+  "es": "Ajustes",
+  "fr": "Réglages"
+ },
+ "nav.sources": {
+  "de": "Quellen",
+  "en": "Sources",
+  "es": "Fuentes",
+  "fr": "Sources"
+ },
+ "page.catalog.sub": {
+  "de": "Suche im lokalen Index",
+  "en": "Search the local index",
+  "es": "Buscar en el índice local",
+  "fr": "Rechercher dans l'index local"
+ },
+ "page.clients.sub": {
+  "de": "Gefundene WoW-Installationen",
+  "en": "Detected WoW installations",
+  "es": "Instalaciones de WoW detectadas",
+  "fr": "Installations WoW détectées"
+ },
+ "page.detail.sub": {
+  "de": "Quellen, Versionen, Ziel",
+  "en": "Sources, versions, target",
+  "es": "Fuentes, versiones, destino",
+  "fr": "Sources, versions, cible"
+ },
+ "page.installed.sub": {
+  "de": "Addons je Client-Ordner",
+  "en": "Addons per client folder",
+  "es": "Addons por carpeta de cliente",
+  "fr": "Addons par dossier de client"
+ },
+ "page.scan.sub": {
+  "de": "Herkünfte prüfen",
+  "en": "Check installations",
+  "es": "Comprobar instalaciones",
+  "fr": "Vérifier les installations"
+ },
+ "page.settings.sub": {
+  "de": "Sprache, Aussehen und Ablage",
+  "en": "Language, appearance and storage",
+  "es": "Idioma, aspecto y almacenamiento",
+  "fr": "Langue, apparence et stockage"
+ },
+ "page.sources.sub": {
+  "de": "Zustand, Verbindungstest, Schlüssel",
+  "en": "State, connection test, keys",
+  "es": "Estado, prueba de conexión, claves",
+  "fr": "État, test de connexion, clés"
+ },
+ "rail.addons": {
+  "de": "Addons",
+  "en": "Addons",
+  "es": "Addons",
+  "fr": "Addons"
+ },
+ "rail.origins": {
+  "de": "Herkünfte",
+  "en": "Origins",
+  "es": "Orígenes",
+  "fr": "Origines"
+ },
+ "rail.sources": {
+  "de": "QUELLEN",
+  "en": "SOURCES",
+  "es": "FUENTES",
+  "fr": "SOURCES"
+ },
+ "rail.stock": {
+  "de": "BESTAND",
+  "en": "STATE",
+  "es": "ESTADO",
+  "fr": "ÉTAT"
+ },
+ "rail.view": {
+  "de": "ANSICHT",
+  "en": "VIEW",
+  "es": "VISTA",
+  "fr": "VUE"
+ },
+ "set.about": {
+  "de": "PROGRAMM",
+  "en": "APPLICATION",
+  "es": "PROGRAMA",
+  "fr": "APPLICATION"
+ },
+ "set.appearance": {
+  "de": "AUSSEHEN",
+  "en": "APPEARANCE",
+  "es": "ASPECTO",
+  "fr": "APPARENCE"
+ },
+ "set.catalog": {
+  "de": "KATALOG",
+  "en": "CATALOGUE",
+  "es": "CATALOGO",
+  "fr": "CATALOGUE"
+ },
+ "set.catalog.hint": {
+  "de": "Woher der Katalog kommt und mit welchem Schlüssel sich die App dort meldet. Beides steht in der Einstellungsdatei, der Schlüssel geht an keine andere Stelle.",
+  "en": "Where the catalogue comes from and the key the app presents there. Both are stored in the settings file, the key is never sent anywhere else.",
+  "es": "De donde viene el catalogo y con que clave se identifica la app. Ambos estan en el archivo de ajustes, la clave no se envia a ningun otro sitio.",
+  "fr": "D ou vient le catalogue et avec quelle cle l application s y presente. Les deux sont dans le fichier de reglages, la cle ne va nulle part ailleurs."
+ },
+ "set.catalog.key": {
+  "de": "Schlüssel",
+  "en": "Key",
+  "es": "Clave",
+  "fr": "Cle"
+ },
+ "set.catalog.url": {
+  "de": "Adresse",
+  "en": "Address",
+  "es": "Direccion",
+  "fr": "Adresse"
+ },
+ "set.col.entries": {
+  "de": "Eintraege",
+  "en": "Entries",
+  "es": "Entradas",
+  "fr": "Entrees"
+ },
+ "set.col.key": {
+  "de": "Schluessel",
+  "en": "Key",
+  "es": "Clave",
+  "fr": "Cle"
+ },
+ "set.col.source": {
+  "de": "Quelle",
+  "en": "Source",
+  "es": "Fuente",
+  "fr": "Source"
+ },
+ "set.col.state": {
+  "de": "Zustand",
+  "en": "State",
+  "es": "Estado",
+  "fr": "Etat"
+ },
+ "set.dark": {
+  "de": "Dunkel",
+  "en": "Dark",
+  "es": "Oscuro",
+  "fr": "Sombre"
+ },
+ "set.empty": {
+  "de": "Noch kein Lauf. Nach dem nächsten Katalogschreiben steht hier der Zustand je Quelle.",
+  "en": "No run yet. After the next catalogue write the state of each source appears here.",
+  "es": "Todavia sin ejecucion. Tras la proxima escritura del catalogo aparece aqui el estado de cada fuente.",
+  "fr": "Aucune execution pour le moment. Apres la prochaine ecriture du catalogue l etat de chaque source apparait ici."
+ },
+ "set.entries.word": {
+  "de": "Eintraege",
+  "en": "entries",
+  "es": "entradas",
+  "fr": "entrees"
+ },
+ "set.expand": {
+  "de": "Aufklappen fuer Schluessel und Adresse",
+  "en": "Expand for key and address",
+  "es": "Abrir para clave y direccion",
+  "fr": "Ouvrir pour cle et adresse"
+ },
+ "set.file": {
+  "de": "DATEI",
+  "en": "FILE",
+  "es": "ARCHIVO",
+  "fr": "FICHIER"
+ },
+ "set.key.entry": {
+  "de": "Schluessel",
+  "en": "Key",
+  "es": "Clave",
+  "fr": "Cle"
+ },
+ "set.key.missing": {
+  "de": "nicht gesetzt",
+  "en": "not set",
+  "es": "sin definir",
+  "fr": "non definie"
+ },
+ "set.key.none": {
+  "de": "nicht noetig",
+  "en": "not required",
+  "es": "no necesaria",
+  "fr": "non requise"
+ },
+ "set.key.save": {
+  "de": "Schluessel speichern",
+  "en": "Save key",
+  "es": "Guardar clave",
+  "fr": "Enregistrer la cle"
+ },
+ "set.key.set": {
+  "de": "gesetzt",
+  "en": "set",
+  "es": "definida",
+  "fr": "definie"
+ },
+ "set.key.url": {
+  "de": "Adresse",
+  "en": "Address",
+  "es": "Direccion",
+  "fr": "Adresse"
+ },
+ "set.language": {
+  "de": "SPRACHE",
+  "en": "LANGUAGE",
+  "es": "IDIOMA",
+  "fr": "LANGUE"
+ },
+ "set.nav.compact": {
+  "de": "Kompakte Leiste, nur Symbole",
+  "en": "Compact rail, icons only",
+  "es": "Barra compacta, solo iconos",
+  "fr": "Barre compacte, icones seuls"
+ },
+ "set.notsaved": {
+  "de": "nicht gespeichert",
+  "en": "not saved",
+  "es": "no guardado",
+  "fr": "non enregistre"
+ },
+ "set.priority": {
+  "de": "QUELLEN-REIHENFOLGE",
+  "en": "SOURCE PRIORITY",
+  "es": "PRIORIDAD DE FUENTES",
+  "fr": "PRIORITÉ DES SOURCES"
+ },
+ "set.saved": {
+  "de": "Einstellungen gespeichert",
+  "en": "Settings saved",
+  "es": "Ajustes guardados",
+  "fr": "Reglages enregistres"
+ },
+ "set.sources": {
+  "de": "QUELLEN",
+  "en": "SOURCES",
+  "es": "FUENTES",
+  "fr": "SOURCES"
+ },
+ "set.state.off": {
+  "de": "abgeschaltet",
+  "en": "off",
+  "es": "desactivada",
+  "fr": "desactivee"
+ },
+ "set.state.on": {
+  "de": "aktiv",
+  "en": "active",
+  "es": "activa",
+  "fr": "active"
+ },
+ "set.sub": {
+  "de": "Sprache, Aussehen und wo die Einstellungen liegen.",
+  "en": "Language, appearance and where the settings live.",
+  "es": "Idioma, aspecto y ubicación de los ajustes.",
+  "fr": "Langue, apparence et emplacement des réglages."
+ },
+ "set.title": {
+  "de": "Einstellungen",
+  "en": "Settings",
+  "es": "Ajustes",
+  "fr": "Réglages"
+ },
+ "set.url.hint": {
+  "de": "Leer heisst: die im Programm hinterlegte Adresse gilt.",
+  "en": "Empty means the built in default address.",
+  "es": "Vacio significa la direccion predeterminada.",
+  "fr": "Vide signifie l adresse par defaut."
+ },
+ "set.url.save": {
+  "de": "Adresse speichern",
+  "en": "Save address",
+  "es": "Guardar direccion",
+  "fr": "Enregistrer l adresse"
+ },
+ "set.version": {
+  "de": "Version",
+  "en": "Version",
+  "es": "Version",
+  "fr": "Version"
+ },
+ "set.version.catalog": {
+  "de": "Katalog",
+  "en": "Catalogue",
+  "es": "Catalogo",
+  "fr": "Catalogue"
+ },
+ "st.catalogue.writing": {
+  "de": "Katalog: Index",
+  "en": "catalogue: index",
+  "es": "catalogo: indice",
+  "fr": "catalogue : index"
+ },
+ "st.clients.addons": {
+  "de": "Clients {} · Addons {}",
+  "en": "clients {} · addons {}",
+  "es": "clientes {} · addons {}",
+  "fr": "clients {} · addons {}"
+ },
+ "st.footer.counts": {
+  "de": "Katalog {} · installiert {} · Ordner {}",
+  "en": "catalogue {} · installed {} · folders {}",
+  "es": "catalogo {} · instalados {} · carpetas {}",
+  "fr": "catalogue {} · installes {} · dossiers {}"
+ },
+ "st.footer.idle": {
+  "de": "bereit",
+  "en": "ready",
+  "es": "listo",
+  "fr": "pret"
+ },
+ "st.footer.noScan": {
+  "de": "kein Scan",
+  "en": "no scan",
+  "es": "sin escaneo",
+  "fr": "aucune analyse"
+ },
+ "st.footer.note": {
+  "de": "Präfixe · Index",
+  "en": "prefixes · index",
+  "es": "prefijos · indice",
+  "fr": "prefixes · index"
+ },
+ "st.footer.stand": {
+  "de": "Stand",
+  "en": "as of",
+  "es": "estado",
+  "fr": "etat"
+ },
+ "st.intros": {
+  "de": "Herkünfte {} · Clients {} · Addons {}",
+  "en": "sources {} · clients {} · addons {}",
+  "es": "fuentes {} · clientes {} · addons {}",
+  "fr": "sources {} · clients {} · addons {}"
+ },
+ "st.kw.catalog": {
+  "de": "katalog vom dienst",
+  "en": "catalogue from service",
+  "es": "catalogo del servicio",
+  "fr": "catalogue du service"
+ },
+ "st.kw.counts": {
+  "de": "KATALOG {} · ADDONS {} · CLIENTS {}",
+  "en": "CATALOGUE {} · ADDONS {} · CLIENTS {}",
+  "es": "CATALOGO {} · ADDONS {} · CLIENTES {}",
+  "fr": "CATALOGUE {} · ADDONS {} · CLIENTS {}"
+ },
+ "st.kw.index": {
+  "de": "INDEX",
+  "en": "INDEX",
+  "es": "INDICE",
+  "fr": "INDEX"
+ },
+ "st.kw.install": {
+  "de": "INSTALLATION",
+  "en": "INSTALLING",
+  "es": "INSTALANDO",
+  "fr": "INSTALLATION"
+ },
+ "st.kw.ready": {
+  "de": "BEREIT",
+  "en": "READY",
+  "es": "LISTO",
+  "fr": "PRET"
+ },
+ "st.kw.scan": {
+  "de": "SCAN",
+  "en": "SCAN",
+  "es": "ESCANEO",
+  "fr": "ANALYSE"
+ },
+ "st.kw.sources": {
+  "de": "QUELLEN",
+  "en": "SOURCES",
+  "es": "FUENTES",
+  "fr": "SOURCES"
+ },
+ "st.no.client": {
+  "de": "kein Client",
+  "en": "no client",
+  "es": "sin cliente",
+  "fr": "aucun client"
+ },
+ "st.ready": {
+  "de": "fertig · {} Einträge",
+  "en": "done · {} entries",
+  "es": "listo · {} entradas",
+  "fr": "pret · {} entrees"
+ },
+ "st.scan.all": {
+  "de": "Scan: Präfixe · Clients · Addons",
+  "en": "scan: prefixes · clients · addons",
+  "es": "escaneo: prefijos · clientes · addons",
+  "fr": "analyse: prefixes · clients · addons"
+ },
+ "st.scan.date": {
+  "de": "Scan {}",
+  "en": "Scan {}",
+  "es": "Escaneo {}",
+  "fr": "Analyse {}"
+ },
+ "st.scan.done.local": {
+  "de": "Index schreiben",
+  "en": "writing index",
+  "es": "escribiendo indice",
+  "fr": "ecriture index"
+ },
+ "st.scan.done.sources": {
+  "de": "Index · Quellen",
+  "en": "index · sources",
+  "es": "indice · fuentes",
+  "fr": "index · sources"
+ },
+ "st.scan.folders": {
+  "de": "Scan: Präfixe",
+  "en": "scan: prefixes",
+  "es": "escaneo: prefijos",
+  "fr": "analyse: prefixes"
+ },
+ "st.scan.fs": {
+  "de": "Dateisystem",
+  "en": "file system",
+  "es": "sistema de archivos",
+  "fr": "systeme de fichiers"
+ }
+}

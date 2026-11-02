@@ -6,14 +6,10 @@
 // Schlüssel, keine Rangfolge einzelner Märkte.
 import { computed, onMounted } from "vue";
 import * as UI from "@weppelmann/components";
+import { SPRACHEN, t } from "../i18n";
 import { einstellungen, info, ladeEinstellungen, speichereEinstellungen, stand } from "../store";
 
-const sprachen = [
-  { value: "de", label: "Deutsch" },
-  { value: "en", label: "English" },
-  { value: "es", label: "Español" },
-  { value: "fr", label: "Français" },
-];
+const sprachen = SPRACHEN;
 const themen = [
   { value: "dark", label: "Dunkel" },
   { value: "light", label: "Hell" },
@@ -28,7 +24,7 @@ onMounted(ladeEinstellungen);
 <template>
   <div class="set" v-if="werte">
     <section class="block">
-      <p class="feld__label">Sprache</p>
+      <p class="feld__label">{{ t("set.language") }}</p>
       <div class="knopfreihe">
         <button v-for="s in sprachen" :key="s.value" type="button" class="knopf"
                 :class="{ 'is-active': werte.language === s.value }" @click="werte.language = s.value">
@@ -36,7 +32,7 @@ onMounted(ladeEinstellungen);
         </button>
       </div>
 
-      <p class="feld__label">Aussehen</p>
+      <p class="feld__label">{{ t("set.appearance") }}</p>
       <div class="knopfreihe">
         <button v-for="t in themen" :key="t.value" type="button" class="knopf"
                 :class="{ 'is-active': werte.theme === t.value }" @click="werte.theme = t.value">
@@ -47,26 +43,26 @@ onMounted(ladeEinstellungen);
       <label class="schalter">
         <input type="checkbox" :checked="werte.nav === 'compact'"
                @change="werte.nav = ($event.target as HTMLInputElement).checked ? 'compact' : 'full'" />
-        <span>Kompakte Leiste, nur Symbole</span>
+        <span>{{ t("set.nav.compact") }}</span>
       </label>
     </section>
 
     <section class="block">
-      <h3>Datei</h3>
+      <h3>{{ t("set.file") }}</h3>
       <p class="pfad">{{ info.settings_pfad || "wird beim Speichern angelegt" }}</p>
     </section>
 
     <section class="block">
-      <h3>Programm</h3>
+      <h3>{{ t("set.about") }}</h3>
       <dl class="fakten">
-        <dt>Version</dt><dd>{{ info.version }}</dd>
-        <dt>Katalog</dt><dd>{{ stand(info.catalog_version) }}</dd>
+        <dt>{{ t("set.version") }}</dt><dd>{{ info.version }}</dd>
+        <dt>{{ t("set.version.catalog") }}</dt><dd>{{ stand(info.catalog_version) }}</dd>
       </dl>
     </section>
 
     <div class="fuss">
-      <UI.WpButton label="Speichern" variant="primary" @press="speichereEinstellungen" />
-      <span v-if="einstellungen.gespeichert" class="ok">gespeichert</span>
+      <UI.WpButton :label="t('set.saved')" variant="primary" @press="speichereEinstellungen" />
+      <span v-if="einstellungen.gespeichert" class="ok">{{ t("set.saved") }}</span>
       <span v-if="einstellungen.fehler" class="fehler">{{ einstellungen.fehler }}</span>
     </div>
   </div>

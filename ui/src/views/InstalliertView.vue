@@ -3,16 +3,17 @@
 // Tabelle. Die Daten kommen aus dem Scan, nicht aus dem Katalog.
 import { computed } from "vue";
 import * as UI from "@weppelmann/components";
-import { bytes, client, state } from "../store";
+import { t } from "../i18n";
+import { bytes, client, oeffneLokal, state } from "../store";
 
 const aktuell = computed(() => client());
 const flavor = computed(() => aktuell.value?.flavors[state.selectedFlavor]);
-const spalten = [
-  { key: "name", label: "Addon", sortable: true },
-  { key: "version", label: "Version", align: "end" as const, sortable: true },
-  { key: "interface", label: "Interface", align: "end" as const },
-  { key: "size", label: "Groesse", align: "end" as const },
-];
+const spalten = computed(() => [
+  { key: "name", label: t("iv.col.addon"), sortable: true },
+  { key: "version", label: t("dt.cap.version"), align: "end" as const, sortable: true },
+  { key: "interface", label: t("iv.col.interface"), align: "end" as const },
+  { key: "size", label: t("dt.cap.size"), align: "end" as const },
+]);
 const tabelle = computed(() =>
   (flavor.value?.addons ?? []).length
     ? ({ kind: "fertig", rows: (flavor.value?.addons ?? []).map((a) => ({
@@ -21,21 +22,21 @@ const tabelle = computed(() =>
         interface: a.interface.length ? a.interface[a.interface.length - 1] : "—",
         size: bytes(a.size_bytes),
       })) } as const)
-    : ({ kind: "leer", text: "Keine Addons in diesem Ordner." } as const),
+    : ({ kind: "leer", text: t("iv.empty.title") } as const),
 );
 </script>
 
 <template>
   <div class="inst">
-    <UI.WpSidePanel title="Clients" :count="state.clients.length">
+    <UI.WpSidePanel :title="t('nav.clients')" :count="state.clients.length">
       <button v-for="(c, i) in state.clients" :key="c.id" type="button" class="client"
               :class="{ 'is-active': i === state.selectedClient }"
               @click="state.selectedClient = i; state.selectedFlavor = 0">
         <span class="client__label">{{ c.label }}</span>
         <span class="client__meta">{{ c.origin }} · {{ c.flavors.length }} Ordner</span>
       </button>
-      <UI.WpEmptyState v-if="state.clients.length === 0 && !state.loading" title="Nichts gefunden"
-                       text="Kein World-of-Warcraft-Ordner gefunden. Laeuft das Spiel ueber Steam, Faugus oder Lutris?" />
+      <UI.WpEmptyState v-if="state.clients.length === 0 && !state.loading" :title="t('cl.none.title')"
+                       :text="t('cl.none.text')" />
     </UI.WpSidePanel>
 
     <main class="inst__main">
@@ -46,7 +47,8 @@ const tabelle = computed(() =>
         </button>
       </div>
       <p v-if="flavor" class="pfad">{{ flavor.addons_dir }}</p>
-      <UI.WpTable :columns="spalten" :state="tabelle" caption="Installierte Addons" />
+      <UI.WpTable :columns="spalten" :state="tabelle" :caption="t('iv.title')"
+                  @row-activate="(i: number) => oeffneLokal((flavor?.addons[i]?.title) ?? '')" />
     </main>
   </div>
 </template>
