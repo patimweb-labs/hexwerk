@@ -12,6 +12,29 @@ import { bytes, lastScan, rescan, state } from "../store";
 
 const gesamt = computed(() => state.clients.reduce(
   (summe, c) => summe + c.flavors.reduce((s, f) => s + f.size_bytes, 0), 0));
+
+// Die Spielordner als Tabelle: Ordner, Interface-Nummern, Anzahl, Groesse.
+// Als Tabelle stehen die Werte untereinander — in einer Zeile mit Abstaenden
+// schwimmt jede Zeile anders, je nachdem wie lang die Interface-Liste ist.
+const ordnerSpalten = [
+  { key: "ordner", label: t("cl.col.folder") },
+  { key: "interface", label: t("iv.col.interface"), align: "end" as const },
+  { key: "addons", label: t("cl.col.addons"), align: "end" as const },
+  { key: "size", label: t("dt.cap.size"), align: "end" as const },
+];
+
+function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
+  return {
+    kind: "fertig" as const,
+    rows: flavors.map((f) => ({
+      ordner: f.dir_name,
+      interface: f.interface.join(" · ") || "—",
+      addons: f.addons.length,
+      size: bytes(f.size_bytes),
+    })),
+  };
+}
+
 </script>
 
 <template>
@@ -29,14 +52,8 @@ const gesamt = computed(() => state.clients.reduce(
         <template #actions>
           <UI.WpBadge tone="neutral" :label="c.origin.toUpperCase()" />
         </template>
-        <p class="karte__pfad" :title="c.prefix">~{{ c.prefix.replace(/^\/home\/[^/]+/, "") }}</p>
-        <div v-for="f in c.flavors" :key="f.dir_name" class="ordner">
-          <span class="ordner__name">{{ f.dir_name }}</span>
-          <span class="ordner__iface">{{ f.interface.join(" · ") || "—" }}</span>
-          <span class="ordner__raum" />
-          <UI.WpBadge tone="ok" :label="f.addons.length === 1 ? t('cl.addon.one') : t('cl.addons', f.addons.length)" />
-          <span class="ordner__size">{{ bytes(f.size_bytes) }}</span>
-        </div>
+        <UI.WpFactList class="karte__pfad" :facts="[{ key: t('cl.col.path'), value: `~${c.prefix.replace(/^\/home\/[^/]+/, '')}`, mono: true }]" />
+        <UI.WpTable class="ordner-tabelle" :columns="ordnerSpalten" :state="ordnerTabelle(c.flavors)" />
       </UI.WpCard>
     </div>
 
@@ -68,15 +85,15 @@ const gesamt = computed(() => state.clients.reduce(
 .hinweis code { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-default); }
 .cl__fuss { display: flex; align-items: center; justify-content: space-between; gap: var(--wp-space-3); margin-top: auto; padding-top: var(--wp-space-3); }
 .cl__zaehler { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-sm); color: var(--wp-color-text-muted); }
-.karte__pfad { margin: 0 0 var(--wp-space-2); font-family: var(--wp-font-family-mono);
-  font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.karte__pfad { margin: 0 0 var(--wp-space-2); }
 /* Eine Zeile je Spielordner: Name, Interface-Nummern, Anzahl, Groesse. */
-.ordner { display: flex; align-items: center; gap: var(--wp-space-2);
-  padding: 3px var(--wp-space-2); font-size: var(--wp-font-size-xs);
-  border-top: var(--wp-size-border) solid var(--wp-color-border-subtle); }
-.ordner__name { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-muted); }
-.ordner__iface { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-faint); }
-.ordner__raum { flex: 1; }
-.ordner__size { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-faint); }
+/* Die Tabelle sitzt in der Karte: kein zweiter Rahmen, kein Aussenabstand. */
+.ordner-tabelle :deep(.wp-table) { border: 0; }
+.ordner-tabelle :deep(table) { font-size: var(--wp-font-size-xs); }
+.ordner-tabelle :deep(th) { padding: 2px var(--wp-space-2); background: transparent;
+  border-bottom: var(--wp-size-border) solid var(--wp-color-border-subtle); }
+.ordner-tabelle :deep(td) { padding: 3px var(--wp-space-2); }
+.ordner-tabelle :deep(td:first-child) { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-muted); }
+.ordner-tabelle :deep(td:not(:first-child)) { font-family: var(--wp-font-family-mono);
+  color: var(--wp-color-text-faint); }
 </style>

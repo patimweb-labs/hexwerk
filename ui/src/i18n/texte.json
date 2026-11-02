@@ -11,6 +11,24 @@
     "es": "{} addons",
     "fr": "{} addons"
   },
+  "cl.col.addons": {
+    "de": "Addons",
+    "en": "Addons",
+    "es": "Addons",
+    "fr": "Addons"
+  },
+  "cl.col.folder": {
+    "de": "Ordner",
+    "en": "Folder",
+    "es": "Carpeta",
+    "fr": "Dossier"
+  },
+  "cl.col.path": {
+    "de": "Pfad",
+    "en": "Path",
+    "es": "Ruta",
+    "fr": "Chemin"
+  },
   "cl.more.text": {
     "de": "Lutris, Bottles, PortProton und ein beliebiger Ordner mit `_retail_` werden mitgesucht. Findet eine Herkunft nichts, fehlt sie hier; die Scan-Seite nennt den Grund.",
     "en": "Lutris, Bottles, PortProton and any folder with `_retail_` are searched too. If an origin finds nothing, it is missing here; the scan page names the reason.",
