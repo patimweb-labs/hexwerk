@@ -143,7 +143,9 @@ jobs:
       - name: Paket schnüren
         run: |
           mkdir -p dist
-          cp target/release/hexwerk target/release/hexwerk-desktop dist/
+          cp target/release/hexwerk dist/
+          # crates/desktop hat einen eigenen Workspace, also ein eigenes target/.
+          cp crates/desktop/target/release/hexwerk-desktop dist/
           cp data/de.weppelmann.Hexwerk.desktop dist/
           cp packaging/linux/de.weppelmann.Hexwerk.metainfo.xml dist/
           cp LICENSE dist/
@@ -161,7 +163,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: hexwerk-desktop
-          path: target/release/hexwerk-desktop
+          path: crates/desktop/target/release/hexwerk-desktop
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
