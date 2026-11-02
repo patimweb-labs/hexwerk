@@ -11,7 +11,11 @@ pub mod commands;
 
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::scan])
+        .invoke_handler(tauri::generate_handler![
+            commands::scan,
+            commands::catalog_stats,
+            commands::catalog_search,
+        ])
         .run(tauri::generate_context!())
         .expect("Hexwerk konnte das Fenster nicht starten");
 }

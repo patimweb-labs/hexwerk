@@ -154,3 +154,152 @@ pub async fn scan() -> Result<ScanResult, String> {
     .await
     .map_err(|e| e.to_string())
 }
+
+
+// ---------------------------------------------------------------- Katalog
+
+/// Ein Release so, wie die Detailansicht es zeigt.
+#[derive(Serialize)]
+pub struct ReleaseDto {
+    pub source: String,
+    pub version: String,
+    pub released_at: Option<String>,
+    pub download_url: String,
+    pub size_bytes: Option<u64>,
+    pub interfaces: Vec<u32>,
+}
+
+/// Ein Katalogeintrag. Dieselbe Form fuer Liste und Detail — die Detailansicht
+/// bekommt zusaetzlich `releases` gefuellt.
+#[derive(Serialize)]
+pub struct ItemDto {
+    pub id: i64,
+    pub key: String,
+    pub name: String,
+    pub author: String,
+    pub summary: String,
+    pub category: Option<String>,
+    pub homepage: Option<String>,
+    pub screenshots: Vec<String>,
+    /// Hoechste Fassung ueber alle Quellen.
+    pub latest: Option<ReleaseDto>,
+    /// Je Quelle die hoechste Fassung.
+    pub sources: Vec<ReleaseDto>,
+    /// Wo es installiert ist.
+    pub installed: Vec<InstalledDto>,
+    pub releases: Vec<ReleaseDto>,
+}
+
+#[derive(Serialize)]
+pub struct InstalledDto {
+    pub client_label: String,
+    pub flavor: String,
+    pub folder: String,
+    pub name: String,
+    pub version: Option<String>,
+    pub size_bytes: u64,
+    /// Version, die es anderswo gibt — `None`, wenn aktuell.
+    pub update: Option<String>,
+}
+
+/// Zahlen fuer Fusszeile und Filter.
+#[derive(Serialize)]
+pub struct StatsDto {
+    pub catalogue: usize,
+    pub clients: usize,
+    pub installed: usize,
+    pub updates: usize,
+    /// Je Quelle die Zahl der Eintraege, absteigend.
+    pub per_source: Vec<(String, usize)>,
+}
+
+fn release_dto(r: &hexwerk_index::ReleaseRow) -> ReleaseDto {
+    ReleaseDto {
+        source: hexwerk_index::source_key(r.source).to_string(),
+        version: r.version.clone(),
+        released_at: r.fetched_at.clone(),
+        download_url: r.url.clone(),
+        size_bytes: r.size_bytes,
+        interfaces: r.interfaces.clone(),
+    }
+}
+
+fn source_release_dto(r: &hexwerk_index::SourceRelease) -> ReleaseDto {
+    ReleaseDto {
+        source: hexwerk_index::source_key(r.source).to_string(),
+        version: r.version.clone(),
+        released_at: r.released_at.clone(),
+        download_url: r.download_url.clone(),
+        size_bytes: r.size_bytes,
+        interfaces: r.interfaces.clone(),
+    }
+}
+
+fn item_dto(item: hexwerk_index::CatalogueItem) -> ItemDto {
+    ItemDto {
+        id: item.id,
+        key: item.key,
+        name: item.name,
+        author: item.author,
+        summary: item.summary,
+        category: item.category,
+        homepage: item.homepage,
+        screenshots: item.screenshots,
+        latest: item.latest.as_ref().map(source_release_dto),
+        sources: item.sources.iter().map(source_release_dto).collect(),
+        installed: item
+            .installed
+            .into_iter()
+            .map(|i| InstalledDto {
+                client_label: i.client_label,
+                flavor: i.flavor,
+                folder: i.folder,
+                name: i.name,
+                version: i.version,
+                size_bytes: i.size_bytes,
+                update: i.update.map(|u| u.version),
+            })
+            .collect(),
+        releases: item.releases.iter().map(release_dto).collect(),
+    }
+}
+
+fn index() -> Result<hexwerk_index::Index, String> {
+    let pfad = hexwerk_index::Index::default_path();
+    hexwerk_index::Index::open(&pfad).map_err(|e| format!("Index {}: {e}", pfad.display()))
+}
+
+/// Zahlen fuer Fusszeile und Quellen-Filter.
+#[tauri::command]
+pub fn catalog_stats() -> Result<StatsDto, String> {
+    let idx = index()?;
+    let stats = idx.stats()?;
+    Ok(StatsDto {
+        catalogue: stats.catalogue,
+        clients: stats.clients,
+        installed: stats.installed,
+        updates: stats.updates,
+        per_source: stats
+            .per_source
+            .into_iter()
+            .map(|(k, n)| (k.to_string(), n))
+            .collect(),
+    })
+}
+
+/// Im Katalog suchen.
+///
+/// Der Index ist eine SQLite-Datei mit Volltextsuche; die Arbeit macht `search`.
+/// Hier wird nur gefiltert, was die Oberflaeche als Eingabe schickt.
+#[tauri::command]
+pub fn catalog_search(query: String, limit: Option<u32>) -> Result<Vec<ItemDto>, String> {
+    let idx = index()?;
+    let filters = hexwerk_index::Filters::new(query);
+    let treffer = idx.search(&filters, limit.unwrap_or(120), 0)?;
+    Ok(treffer.into_iter().map(item_dto).collect())
+}
+
+// Eine eigene Detailabfrage gibt es nicht: `search` liefert je Eintrag schon
+// Quellen, hoechste Fassung und die Installationen. Die Detailansicht arbeitet
+// mit dem Eintrag, den die Liste geholt hat — eine zweite Abfrage waere eine
+// zweite Wahrheit.

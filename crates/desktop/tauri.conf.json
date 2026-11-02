@@ -4,10 +4,10 @@
   "version": "0.2.2",
   "identifier": "de.weppelmann.Hexwerk",
   "build": {
-    "beforeDevCommand": "npm --prefix ui run dev",
+    "beforeDevCommand": "npm --prefix ../../ui run dev",
     "devUrl": "http://localhost:1421",
-    "beforeBuildCommand": "npm --prefix ui run build",
-    "frontendDist": "ui/dist"
+    "beforeBuildCommand": "npm --prefix ../../ui run build",
+    "frontendDist": "../../ui/dist"
   },
   "app": {
     "windows": [

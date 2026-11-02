@@ -44,3 +44,53 @@ export interface ScanResult {
 export function scan(): Promise<ScanResult> {
   return invoke<ScanResult>("scan");
 }
+
+export interface Release {
+  source: string;
+  version: string;
+  released_at: string | null;
+  download_url: string;
+  size_bytes: number | null;
+  interfaces: number[];
+}
+
+export interface InstalledInfo {
+  client_label: string;
+  flavor: string;
+  folder: string;
+  name: string;
+  version: string | null;
+  size_bytes: number;
+  update: string | null;
+}
+
+export interface Item {
+  id: number;
+  key: string;
+  name: string;
+  author: string;
+  summary: string;
+  category: string | null;
+  homepage: string | null;
+  screenshots: string[];
+  latest: Release | null;
+  sources: Release[];
+  installed: InstalledInfo[];
+  releases: Release[];
+}
+
+export interface Stats {
+  catalogue: number;
+  clients: number;
+  installed: number;
+  updates: number;
+  per_source: [string, number][];
+}
+
+export function catalogStats(): Promise<Stats> {
+  return invoke<Stats>("catalog_stats");
+}
+
+export function catalogSearch(query: string, limit = 120): Promise<Item[]> {
+  return invoke<Item[]>("catalog_search", { query, limit });
+}

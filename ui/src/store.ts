@@ -1,7 +1,7 @@
 // Ein Ort fuer den Zustand. Die Ansichten lesen hier und rufen Aktionen auf —
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
-import { scan, type Client, type Note, type ScanResult } from "./api";
+import { catalogSearch, catalogStats, scan, type Client, type Item, type Note, type ScanResult, type Stats } from "./api";
 
 export const state = reactive<{
   clients: Client[];
@@ -51,4 +51,41 @@ export function bytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
   if (n < 1024 ** 3) return `${(n / 1024 / 1024).toFixed(1)} MB`;
   return `${(n / 1024 ** 3).toFixed(2)} GB`;
+}
+
+// ------------------------------------------------------------------ Katalog
+
+export const katalog = reactive<{
+  suche: string;
+  items: Item[];
+  stats: Stats | null;
+  loading: boolean;
+  error: string | null;
+  gewaehlt: number;
+}>({
+  suche: "",
+  items: [],
+  stats: null,
+  loading: false,
+  error: null,
+  gewaehlt: -1,
+});
+
+/** Suche starten. Leerer Text heisst: die ersten Eintraege zeigen. */
+export async function suchen(text = katalog.suche) {
+  katalog.loading = true;
+  katalog.error = null;
+  try {
+    katalog.items = await catalogSearch(text);
+    if (!katalog.stats) katalog.stats = await catalogStats();
+    katalog.gewaehlt = katalog.items.length ? 0 : -1;
+  } catch (fehler) {
+    katalog.error = String(fehler);
+  } finally {
+    katalog.loading = false;
+  }
+}
+
+export function gewaehlt(): Item | undefined {
+  return katalog.items[katalog.gewaehlt];
 }

@@ -25,6 +25,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 
+# Ohne dieses Feature laedt das Release-Binary die Dev-URL (Port 1421) statt der
+# eingebetteten Dateien. Beim Ausliefern also mit --features custom-protocol bauen.
+[features]
+default = []
+custom-protocol = ["tauri/custom-protocol"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
