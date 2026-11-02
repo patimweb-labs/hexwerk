@@ -143,4 +143,4 @@ Der Stil steht in `docs/marke/icons.md`; hier nur die Regeln, an die sich Code h
   eines pro Lauf, die Ergebnisse werden mit `jq -s 'add | unique'` gemerged
   (`unique`, nicht `unique_by(.dest)` — sonst gehen die Checksummen-Einträge
   verloren). Die frühere GTK4-Oberfläche (`crates/ui-gtk`) ist entfernt.
-- **Kontakt/Issues:** https://github.com/Smotherer007/hexwerk/issues
+- **Kontakt/Issues:** https://github.com/patimweb-labs/hexwerk/issues

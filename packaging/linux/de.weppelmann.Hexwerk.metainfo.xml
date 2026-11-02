@@ -29,8 +29,8 @@
     </p>
   </description>
   <launchable type="desktop-id">de.weppelmann.Hexwerk.desktop</launchable>
-  <url type="homepage">https://github.com/Smotherer007/hexwerk</url>
-  <url type="bugtracker">https://github.com/Smotherer007/hexwerk/issues</url>
+  <url type="homepage">https://github.com/patimweb-labs/hexwerk</url>
+  <url type="bugtracker">https://github.com/patimweb-labs/hexwerk/issues</url>
   <categories>
     <category>Game</category>
   </categories>
