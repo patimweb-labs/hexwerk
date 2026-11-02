@@ -89,6 +89,11 @@ Gerät, PipeWire oder eine WoW-Installation braucht, hat die Grenze falsch gezog
 - `release-please` mit `bump-minor-pre-major: true` (0.x bleibt unter 1.0, auch bei
   Breaking Changes) und `extra-files` für die `.metainfo.xml`.
 - Kleine Commits, ein Gedanke pro Commit, deutschsprachige Betreffzeile erlaubt.
+- **Immer über einen Branch und einen Pull Request.** `main` ist geschützt: kein
+  direkter Push, kein Force-Push, kein Löschen. Ablauf:
+  `git switch -c fix/kurzbeschreibung`, committen, `git push -u origin HEAD`,
+  PR öffnen, CI abwarten, mergen. Reviews sind nicht erzwungen
+  (`required_approving_review_count: 0`, Solo-Betrieb), der PR ist es.
 - Kein „WIP"-Merge nach `main`; `main` ist immer lauffähig.
 
 ## 7. Dokumentation
