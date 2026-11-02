@@ -52,7 +52,6 @@ function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
         <template #actions>
           <UI.WpBadge tone="neutral" :label="c.origin.toUpperCase()" />
         </template>
-        <UI.WpFactList class="karte__pfad" :facts="[{ key: t('cl.col.path'), value: `~${c.prefix.replace(/^\/home\/[^/]+/, '')}`, mono: true }]" />
         <UI.WpTable class="ordner-tabelle" :columns="ordnerSpalten" :state="ordnerTabelle(c.flavors)" />
       </UI.WpCard>
     </div>
@@ -85,14 +84,20 @@ function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
 .hinweis code { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-default); }
 .cl__fuss { display: flex; align-items: center; justify-content: space-between; gap: var(--wp-space-3); margin-top: auto; padding-top: var(--wp-space-3); }
 .cl__zaehler { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-sm); color: var(--wp-color-text-muted); }
-.karte__pfad { margin: 0 0 var(--wp-space-2); }
 /* Eine Zeile je Spielordner: Name, Interface-Nummern, Anzahl, Groesse. */
 /* Die Tabelle sitzt in der Karte: kein zweiter Rahmen, kein Aussenabstand. */
 .ordner-tabelle :deep(.wp-table) { border: 0; }
+/* Die Tabelle liegt buendig in der Karte — kein Kasten im Kasten. Die Zellen
+   tragen ihren eigenen Abstand, damit der Text nicht am Rand klebt. */
+.karte :deep(.wp-card__body) { padding: 0; }
 .ordner-tabelle :deep(table) { font-size: var(--wp-font-size-xs); }
 .ordner-tabelle :deep(th) { padding: 2px var(--wp-space-2); background: transparent;
   border-bottom: var(--wp-size-border) solid var(--wp-color-border-subtle); }
 .ordner-tabelle :deep(td) { padding: 3px var(--wp-space-2); }
+.ordner-tabelle :deep(th:first-child),
+.ordner-tabelle :deep(td:first-child) { padding-left: var(--wp-space-3); }
+.ordner-tabelle :deep(th:last-child),
+.ordner-tabelle :deep(td:last-child) { padding-right: var(--wp-space-3); }
 .ordner-tabelle :deep(td:first-child) { font-family: var(--wp-font-family-mono); color: var(--wp-color-text-muted); }
 .ordner-tabelle :deep(td:not(:first-child)) { font-family: var(--wp-font-family-mono);
   color: var(--wp-color-text-faint); }

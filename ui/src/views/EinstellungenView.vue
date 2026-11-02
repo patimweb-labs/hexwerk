@@ -69,8 +69,12 @@ onMounted(ladeEinstellungen);
 </template>
 
 <style scoped>
-.set { flex: 1; overflow: auto; padding: var(--wp-space-4); display: flex; flex-direction: column; gap: var(--wp-space-5); max-width: 720px; }
-.block h3 { margin: 0 0 var(--wp-space-1); font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-md); font-weight: var(--wp-font-weight-semibold); }
+.set { flex: 1; overflow: auto; padding: var(--wp-space-5); display: flex; flex-direction: column;
+  gap: var(--wp-space-6); max-width: 720px; }
+/* Die Bloecke brauchen eigenen Abstand: seit die Beschriftung an der Komponente
+   haengt (WpToggleGroup), klebte ohne gap alles aneinander. */
+.block { display: flex; flex-direction: column; gap: var(--wp-space-3); }
+.block h3 { margin: 0; font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-md); font-weight: var(--wp-font-weight-semibold); }
 .knopfreihe { display: flex; gap: 2px; margin-bottom: var(--wp-space-2); }
 .knopf { padding: 5px var(--wp-space-3); font: inherit; font-size: var(--wp-font-size-sm);
   background: var(--wp-color-bg-raised); color: var(--wp-color-text-muted);
