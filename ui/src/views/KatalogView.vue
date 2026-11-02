@@ -48,7 +48,7 @@ function schalteVersion(n: number) {
   else gewaehlteVersionen.add(n);
 }
 
-onMounted(async () => { await suchen(""); if (katalog.items.length) oeffneDetail(katalog.items[2]); });
+onMounted(() => suchen(""));
 </script>
 
 <template>

@@ -122,6 +122,10 @@ jobs:
           node-version: "22"
       - name: Oberflaeche bauen
         run: |
+          # Die Bibliothek kommt als Untermodul und bringt nur Quellcode mit;
+          # ihre eigenen Abhaengigkeiten (vue, lucide) muessen eigens installiert
+          # werden, sonst findet vue-tsc sie nicht.
+          npm --prefix weppelmann-ui install --no-audit --no-fund
           npm --prefix ui ci
           npm --prefix ui run build
       - name: Kommandozeile bauen
