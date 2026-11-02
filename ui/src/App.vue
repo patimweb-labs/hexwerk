@@ -123,13 +123,11 @@ onMounted(() => {
       <UI.WpToolbar class="kopf" :title="kopf.label" :subtitle="kopf.untertitel">
         <template #actions>
           <div v-if="ansicht === 'detail'" class="krumen">
-            <button type="button" class="krumen__link" @click="ansicht = 'katalog'">Katalog</button>
+            <UI.WpLink href="#" label="Katalog" @open="ansicht = 'katalog'" />
             <span class="krumen__trenner">›</span>
             <span class="krumen__hier">{{ gewaehlt()?.name }}</span>
           </div>
-          <button type="button" class="thema" :aria-label="thema" :title="thema" @click="schalteThema">
-            <UI.WpIcon :icon="themaIcon" size="sm" />
-          </button>
+          <UI.WpIconButton :icon="themaIcon" :label="thema" size="lg" @press="schalteThema" />
         </template>
       </UI.WpToolbar>
 
@@ -181,12 +179,8 @@ onMounted(() => {
 .kopf { padding: var(--wp-space-2) var(--wp-space-4); border-bottom: var(--wp-size-border) solid var(--wp-color-border-subtle);
   background: var(--wp-color-bg-panel); }
 .krumen { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size-sm); }
-.krumen__link { background: none; border: 0; padding: 0; color: var(--wp-color-accent-default); font: inherit; cursor: pointer; }
 .krumen__trenner { color: var(--wp-color-text-faint); }
 .krumen__hier { color: var(--wp-color-text-default); }
-.thema { width: 30px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-  background: var(--wp-color-bg-raised); color: var(--wp-color-text-muted);
-  border: var(--wp-size-border) solid var(--wp-color-border-subtle); cursor: pointer; }
 .seite { flex: 1; min-height: 0; display: flex; }
 .fuss__zahl { font-family: var(--wp-font-family-mono); }
 /* Meldung ueber der Ansicht, nicht im Weg: unten rechts, ueber der Fusszeile. */
