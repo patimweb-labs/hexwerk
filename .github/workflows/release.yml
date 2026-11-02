@@ -126,6 +126,9 @@ jobs:
           # ihre eigenen Abhaengigkeiten (vue, lucide) muessen eigens installiert
           # werden, sonst findet vue-tsc sie nicht.
           npm --prefix weppelmann-ui install --no-audit --no-fund
+          # Tokens erzeugen dist/css/vars.css und die Schriften; das ist ein
+          # Bauergebnis und liegt nicht im Repo.
+          npm --prefix weppelmann-ui run tokens
           npm --prefix ui ci
           npm --prefix ui run build
       - name: Kommandozeile bauen
