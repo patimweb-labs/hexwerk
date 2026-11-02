@@ -7,7 +7,7 @@
 // Katalog oder Installiert geoeffnet und ueber die Brotkrumen verlassen.
 import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
-import { IconBrand, IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
+import { IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
 import { t } from "./i18n";
 import { ansicht, einstellungen, gewaehlt, installation, katalog, ladeStats, lastScan, meldung, quellenName, rescan, state, sync, thema, wendeThema } from "./store";
 import ClientsView from "./views/ClientsView.vue";
@@ -80,7 +80,7 @@ onMounted(() => {
     <!-- ------------------------------------------------------------ Leiste -->
     <aside class="leiste" :class="{ 'is-compact': kompakt }">
       <div class="marke">
-        <UI.WpIcon :icon="IconBrand" size="lg" class="marke__zeichen" />
+        <img class="marke__zeichen" src="/icon.svg" alt="" width="22" height="22" />
         <span class="marke__wort">HEXWERK</span>
       </div>
 

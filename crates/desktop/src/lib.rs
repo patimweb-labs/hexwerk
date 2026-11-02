@@ -22,6 +22,7 @@ pub fn run() {
             commands::catalog_sync,
             commands::app_info,
             commands::fetch_images,
+            commands::oeffne_url,
         ])
         .run(tauri::generate_context!())
         .expect("Hexwerk konnte das Fenster nicht starten");

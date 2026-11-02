@@ -512,3 +512,30 @@ pub async fn fetch_images(urls: Vec<String>) -> Vec<BildDto> {
     .await
     .unwrap_or_default()
 }
+
+
+/// Einen Link im Systembrowser oeffnen.
+///
+/// In der Web-Ansicht reicht `target="_blank"` nicht: WebKitGTK gibt den
+/// Navigationswunsch an das Fenster, und das laesst ihn fallen. Also oeffnet
+/// das Programm den Browser selbst — auf jeder Plattform mit dem, was dort
+/// vorgesehen ist.
+#[tauri::command]
+pub fn oeffne_url(url: String) -> Result<(), String> {
+    // Nur, was nach Web aussieht: kein `file://`, kein `javascript:`.
+    if !(url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:")) {
+        return Err(format!("keine web-adresse: {url}"));
+    }
+    #[cfg(target_os = "linux")]
+    let (programm, args): (&str, Vec<&str>) = ("xdg-open", vec![&url]);
+    #[cfg(target_os = "macos")]
+    let (programm, args): (&str, Vec<&str>) = ("open", vec![&url]);
+    #[cfg(target_os = "windows")]
+    let (programm, args): (&str, Vec<&str>) = ("cmd", vec!["/C", "start", "", &url]);
+
+    std::process::Command::new(programm)
+        .args(args)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("{programm}: {e}"))
+}

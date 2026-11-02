@@ -152,3 +152,8 @@ export interface Bild {
 export function fetchImages(urls: string[]): Promise<Bild[]> {
   return invoke<Bild[]>("fetch_images", { urls });
 }
+
+/** Einen Link im Systembrowser öffnen (target="_blank" tut es hier nicht). */
+export function oeffneUrl(url: string): Promise<void> {
+  return invoke<void>("oeffne_url", { url });
+}

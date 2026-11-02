@@ -8,7 +8,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconChevronRight } from "@weppelmann/icons";
-import { fetchImages } from "../api";
+import { fetchImages, oeffneUrl } from "../api";
 import { t } from "../i18n";
 import { bytes, gewaehlt, installiere, installation, lokales, ziele } from "../store";
 
@@ -87,7 +87,10 @@ function weiter(richtung: -1 | 1) {
 
     <!-- Galerie -->
     <section class="galerie" v-if="galerie.length">
-      <img class="galerie__bild" :src="galerie[galerieBild]" :alt="t('dt.preview', item.name)" />
+      <UI.WpImageFrame class="galerie__rahmen"
+                       :state="{ kind: 'bild', src: galerie[galerieBild] }"
+                       :alt="t('dt.preview', item.name)"
+                       :max-height="'400px'" />
       <div class="galerie__leiste" v-if="galerie.length > 1">
         <UI.WpButton :label="'‹'" size="sm" variant="secondary" :aria-label="t('dt.prev')" @press="weiter(-1)" />
         <span class="galerie__zaehler">{{ galerieBild + 1 }} / {{ galerie.length }}</span>
@@ -109,7 +112,7 @@ function weiter(richtung: -1 | 1) {
         <dt>{{ t("dt.row.author") }}</dt><dd>{{ item.author || t("cv.unspecified") }}</dd>
         <dt>{{ t("dt.row.category") }}</dt><dd>{{ item.category || t("dt.no.category") }}</dd>
         <dt>{{ t("dt.row.homepage") }}</dt>
-        <dd><a v-if="item.homepage" :href="item.homepage" target="_blank" rel="noreferrer">{{ item.homepage }}</a><span v-else>—</span></dd>
+        <dd><UI.WpLink v-if="item.homepage" :href="item.homepage" external block :label="item.homepage" @open="oeffneUrl" /><span v-else>—</span></dd>
         <dt>{{ t("dt.row.interface") }}</dt><dd>{{ item.latest?.interfaces.join(", ") || "—" }}</dd>
       </dl>
     </section>
@@ -133,8 +136,10 @@ function weiter(richtung: -1 | 1) {
 
     <section v-else-if="tab === 'shots'" class="dt__bereich">
       <div class="bilder" v-if="galerie.length">
-        <img v-for="(bild, i) in galerie" :key="i" class="bilder__bild" :src="bild"
-             :alt="t('dt.preview', item.name)" @click="galerieBild = i" />
+        <UI.WpImageFrame v-for="(bild, i) in galerie" :key="i" class="bilder__rahmen"
+                         :state="{ kind: 'bild', src: bild }" :alt="t('dt.preview', item.name)"
+                         :ratio="'16 / 9'" :max-height="'110px'" clickable
+                         @click="galerieBild = i; tab = 'desc'" />
       </div>
       <p v-else class="dt__leer">{{ t("dt.hint.no.images") }}</p>
     </section>
@@ -201,8 +206,7 @@ function weiter(richtung: -1 | 1) {
 .dt__ziel :deep(.wp-formfield) { flex: 1; }
 
 .galerie { display: flex; flex-direction: column; gap: var(--wp-space-1); }
-.galerie__bild { max-width: 100%; max-height: 340px; object-fit: contain; align-self: flex-start;
-  border: var(--wp-size-border) solid var(--wp-color-border-subtle); background: var(--wp-color-bg-input); }
+.galerie__rahmen { max-width: 620px; }
 .galerie__leiste { display: flex; align-items: center; gap: var(--wp-space-2); }
 .galerie__zaehler { font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 
@@ -224,9 +228,7 @@ function weiter(richtung: -1 | 1) {
 .dt__tabelle .r { text-align: right; }
 .dt__tabelle .mono { font-family: var(--wp-font-family-mono); }
 .dt__unter { margin: var(--wp-space-3) 0 var(--wp-space-1); font-size: var(--wp-font-size-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--wp-color-text-faint); }
-.bilder { display: flex; flex-wrap: wrap; gap: var(--wp-space-2); }
-.bilder__bild { max-height: 140px; border: var(--wp-size-border) solid var(--wp-color-border-subtle);
-  background: var(--wp-color-bg-input); cursor: pointer; }
+.bilder { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--wp-space-2); }
 .dt__leer { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 .dt__fehler { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-error); }
 .dt__erfolg { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-ok); }
