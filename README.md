@@ -30,6 +30,27 @@ Kein Hintergrunddienst, kein Konto.
 * Vier Sprachen (deutsch, englisch, spanisch, französisch) und drei Farbschemata
   (dunkel, hell, mono); die Wahl wird gemerkt.
 
+## Plattformen
+
+Die Erkennung ist plattformneutral gebaut: Herkünfte sind Daten (Wurzeln), keine
+`cfg`-Abfragen im Code. Gesucht wird überall gleich — ein Ordner heißt
+`World of Warcraft` und enthält `_retail_`-artige Verzeichnisse.
+
+| System | Herkünfte |
+|---|---|
+| Linux | Steam/Proton, Faugus/UMU, Heroic, Lutris, Bottles, PortProton, eigener Ordner |
+| Windows | `%ProgramFiles%` und `%ProgramFiles(x86)%` |
+| macOS | CrossOver-Flaschen und Whisky, dazu `/Applications` (Blizzard-Launcher) |
+
+Auf macOS sind CrossOver-Flaschen Wine-Präfixe und laufen durch dieselbe Prüfung
+wie Bottles unter Linux; unter Windows verhält sich `Program Files` wie ein
+`drive_c`. Beides ist gegen künstliche Bäume getestet
+(`crates/core/tests/plattform_herkuenfte.rs`).
+
+**Noch nicht gebaut** sind Pakete für Windows und macOS: das Fenster ist Tauri 2
+und muss dort mit WebView2 bzw. gegen die macOS-SDK gebaut und signiert werden.
+Der Papierkorb nutzt bisher den XDG-Papierkorb des Linux-Desktops.
+
 ## Screenshots
 
 | | |
