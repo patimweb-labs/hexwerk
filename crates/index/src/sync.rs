@@ -527,16 +527,11 @@ fn write_installed(
 }
 
 /// Herkunft als stabile Kennung im Index.
+///
+/// Delegiert an `Origin::slug()`, damit es nur eine Liste gibt: die Kopie hier
+/// lief bei jeder neuen Herkunft dem Enum hinterher.
 fn origin_key(origin: Origin) -> &'static str {
-    match origin {
-        Origin::Steam => "steam",
-        Origin::Faugus => "faugus",
-        Origin::Heroic => "heroic",
-        Origin::Lutris => "lutris",
-        Origin::Bottles => "bottles",
-        Origin::PortProton => "portproton",
-        Origin::Manual => "manual",
-    }
+    origin.slug()
 }
 
 /// Externe Kennungen aus dem `.toc` als JSON.

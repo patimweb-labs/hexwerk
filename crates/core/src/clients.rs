@@ -23,6 +23,12 @@ pub enum Origin {
     Lutris,
     Bottles,
     PortProton,
+    /// Windows: das Spiel liegt direkt in einem Programmordner.
+    Windows,
+    /// macOS: WoW in einer CrossOver-Flasche (Wine).
+    CrossOver,
+    /// macOS: die native Fassung des Blizzard-Launchers.
+    MacNative,
     Manual,
 }
 
@@ -35,6 +41,9 @@ impl Origin {
             Origin::Lutris => "Lutris",
             Origin::Bottles => "Bottles",
             Origin::PortProton => "PortProton",
+            Origin::Windows => "Windows",
+            Origin::CrossOver => "CrossOver",
+            Origin::MacNative => "macOS",
             Origin::Manual => "Manuell",
         }
     }
@@ -50,6 +59,9 @@ impl Origin {
             Origin::Lutris => "lutris",
             Origin::Bottles => "bottles",
             Origin::PortProton => "portproton",
+            Origin::Windows => "windows",
+            Origin::CrossOver => "crossover",
+            Origin::MacNative => "macos",
             Origin::Manual => "manual",
         }
     }
@@ -62,6 +74,9 @@ impl Origin {
             Origin::Lutris,
             Origin::Bottles,
             Origin::PortProton,
+            Origin::Windows,
+            Origin::CrossOver,
+            Origin::MacNative,
         ]
     }
 }
@@ -113,6 +128,12 @@ pub struct SearchRoots {
     pub lutris: Vec<PathBuf>,
     pub bottles: Vec<PathBuf>,
     pub portproton: Vec<PathBuf>,
+    /// Programmordner unter Windows (`%ProgramFiles%`, `%ProgramFiles(x86)%`).
+    pub windows: Vec<PathBuf>,
+    /// CrossOver-Flaschen unter macOS.
+    pub crossover: Vec<PathBuf>,
+    /// Native macOS-Installationen (`/Applications`).
+    pub mac_native: Vec<PathBuf>,
 }
 
 impl SearchRoots {
@@ -130,13 +151,22 @@ impl SearchRoots {
             lutris: finders::generic::lutris_roots(home),
             bottles: finders::generic::bottles_roots(home),
             portproton: finders::generic::portproton_roots(home),
+            windows: finders::direct::windows_roots(home),
+            crossover: finders::direct::crossover_roots(home),
+            mac_native: finders::direct::mac_native_roots(home),
         }
     }
 
-    /// Die echten Wurzeln dieses Rechners. Einzige Stelle im Kern, die `$HOME`
-    /// liest - dadurch bleibt die Erkennung selbst seiteneffektfrei pruefbar.
+    /// Die echten Wurzeln dieses Rechners. Einzige Stelle im Kern, die das
+    /// Benutzerverzeichnis liest - dadurch bleibt die Erkennung selbst
+    /// seiteneffektfrei pruefbar.
+    ///
+    /// `HOME` gibt es unter Windows nicht; dort heisst das Verzeichnis
+    /// `USERPROFILE`. Beide werden gelesen, damit dieselbe Funktion auf allen
+    /// drei Plattformen das Richtige tut.
     pub fn local() -> Self {
-        match std::env::var_os("HOME") {
+        let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
+        match home {
             Some(home) => Self::from_home(Path::new(&home)),
             None => Self::default(),
         }
@@ -152,6 +182,9 @@ impl SearchRoots {
             Origin::Lutris => &self.lutris,
             Origin::Bottles => &self.bottles,
             Origin::PortProton => &self.portproton,
+            Origin::Windows => &self.windows,
+            Origin::CrossOver => &self.crossover,
+            Origin::MacNative => &self.mac_native,
             Origin::Manual => &[],
         }
     }

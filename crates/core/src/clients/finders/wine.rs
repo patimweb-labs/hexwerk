@@ -74,9 +74,26 @@ fn score(flavors: &[FlavorDir]) -> (usize, usize) {
 /// er auch Client-Varianten enthaelt - ein leeres `World of Warcraft` neben dem
 /// echten (etwa ein Rest nach einem fehlgeschlagenen Update) darf den Lauf nicht
 /// vorzeitig beenden.
+/// Alle Fundstellen unterhalb einer Wurzel, in sortierter Reihenfolge.
+///
+/// Gebraucht bei Wurzeln, unter denen mehrere Spiele liegen können (Windows:
+/// zwei Laufwerke, macOS: `/Applications` neben einer zweiten Installation).
+pub(crate) fn find_all_wow(drive_c: &Path) -> Vec<PathBuf> {
+    let mut treffer = Vec::new();
+    sammle_wow(drive_c, &mut treffer, None);
+    treffer
+}
+
 pub(crate) fn find_wow(drive_c: &Path) -> Option<PathBuf> {
+    let mut treffer = Vec::new();
+    sammle_wow(drive_c, &mut treffer, Some(1));
+    treffer.into_iter().next()
+}
+
+/// gemeinsame Suche; `grenze` begrenzt die Zahl der Treffer (None = alle).
+fn sammle_wow(drive_c: &Path, treffer: &mut Vec<PathBuf>, grenze: Option<usize>) {
     if !drive_c.is_dir() {
-        return None;
+        return;
     }
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut queue: VecDeque<(PathBuf, usize)> = VecDeque::new();
@@ -110,7 +127,10 @@ pub(crate) fn find_wow(drive_c: &Path) -> Option<PathBuf> {
                 .unwrap_or_default();
             if name == "world of warcraft" {
                 if !describe(&child).is_empty() {
-                    return Some(child);
+                    treffer.push(child);
+                    if grenze.is_some_and(|g| treffer.len() >= g) {
+                        return;
+                    }
                 }
                 // Namensgleicher, aber leerer Ordner: weiter suchen.
                 continue;
@@ -123,7 +143,6 @@ pub(crate) fn find_wow(drive_c: &Path) -> Option<PathBuf> {
             }
         }
     }
-    None
 }
 
 fn canonical(path: &Path) -> PathBuf {

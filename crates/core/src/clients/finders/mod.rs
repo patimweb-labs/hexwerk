@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use super::{Client, Note, NoteStatus, Origin};
 
+pub mod direct;
 pub mod generic;
 pub mod steam;
 
@@ -21,6 +22,9 @@ pub(crate) fn run(origin: Origin, roots: &[PathBuf]) -> (Vec<Client>, Note) {
         Origin::Lutris => generic::find_lutris_in(roots),
         Origin::Bottles => generic::find_bottles_in(roots),
         Origin::PortProton => generic::find_portproton_in(roots),
+        Origin::Windows => direct::find_direct_in(Origin::Windows, roots),
+        Origin::CrossOver => direct::find_crossover_in(roots),
+        Origin::MacNative => direct::find_direct_in(Origin::MacNative, roots),
         Origin::Manual => Vec::new(),
     };
     let note = note_for(origin, roots, &found);
@@ -47,9 +51,15 @@ fn note_for(origin: Origin, roots: &[PathBuf], found: &[Client]) -> Note {
             format!("{}: keine WoW-Installation gefunden", origin.label()),
         )
     } else {
+        // Windows und macOS kennen kein Praefix; dort sucht man einen normalen
+        // Ordner, deshalb heisst es dort anders.
+        let was = match origin {
+            Origin::Windows | Origin::MacNative => "Ordner",
+            _ => "Praefix",
+        };
         (
             NoteStatus::Skip,
-            format!("{}: kein Praefix mit World of Warcraft", origin.label()),
+            format!("{}: kein {} mit World of Warcraft", origin.label(), was),
         )
     };
     Note {
