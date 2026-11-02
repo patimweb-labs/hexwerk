@@ -4,7 +4,7 @@
 import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconSearch } from "@weppelmann/icons";
-import { bytes, gewaehlt, katalog, suchen } from "../store";
+import { bytes, gewaehlt, installiere, installation, katalog, suchen, ziele } from "../store";
 
 const eingabe = ref("");
 const spalten = [
@@ -33,6 +33,13 @@ const tabelle = computed(() =>
 );
 
 const detail = computed(() => gewaehlt());
+
+// Ziele sind die Spielordner aus dem Scan: dorthin wird entpackt.
+// WpSelect arbeitet mit Zeichenketten, also ist der Wert der Pfad selbst.
+const zielWahl = ref("");
+const zielOptionen = computed(() =>
+  ziele().map((z) => ({ value: z.addonsDir, label: z.label })),
+);
 
 function starte() {
   katalog.suche = eingabe.value;
@@ -84,6 +91,15 @@ onMounted(() => suchen(""));
             </li>
           </ul>
 
+          <div class="ziel">
+            <UI.WpSelect v-model="zielWahl" :options="zielOptionen" label="Ziel" />
+            <UI.WpButton label="Installieren" variant="primary" size="sm"
+                         :state="installation.laeuft ? 'busy' : detail.latest ? 'default' : 'disabled'"
+                         @press="installiere(detail, zielWahl)" />
+          </div>
+          <p v-if="installation.fehler" class="fehler">{{ installation.fehler }}</p>
+          <p v-if="installation.erfolg" class="erfolg">installiert: {{ installation.erfolg }}</p>
+
           <p class="unter">Installiert</p>
           <ul class="liste" v-if="detail.installed.length">
             <li v-for="i in detail.installed" :key="i.folder">
@@ -124,4 +140,8 @@ onMounted(() => suchen(""));
 .quelle { color: var(--wp-color-text-muted); }
 .version { font-family: var(--wp-font-family-mono); }
 .leer { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
+.ziel { display: flex; align-items: flex-end; gap: var(--wp-space-2); margin-top: var(--wp-space-3); }
+.ziel :deep(.wp-select), .ziel :deep(.wp-formfield) { flex: 1; min-width: 0; }
+.fehler { margin: var(--wp-space-2) 0 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-error); }
+.erfolg { margin: var(--wp-space-2) 0 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-ok); }
 </style>

@@ -303,3 +303,48 @@ pub fn catalog_search(query: String, limit: Option<u32>) -> Result<Vec<ItemDto>,
 // Quellen, hoechste Fassung und die Installationen. Die Detailansicht arbeitet
 // mit dem Eintrag, den die Liste geholt hat — eine zweite Abfrage waere eine
 // zweite Wahrheit.
+
+
+// ------------------------------------------------------------ Installieren
+
+/// Ergebnis einer Installation.
+#[derive(Serialize)]
+pub struct InstallErgebnis {
+    /// Ordner, der im Addon-Verzeichnis entstanden ist.
+    pub folder: String,
+    /// Version aus der `.toc`, falls das ZIP eine enthielt.
+    pub version: Option<String>,
+}
+
+/// Ein Release laden und in ein Addon-Verzeichnis entpacken.
+///
+/// Der Ablauf ist der der GTK-Oberflaeche: laden, entpacken, fertig. Was dabei
+/// passiert, macht `install_zip` — inklusive Sicherung des vorhandenen Ordners
+/// und Papierkorb. Neu eingelesen wird danach vom Aufrufer (neuer Scan): so gibt
+/// es genau einen Weg, auf dem installierte Addons in den Index kommen.
+///
+/// `addons_dir` ist der Zielordner aus dem Scan, nicht ein Client-Name: die
+/// Oberflaeche weiss, wohin sie will, und muss hier nicht nachgeschlagen werden.
+#[tauri::command]
+pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // `request` kommt aus dem Trait, nicht aus dem Typ.
+        use hexwerk_sources::Http as _;
+        let http = hexwerk_sources::UreqHttp::new();
+        let request = hexwerk_sources::Request::get(&url);
+        let antwort = http.request(&request).map_err(|e| format!("Download: {e}"))?;
+        if !antwort.is_success() {
+            return Err(format!("Download: HTTP {}", antwort.status));
+        }
+        let ziel = std::path::Path::new(&addons_dir);
+        let pfade = hexwerk_install::Paths::system();
+        let installiert = hexwerk_install::install_zip(&antwort.body, ziel, None, &pfade)
+            .map_err(|e| format!("Entpacken: {e}"))?;
+        Ok(InstallErgebnis {
+            folder: installiert.folder.display().to_string(),
+            version: installiert.version,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

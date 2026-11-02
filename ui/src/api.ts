@@ -94,3 +94,13 @@ export function catalogStats(): Promise<Stats> {
 export function catalogSearch(query: string, limit = 120): Promise<Item[]> {
   return invoke<Item[]>("catalog_search", { query, limit });
 }
+
+export interface InstallErgebnis {
+  folder: string;
+  version: string | null;
+}
+
+/** Ein Release laden und in ein Addon-Verzeichnis entpacken. */
+export function install(addonsDir: string, url: string): Promise<InstallErgebnis> {
+  return invoke<InstallErgebnis>("install", { addonsDir, url });
+}
