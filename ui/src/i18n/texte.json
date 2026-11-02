@@ -30,10 +30,10 @@
     "fr": "Chemin"
   },
   "cl.more.text": {
-    "de": "Lutris, Bottles, PortProton und ein beliebiger Ordner mit `_retail_` werden mitgesucht. Findet eine Herkunft nichts, fehlt sie hier; die Scan-Seite nennt den Grund.",
-    "en": "Lutris, Bottles, PortProton and any folder with `_retail_` are searched too. If an origin finds nothing, it is missing here; the scan page names the reason.",
-    "es": "Tambien se buscan Lutris, Bottles, PortProton y cualquier carpeta con `_retail_`. Si un origen no encuentra nada, falta aqui; la pagina de escaneo indica el motivo.",
-    "fr": "Lutris, Bottles, PortProton et tout dossier avec `_retail_` sont aussi fouilles. Si une origine ne trouve rien, elle est absente ici; la page d analyse en donne la raison."
+    "de": "Steam, Faugus, Heroic, Lutris, Bottles und PortProton werden mitgesucht, unter Windows die Programmordner, unter macOS die CrossOver-Flaschen und `/Applications`; dazu jeder Ordner mit `_retail_`. Findet eine Herkunft nichts, fehlt sie hier; die Scan-Seite nennt den Grund.",
+    "en": "Steam, Faugus, Heroic, Lutris, Bottles and PortProton are searched, on Windows the program folders, on macOS the CrossOver bottles and `/Applications`, plus any folder with `_retail_`. If an origin finds nothing, it is missing here; the scan page names the reason.",
+    "es": "Se buscan Steam, Faugus, Heroic, Lutris, Bottles y PortProton, en Windows las carpetas de programas, en macOS las botellas de CrossOver y `/Applications`, además de cualquier carpeta con `_retail_`. Si un origen no encuentra nada, falta aquí; la página de escaneo indica el motivo.",
+    "fr": "Steam, Faugus, Heroic, Lutris, Bottles et PortProton sont recherchés, sous Windows les dossiers de programmes, sous macOS les bouteilles CrossOver et `/Applications`, plus tout dossier avec `_retail_`. Si une origine ne trouve rien, elle manque ici ; la page de scan en donne la raison."
   },
   "cl.more.title": {
     "de": "Weitere Herkünfte",
