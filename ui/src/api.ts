@@ -104,3 +104,20 @@ export interface InstallErgebnis {
 export function install(addonsDir: string, url: string): Promise<InstallErgebnis> {
   return invoke<InstallErgebnis>("install", { addonsDir, url });
 }
+
+export interface Settings {
+  source_priority: string[];
+  language: string;
+  nav: string;
+  keys: Record<string, string>;
+  urls: Record<string, string>;
+  theme: string;
+}
+
+export function settingsGet(): Promise<Settings> {
+  return invoke<Settings>("settings_get");
+}
+
+export function settingsSet(settings: Settings): Promise<void> {
+  return invoke<void>("settings_set", { settings });
+}

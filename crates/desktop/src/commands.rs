@@ -348,3 +348,18 @@ pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis,
     .await
     .map_err(|e| e.to_string())?
 }
+
+
+// ------------------------------------------------------------- Einstellungen
+
+/// Einstellungen lesen. Dieselbe Datei wie die GTK-Oberflaeche.
+#[tauri::command]
+pub fn settings_get() -> crate::settings::Settings {
+    crate::settings::Settings::load()
+}
+
+/// Einstellungen schreiben.
+#[tauri::command]
+pub fn settings_set(settings: crate::settings::Settings) -> Result<(), String> {
+    settings.save()
+}

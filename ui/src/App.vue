@@ -6,13 +6,15 @@ import * as UI from "@weppelmann/components";
 import { lastScan, rescan, state } from "./store";
 import InstalliertView from "./views/InstalliertView.vue";
 import KatalogView from "./views/KatalogView.vue";
+import EinstellungenView from "./views/EinstellungenView.vue";
 
 // Der Katalog ist die Hauptansicht: dort sucht man, installiert und
 // aktualisiert. "Installiert" zeigt, was auf der Platte liegt.
-const ansicht = ref<"installiert" | "katalog">("katalog");
+const ansicht = ref<"installiert" | "katalog" | "einstellungen">("katalog");
 const reiter = [
   { id: "katalog", label: "Katalog" },
   { id: "installiert", label: "Installiert" },
+  { id: "einstellungen", label: "Einstellungen" },
 ] as const;
 
 onMounted(rescan);
@@ -38,6 +40,7 @@ onMounted(rescan);
     </UI.WpAppBar>
 
     <InstalliertView v-if="ansicht === 'installiert'" />
+    <EinstellungenView v-else-if="ansicht === 'einstellungen'" />
     <KatalogView v-else />
 
     <UI.WpTelemetryBar title="Stand"

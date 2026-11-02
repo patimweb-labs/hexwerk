@@ -8,6 +8,7 @@
 //! `core`, `sources`, `index` und `install`.
 
 pub mod commands;
+pub mod settings;
 
 pub fn run() {
     tauri::Builder::default()
@@ -16,6 +17,8 @@ pub fn run() {
             commands::catalog_stats,
             commands::catalog_search,
             commands::install,
+            commands::settings_get,
+            commands::settings_set,
         ])
         .run(tauri::generate_context!())
         .expect("Hexwerk konnte das Fenster nicht starten");

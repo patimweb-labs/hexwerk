@@ -1,7 +1,7 @@
 // Ein Ort fuer den Zustand. Die Ansichten lesen hier und rufen Aktionen auf —
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
-import { catalogSearch, catalogStats, install, scan, type Client, type Item, type Note, type ScanResult, type Stats } from "./api";
+import { catalogSearch, catalogStats, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings } from "./api";
 
 export const state = reactive<{
   clients: Client[];
@@ -131,5 +131,33 @@ export async function installiere(item: Item, addonsDir: string) {
     installation.fehler = String(fehler);
   } finally {
     installation.laeuft = false;
+  }
+}
+
+// ------------------------------------------------------------- Einstellungen
+
+export const einstellungen = reactive<{
+  werte: Settings | null;
+  gespeichert: boolean;
+  fehler: string | null;
+}>({ werte: null, gespeichert: false, fehler: null });
+
+export async function ladeEinstellungen() {
+  try {
+    einstellungen.werte = await settingsGet();
+  } catch (fehler) {
+    einstellungen.fehler = String(fehler);
+  }
+}
+
+export async function speichereEinstellungen() {
+  if (!einstellungen.werte) return;
+  try {
+    await settingsSet(einstellungen.werte);
+    einstellungen.gespeichert = true;
+    einstellungen.fehler = null;
+    window.setTimeout(() => (einstellungen.gespeichert = false), 2000);
+  } catch (fehler) {
+    einstellungen.fehler = String(fehler);
   }
 }
