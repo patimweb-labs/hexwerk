@@ -47,9 +47,14 @@ wie Bottles unter Linux; unter Windows verhält sich `Program Files` wie ein
 `drive_c`. Beides ist gegen künstliche Bäume getestet
 (`crates/core/tests/plattform_herkuenfte.rs`).
 
-**Noch nicht gebaut** sind Pakete für Windows und macOS: das Fenster ist Tauri 2
-und muss dort mit WebView2 bzw. gegen die macOS-SDK gebaut und signiert werden.
-Der Papierkorb nutzt bisher den XDG-Papierkorb des Linux-Desktops.
+Für alle drei Systeme gibt es Pakete: Linux als Tarball und Flatpak, macOS als
+Universal-DMG (arm64 und x86_64, ad-hoc signiert; mit Zertifikat in den Secrets
+wird echt signiert und notarisiert), Windows als Portable-ZIP und
+Inno-Setup-Installer. Die Jobs laufen in der CI auf `ubuntu-24.04`,
+`macos-latest` und `windows-latest`.
+
+Der Papierkorb nutzt bisher den XDG-Papierkorb des Linux-Desktops; unter Windows
+und macOS landet Gelöschtes in einem eigenen Ordner.
 
 ## Screenshots
 
@@ -141,7 +146,7 @@ Datenfluss und Datenmodell als Diagramm in
 
 ## Stand
 
-Version 0.3.0, kein öffentliches Release.
+Version 0.4.0.
 
 | Teil | Stand |
 |---|---|
@@ -151,7 +156,8 @@ Version 0.3.0, kein öffentliches Release.
 | Installation | fertig, 36 Tests |
 | Fenster | fünf Ansichten, vier Sprachen, drei Farbschemata |
 | Tests | 93 in Rust |
-| Flatpak | vorbereitet, mit der Tauri-Fassung noch nicht gebaut |
+| Flatpak | baut im Sandkasten |
+| Windows/macOS | Pakete im Release, CI baut beide |
 
 Offen:
 
