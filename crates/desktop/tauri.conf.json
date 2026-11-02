@@ -36,7 +36,8 @@
     "icon": [
       "assets/icons/icon-32.png",
       "assets/icons/icon-128.png",
-      "assets/icons/icon-256.png"
+      "assets/icons/icon-256.png",
+      "icons/icon.ico"
     ]
   }
 }
