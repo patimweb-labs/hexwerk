@@ -145,6 +145,14 @@ pub async fn scan() -> Result<ScanResult, String> {
             })
             .collect();
 
+        // Der Scan ist der eine Weg, auf dem installierte Addons in den Index
+        // kommen (wie `index.sync_clients` in der GTK-Fassung). Ohne diesen
+        // Schritt weiss die Detailseite nichts von Installationen: der Katalog
+        // fragt den Index, und der kennt nur, was hier hineingeschrieben wurde.
+        if let Ok(mut idx) = hexwerk_index::Index::open(&hexwerk_index::Index::default_path()) {
+            let _ = idx.sync_clients(&hexwerk::discover(&[]));
+        }
+
         ScanResult {
             clients,
             notes,
@@ -437,4 +445,70 @@ pub fn app_info() -> Info {
             .unwrap_or_default(),
         catalog_version,
     }
+}
+
+
+// ------------------------------------------------------------------- Bilder
+
+/// Ein Bild, wie es angekommen ist: Adresse und fertige data-URL.
+#[derive(Serialize)]
+pub struct BildDto {
+    pub url: String,
+    /// `data:image/…;base64,…` — die Oberflaeche setzt es direkt als src ein.
+    pub data: String,
+}
+
+fn base64(daten: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut aus = String::with_capacity(daten.len().div_ceil(3) * 4);
+    for stueck in daten.chunks(3) {
+        let b = [stueck[0], *stueck.get(1).unwrap_or(&0), *stueck.get(2).unwrap_or(&0)];
+        let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+        aus.push(ALPHABET[(n >> 18) as usize & 63] as char);
+        aus.push(ALPHABET[(n >> 12) as usize & 63] as char);
+        aus.push(if stueck.len() > 1 { ALPHABET[(n >> 6) as usize & 63] as char } else { '=' });
+        aus.push(if stueck.len() > 2 { ALPHABET[n as usize & 63] as char } else { '=' });
+    }
+    aus
+}
+
+/// Bilder einer Detailseite laden.
+///
+/// Bilder sind Anzeige, nicht Kataloginhalt: im Index stehen nur die Adressen,
+/// geholt wird erst, wenn jemand den Eintrag oeffnet. Sonst zoege ein
+/// Kataloglauf zehntausend Bilder mit (so steht es auch in `spawn_image_fetch`).
+#[tauri::command]
+pub async fn fetch_images(urls: Vec<String>) -> Vec<BildDto> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use hexwerk_sources::Http as _;
+        let http = hexwerk_sources::UreqHttp::new();
+        let mut aus = Vec::new();
+        for url in urls {
+            let anfrage = hexwerk_sources::Request::get(&url).header("accept", "image/*");
+            if let Ok(antwort) = http.request(&anfrage) {
+                if !antwort.is_success() || antwort.body.is_empty() {
+                    continue;
+                }
+                // Typ aus dem Inhalt raten: Header sind nicht immer da.
+                let typ = if antwort.body.starts_with(&[0x89, b'P', b'N', b'G']) {
+                    "image/png"
+                } else if antwort.body.starts_with(&[0xff, 0xd8]) {
+                    "image/jpeg"
+                } else if antwort.body.starts_with(b"GIF8") {
+                    "image/gif"
+                } else if antwort.body.starts_with(b"RIFF") {
+                    "image/webp"
+                } else {
+                    "image/jpeg"
+                };
+                aus.push(BildDto {
+                    url,
+                    data: format!("data:{typ};base64,{}", base64(&antwort.body)),
+                });
+            }
+        }
+        aus
+    })
+    .await
+    .unwrap_or_default()
 }

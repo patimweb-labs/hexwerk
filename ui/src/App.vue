@@ -9,7 +9,7 @@ import { computed, onMounted, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconBrand, IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
 import { t } from "./i18n";
-import { ansicht, gewaehlt, katalog, ladeStats, lastScan, quellenName, rescan, state, thema, wendeThema } from "./store";
+import { ansicht, einstellungen, gewaehlt, installation, katalog, ladeStats, lastScan, meldung, quellenName, rescan, state, sync, thema, wendeThema } from "./store";
 import ClientsView from "./views/ClientsView.vue";
 import InstalliertView from "./views/InstalliertView.vue";
 import KatalogView from "./views/KatalogView.vue";
@@ -54,6 +54,13 @@ function schalteThema() {
 const themaIcon = computed(() => (thema.value === "dark" ? IconSun : IconMoon));
 
 
+/** "Kompakte Leiste, nur Symbole" aus den Einstellungen. */
+const kompakt = computed(() => einstellungen.werte?.nav === "compact");
+
+/** Laeuft gerade etwas im Hintergrund? */
+const beschaeftigt = computed(() => state.loading || installation.laeuft || sync.laeuft);
+const lacuft = computed(() => (installation.laeuft ? t("st.kw.install") : sync.laeuft ? t("st.kw.catalog") : t("st.kw.scan")));
+
 const zustand = computed(() => {
   if (state.loading) return t("cl.running");
   if (state.error) return state.error;
@@ -71,7 +78,7 @@ onMounted(() => {
 <template>
   <div class="fenster">
     <!-- ------------------------------------------------------------ Leiste -->
-    <aside class="leiste">
+    <aside class="leiste" :class="{ 'is-compact': kompakt }">
       <div class="marke">
         <UI.WpIcon :icon="IconBrand" size="lg" class="marke__zeichen" />
         <span class="marke__wort">HEXWERK</span>
@@ -132,8 +139,14 @@ onMounted(() => {
         <EinstellungenView v-else />
       </main>
 
+      <div v-if="meldung" class="toast">
+        <UI.WpToast :tone="meldung.ton" :title="meldung.titel" dismissible @close="meldung = null" />
+      </div>
+
       <footer class="fuss">
         <span class="fuss__marke">HEXWERK</span>
+        <UI.WpSpinner v-if="beschaeftigt" size="sm" />
+        <span v-if="beschaeftigt" class="fuss__zahl">{{ lacuft }}</span>
         <span class="fuss__zustand">{{ zustand }}</span>
         <span class="fuss__zahl">{{ t("st.kw.counts", katalog.stats?.catalogue ?? 0, state.addonCount, state.clients.length) }}</span>
       </footer>
@@ -195,4 +208,18 @@ onMounted(() => {
 .fuss__marke { font-family: var(--wp-font-family-display); letter-spacing: 0.1em; color: var(--wp-color-text-muted); }
 .fuss__zustand { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fuss__zahl { font-family: var(--wp-font-family-mono); }
+/* Meldung ueber der Ansicht, nicht im Weg: unten rechts, ueber der Fusszeile. */
+.toast { position: absolute; right: var(--wp-space-4); bottom: 44px; min-width: 280px; max-width: 460px; z-index: 20; }
+.inhalt { position: relative; }
+
+/* Kompakte Leiste: nur Symbole, Breite wie ein Symbol plus Rand. */
+.leiste.is-compact { width: 58px; }
+.leiste.is-compact .marke__wort,
+.leiste.is-compact .nav__label,
+.leiste.is-compact .nav__zahl,
+.leiste.is-compact .bestand,
+.leiste.is-compact .quellen,
+.leiste.is-compact .abschnitt { display: none; }
+.leiste.is-compact .nav__eintrag { justify-content: center; padding: 8px 0; }
+.leiste.is-compact .marke { justify-content: center; padding: var(--wp-space-3) 0; }
 </style>

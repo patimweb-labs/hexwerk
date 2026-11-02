@@ -142,3 +142,13 @@ export interface Info {
 export function appInfo(): Promise<Info> {
   return invoke<Info>("app_info");
 }
+
+export interface Bild {
+  url: string;
+  data: string;
+}
+
+/** Bilder einer Detailseite laden (data-URLs, erst beim Öffnen geholt). */
+export function fetchImages(urls: string[]): Promise<Bild[]> {
+  return invoke<Bild[]>("fetch_images", { urls });
+}

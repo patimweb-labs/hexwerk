@@ -1,7 +1,7 @@
 // Ein Ort fuer den Zustand. Die Ansichten lesen hier und rufen Aktionen auf —
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
-import { setSprache, sprache } from "./i18n";
+import { setSprache, sprache, t } from "./i18n";
 import { appInfo, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings, type Info } from "./api";
 
 export const state = reactive<{
@@ -128,10 +128,12 @@ export async function installiere(item: Item, addonsDir: string) {
   try {
     const ergebnis = await install(addonsDir, release.download_url);
     installation.erfolg = `${ergebnis.folder.split("/").pop()} ${ergebnis.version ?? ""}`.trim();
+    zeigeMeldung(`${t("dt.installed")}: ${installation.erfolg}`, "ok");
     // Ein Weg in den Index: der Scan liest den Ordner neu.
     await rescan();
   } catch (fehler) {
     installation.fehler = String(fehler);
+    zeigeMeldung(String(fehler), "error");
   } finally {
     installation.laeuft = false;
   }
@@ -273,20 +275,52 @@ export function wendeThema(neu: string) {
  * Addon hat den aber nicht immer. Deshalb wird im Index nach dem Titel gesucht:
  * ein Treffer oeffnet dessen Detailseite, kein Treffer meldet das ehrlich.
  */
-export async function oeffneLokal(titel: string): Promise<boolean> {
+/**
+ * Ein lokal installiertes Addon in der Detailansicht oeffnen.
+ *
+ * Gibt es einen Katalogeintrag dazu, wird der geoeffnet (mit Quellen und
+ * Versionen). Gibt es keinen — selbstgebaute Addons stehen in keinem Markt —,
+ * dann zeigt die Detailseite die lokalen Daten. Genau das macht `show_local_detail`
+ * in der GTK-Fassung; vorher landete man hier in einer Fehlermeldung.
+ */
+export const lokales = ref<import("./api").Addon | null>(null);
+
+export async function oeffneLokal(addon: import("./api").Addon): Promise<boolean> {
+  lokales.value = null;
   try {
-    const treffer = await catalogSearch(titel, 5);
-    const passend = treffer.find((i) => i.name.toLowerCase() === titel.toLowerCase()) ?? treffer[0];
-    if (!passend) {
-      katalog.error = "Kein Katalogeintrag zu diesem Addon.";
-      return false;
+    const treffer = await catalogSearch(addon.title, 5);
+    const passend = treffer.find((i) => i.name.toLowerCase() === addon.title.toLowerCase());
+    if (passend) {
+      katalog.items = [passend, ...katalog.items.filter((i) => i.id !== passend.id)];
+      katalog.gewaehlt = 0;
+    } else {
+      lokales.value = addon;
+      katalog.gewaehlt = -1;
     }
-    katalog.items = [passend, ...katalog.items.filter((i) => i.id !== passend.id)];
-    katalog.gewaehlt = 0;
     ansicht.value = "detail";
     return true;
   } catch (fehler) {
+    // Auch ohne Index bleibt das Lokale sichtbar.
+    lokales.value = addon;
+    katalog.gewaehlt = -1;
+    ansicht.value = "detail";
     katalog.error = String(fehler);
     return false;
   }
+}
+
+// ------------------------------------------------------------------ Meldungen
+
+/**
+ * Kurze Rückmeldung über der Ansicht (wie adw::ToastOverlay in der GTK-Fassung).
+ * Eine Meldung, die nach ein paar Sekunden von selbst geht — kein Dialog, der
+ * einen Klick verlangt.
+ */
+export const meldung = ref<{ ton: "info" | "ok" | "warn" | "error"; titel: string } | null>(null);
+
+let meldungTimer = 0;
+export function zeigeMeldung(titel: string, ton: "info" | "ok" | "warn" | "error" = "info") {
+  meldung.value = { ton, titel };
+  window.clearTimeout(meldungTimer);
+  meldungTimer = window.setTimeout(() => (meldung.value = null), 4000);
 }

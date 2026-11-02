@@ -48,7 +48,7 @@ const tabelle = computed(() =>
       </div>
       <p v-if="flavor" class="pfad">{{ flavor.addons_dir }}</p>
       <UI.WpTable :columns="spalten" :state="tabelle" :caption="t('iv.title')"
-                  @row-activate="(i: number) => oeffneLokal((flavor?.addons[i]?.title) ?? '')" />
+                  @row-activate="(i: number) => flavor?.addons[i] && oeffneLokal(flavor.addons[i])" />
     </main>
   </div>
 </template>
