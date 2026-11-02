@@ -140,7 +140,7 @@ Die Oberfläche teilt ihre Bausteine mit wledambilight und crosspoint
 als Untermodul.
 
 Datenfluss und Datenmodell als Diagramm in
-[`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md). Arbeitspakete und Risiken in
+[`docs/architektur.md`](docs/architektur.md). Arbeitspakete und Risiken in
 [`PLAN.md`](PLAN.md).
 
 ## Stand
@@ -164,6 +164,14 @@ Offen:
 * Notizen zu einem Addon (die GTK-Fassung hatte sie).
 * Kontextmenü auf einem Addon (installieren, deinstallieren, Ordner öffnen).
 * Addon-Profile (schaltbare Sammlungen).
+
+## Daten und Datenschutz
+
+Netzwerkzugriff gibt es nur, wo er gebraucht wird: zu den Quellen (GitHub,
+Tukui, WoWInterface, Wago, CurseForge) und zum Katalogdienst. Schlüssel für
+Wago und CurseForge liegen im Schlüsselbund (`org.freedesktop.secrets`), nicht
+in der Konfiguration. Keine Telemetrie, kein Konto, kein Hintergrunddienst.
+Konfiguration unter `~/.config/hexwerk`, Addons bleiben in den Wine-Präfixen.
 
 ## Lizenz
 
