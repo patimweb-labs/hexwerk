@@ -186,3 +186,32 @@ export async function ladeKatalog(pages = 400) {
     sync.laeuft = false;
   }
 }
+
+// ------------------------------------------------------------------ Detail
+
+/** Katalogeintrag als eigene Seite oeffnen (wie in der GTK-Fassung). */
+export function oeffneDetail(item: Item) {
+  katalog.gewaehlt = katalog.items.findIndex((i) => i.id === item.id);
+  ansicht.value = "detail";
+}
+
+/** Zurueck in den Katalog (Brotkrumen). */
+export function schliesseDetail() {
+  ansicht.value = "katalog";
+}
+
+/** Welcher Bildschirm sichtbar ist. Die Detailseite haengt an einer Auswahl,
+ *  nicht an der Leiste — sie wird aus Katalog oder Installiert geoeffnet. */
+export const ansicht = ref<"clients" | "installiert" | "katalog" | "detail" | "einstellungen">("clients");
+
+/** Zaehler in der Leiste. */
+export const zaehler = reactive({ clients: 0, installiert: 0, katalog: 0 });
+
+/** Zahlen fuer Leiste und Fusszeile, ohne den Katalog zu oeffnen. */
+export async function ladeStats() {
+  try {
+    katalog.stats = await catalogStats();
+  } catch {
+    /* Index noch nicht da: die Leiste zeigt dann eben nichts */
+  }
+}
