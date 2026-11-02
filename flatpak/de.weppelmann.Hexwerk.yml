@@ -19,7 +19,7 @@ runtime-version: '51'
 sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-command: hexwerk-gtk
+command: hexwerk-desktop
 
 finish-args:
   # Fenster: Wayland bevorzugt, X11 als Rückfall, GPU für die Darstellung.
@@ -62,13 +62,14 @@ modules:
         cat .cargo/config.toml
       - cargo --offline fetch --locked
       - cargo --offline build --release --locked
-      # Die Oberfläche ist ein eigenes Paket mit eigener [workspace]-Tabelle,
-      # deshalb ein eigener Aufruf. Ohne --locked, weil ihr Cargo.lock nicht aus
-      # derselben Auflösung stammt wie das der Wurzel; die Versionen sind
-      # trotzdem im eingefrorenen Quellensatz enthalten.
-      - cargo --offline build --release --manifest-path crates/ui-gtk/Cargo.toml
+      # Die Oberfläche ist die Tauri-App: Vue-Frontend aus `ui/dist` (vor dem
+      # Bau auf dem Host erzeugt: cd ui && npm ci && npm run build) plus der
+      # Rust-Host in crates/desktop mit eigener [workspace]-Tabelle. Ohne
+      # --locked, weil ihr Cargo.lock nicht aus derselben Auflösung stammt wie
+      # das der Wurzel; die Versionen liegen im eingefrorenen Quellensatz.
+      - cargo --offline build --release --manifest-path crates/desktop/Cargo.toml --features custom-protocol
       - install -Dm755 target/release/hexwerk ${FLATPAK_DEST}/bin/hexwerk
-      - install -Dm755 crates/ui-gtk/target/release/hexwerk-gtk ${FLATPAK_DEST}/bin/hexwerk-gtk
+      - install -Dm755 crates/desktop/target/release/hexwerk-desktop ${FLATPAK_DEST}/bin/hexwerk-desktop
       - install -Dm644 data/de.weppelmann.Hexwerk.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
       - install -Dm644 packaging/linux/de.weppelmann.Hexwerk.metainfo.xml ${FLATPAK_DEST}/share/metainfo/${FLATPAK_ID}.metainfo.xml
       - install -Dm644 data/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
@@ -84,8 +85,8 @@ modules:
         pngs=$(ls -1 "${FLATPAK_DEST}/share/icons/hicolor"/*/apps/${FLATPAK_ID}.png | wc -l)
         test "$pngs" -eq 7
         test -x "${FLATPAK_DEST}/bin/hexwerk"
-        test -x "${FLATPAK_DEST}/bin/hexwerk-gtk"
-        echo "Installiert: 2 Binaries, Desktop-Eintrag, Metainfo, 2 SVGs, ${pngs} PNG-Größen"
+        test -x "${FLATPAK_DEST}/bin/hexwerk-desktop"
+        echo "Installiert: 2 Binaries (CLI + Tauri-App), Desktop-Eintrag, Metainfo, 2 SVGs, ${pngs} PNG-Größen"
     sources:
       - type: dir
         path: ..
@@ -94,6 +95,5 @@ modules:
           - build-dir
           - .flatpak-builder
           - .flatpak-build
-          - crates/ui-gtk/target
           - .git
       - new-sources.json

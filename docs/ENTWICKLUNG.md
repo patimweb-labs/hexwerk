@@ -12,7 +12,7 @@ podman run -d --name hexwerk-build \
   -v "$PWD":/work:z \
   -v "$HOME/.cargo/registry":/root/.cargo/registry:z \
   -w /work hexwerk-buildenv sleep infinity
-podman exec -w /work hexwerk-build sh -lc 'cd crates/ui-gtk && cargo build'
+podman exec -w /work hexwerk-build sh -lc 'cd crates/desktop && cargo build --features custom-protocol'
 ```
 
 Im Container liegen GTK 4.22.5 und libadwaita 1.9.4 sowie `Xvfb`, `xdotool`,
@@ -24,7 +24,7 @@ Im Container liegen GTK 4.22.5 und libadwaita 1.9.4 sowie `Xvfb`, `xdotool`,
 cargo test --workspace                                   # 165 Tests, ohne GTK
 cargo clippy --workspace --all-targets
 ./target/release/hexwerk scan                            # gegen die echte Installation
-podman exec -w /work hexwerk-build sh -lc 'cd crates/ui-gtk && cargo build'
+podman exec -w /work hexwerk-build sh -lc 'cd crates/desktop && cargo build --features custom-protocol'
 podman exec -w /work hexwerk-build bash tools/ux_check.sh /tmp/ux
 ```
 

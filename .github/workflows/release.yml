@@ -133,8 +133,7 @@ jobs:
           npm --prefix ui run build
       - name: Kommandozeile bauen
         run: cargo build --release --locked --bin hexwerk
-      # Nur das Fenster-Crate: das GTK-Crate (crates/ui-gtk) ist abgeloest und
-      # zieht libadwaita nach, das auf dem Runner fehlt.
+      # Nur die Tauri-App: die fruehere GTK-Oberflaeche ist entfernt.
       - name: Fenster bauen
         # crates/desktop ist ein eigener Workspace (Tauri zieht WebKit nach),
         # deshalb von dort bauen statt mit -p aus dem Wurzel-Workspace.

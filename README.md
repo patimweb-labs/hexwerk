@@ -134,7 +134,6 @@ nie vollständig, nur die letzten vier Zeichen.
 | `crates/desktop` | Fenster (Tauri 2): Befehle, keine Fachlogik |
 | `ui/` | Oberfläche (Vue 3), baut gegen `weppelmann-ui` |
 | `src/` | Kommandozeile |
-| `crates/ui-gtk` | alte GTK-Fassung, abgelöst; liegt noch im Baum und wird entfernt |
 
 Die Oberfläche teilt ihre Bausteine mit wledambilight und crosspoint
 ([`weppelmann-ui`](https://github.com/Smotherer007/weppelmann-ui)), eingebunden

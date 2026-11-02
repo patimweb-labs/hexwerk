@@ -35,7 +35,7 @@ jobs:
       - name: Workspace
         run: cargo fmt --all --check
       - name: Oberflaeche
-        run: cargo fmt --manifest-path crates/ui-gtk/Cargo.toml --all --check
+        run: cargo fmt --manifest-path crates/desktop/Cargo.toml --all --check
 
   clippy:
     name: Clippy
@@ -81,39 +81,6 @@ jobs:
           name: hexwerk
           path: target/release/hexwerk
           if-no-files-found: error
-
-  gtk:
-    name: Oberfläche (GTK4)
-    runs-on: ubuntu-latest
-    # Fedora statt Ubuntu: ubuntu-latest bringt libadwaita 1.5, die Oberfläche
-    # verlangt 1.6 (AdwSpinner). Fedora 44 hat libadwaita 1.9 und entspricht
-    # damit der Umgebung, in der hier entwickelt wird.
-    container:
-      image: registry.fedoraproject.org/fedora:44
-    steps:
-      - name: Werkzeuge
-        run: |
-          dnf install -y --setopt=install_weak_deps=False \
-            gtk4-devel libadwaita-devel pkgconf-pkg-config \
-            cargo rust rustfmt clippy git
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: crates/ui-gtk
-      # Gebaut wird ueber das Wurzelpaket mit Feature `ui` ([[bin]] hexwerk-gtk
-      # mit required-features), nicht ueber die eigene [workspace]-Wurzel von
-      # crates/ui-gtk: nur so gilt Cargo.lock der Wurzel und das Artefakt liegt
-      # dort, wo das Flatpak-Manifest es erwartet.
-      - name: Clippy der Oberfläche
-        run: cargo clippy --locked --features ui --all-targets -- -D clippy::correctness
-      # Das Fenster wird hier gebaut, nicht im Flatpak: dort gibt es kein cargo.
-      - name: Fenster bauen
-        run: cargo build --release --locked --features ui --bin hexwerk-gtk
-      # Kein Artefakt mehr: das Flatpak baut die Oberfläche selbst im Sandkasten
-      # (siehe flatpak/de.weppelmann.Hexwerk.yml). Dieser Job ist der frühe
-      # Warnruf, wenn die Oberfläche gegen GTK nicht mehr baut.
 
   metadaten:
     name: Paket-Metadaten

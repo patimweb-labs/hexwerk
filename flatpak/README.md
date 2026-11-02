@@ -40,7 +40,7 @@ Paket und jedem Versionssprung. Fehlt ein Paket im eingefrorenen Satz, bricht
 `cargo --offline` im Sandkasten mit einer klaren Meldung ab; der Bau läuft nicht
 mit einer halben Abhängigkeitsliste durch.
 
-`crates/ui-gtk/Cargo.lock` wird nicht eigens eingefroren. Die Oberfläche ist ein
+`crates/desktop/Cargo.lock` wird nicht eigens eingefroren. Die Oberfläche ist ein
 eigenes Paket mit eigener `[workspace]`-Tabelle, ihre Abhängigkeiten sind aber
 dieselben wie die der Wurzel und liegen damit im selben Quellensatz. Deshalb
 baut der zweite `cargo`-Aufruf im Manifest ohne `--locked`.
@@ -69,7 +69,7 @@ Sandkasten kompiliert werden. Danach liegt die App als
 
 ```bash
 flatpak run --command=hexwerk de.weppelmann.Hexwerk scan
-flatpak run --command=sh de.weppelmann.Hexwerk -c 'ldd /app/bin/hexwerk-gtk | grep -c "not found"'
+flatpak run --command=sh de.weppelmann.Hexwerk -c 'ldd /app/bin/hexwerk-desktop | grep -c "not found"'
 ```
 
 Erwartet: der Scan findet die echten Wine-Präfixe (dafür steht

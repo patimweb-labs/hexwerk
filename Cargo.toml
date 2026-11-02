@@ -7,30 +7,19 @@ license = "GPL-3.0-or-later"
 
 # Der Kern liegt in `crates/core`, Quellen, Index und Installation in eigenen
 # Paketen. Richtung des Pfeils wie bei Crosspoint: core -> sources/index/install
-# -> ui -> dieses Paket.
+# -> desktop -> dieses Paket.
 [dependencies]
 hexwerk = { package = "hexwerk-core", path = "crates/core" }
 hexwerk-sources = { path = "crates/sources" }
 hexwerk-index = { path = "crates/index" }
 hexwerk-install = { path = "crates/install" }
-# GTK4-Oberflaeche, nur mit Feature `ui`. Ohne das Feature wird dieses Paket
-# ohne GTK gebaut - so laeuft auch die CI, die kein GTK im Testjob hat.
-hexwerk-ui = { path = "crates/ui-gtk", optional = true }
-
-[features]
-default = []
-ui = ["dep:hexwerk-ui"]
 
 [[bin]]
 name = "hexwerk"
 path = "src/main.rs"
 
-[[bin]]
-name = "hexwerk-gtk"
-path = "src/bin/hexwerk_gtk.rs"
-required-features = ["ui"]
-
 [workspace]
 members = ["crates/core", "crates/sources", "crates/index", "crates/install"]
-# Die GTK-Oberflaeche ist ein eigenes Paket mit eigener [workspace]-Tabelle.
-exclude = ["crates/ui-gtk"]
+# Die Oberflaeche ist die Tauri-App in `crates/desktop` (eigene
+# [workspace]-Tabelle) mit dem Vue-Frontend aus `ui/`.
+exclude = ["crates/desktop"]

@@ -3,7 +3,7 @@
 //! Der Kern kennt kein Netz und keine Oberflaeche. Er liest Dateisystem und
 //! liefert Typen, auf denen Quellen (`hexwerk-sources`), Index
 //! (`hexwerk-index`), Installation (`hexwerk-install`) und Oberflaeche
-//! (`hexwerk-ui`) aufsetzen.
+//! (`hexwerk-desktop`, Tauri + Vue) aufsetzen.
 
 pub mod addon;
 pub mod clients;

@@ -15,7 +15,7 @@ jemand sie anfasst.
 flowchart TD
     subgraph Anwendung
         CLI[hexwerk<br/>Kommandozeile]
-        UI[hexwerk-ui<br/>GTK4 und libadwaita<br/>Feature ui]
+        UI[hexwerk-desktop<br/>Tauri + Vue-Frontend<br/>crates/desktop]
     end
 
     subgraph Fachpakete
