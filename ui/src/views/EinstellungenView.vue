@@ -60,7 +60,7 @@ onMounted(ladeEinstellungen);
     </section>
 
     <div class="fuss">
-      <UI.WpButton :label="t('set.saved')" variant="primary" @press="speichereEinstellungen" />
+      <UI.WpButton :label="t('set.save')" variant="primary" @press="speichereEinstellungen" />
       <span v-if="einstellungen.gespeichert" class="ok">{{ t("set.saved") }}</span>
       <span v-if="einstellungen.fehler" class="fehler">{{ einstellungen.fehler }}</span>
     </div>

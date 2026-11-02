@@ -5,8 +5,8 @@ WoW-Installation in einem Wine-Präfix, egal ob sie über Steam und Proton,
 Faugus, Heroic, Lutris, Bottles, PortProton oder von Hand angelegt wurde, und
 verwaltet die Addons aller Client-Versionen aus einem Fenster.
 
-Native Oberfläche mit GTK4 und libadwaita, Kern in Rust, lokaler Index für die
-Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
+Oberfläche mit Tauri 2 und Vue 3, Kern in Rust, lokaler Index für die Suche.
+Kein Hintergrunddienst, kein Konto.
 
 ## Funktionen
 
@@ -14,54 +14,57 @@ Suche. Keine Browserschnittstelle, kein Hintergrunddienst, kein Konto.
   PortProton und jeden Ordner, den du selbst auswählst.
 * Alle Client-Versionen: Retail, Classic, Classic Era, Anniversary, Forever und
   die PTR-Varianten, jede mit eigener Addon-Liste.
-* Katalog aus mehreren Quellen, ohne Zugangsdaten über 7.800 Einträge
-  (WoWInterface 7.766, Tukui 24, GitHub nach Stichwort). Dasselbe Addon aus
-  mehreren Märkten ist ein Eintrag mit den Versionen je Quelle.
+* Katalog aus mehreren Quellen, ohne Zugangsdaten über 27.000 Einträge, dazu
+  CurseForge und Wago, sobald ein eigener Schlüssel hinterlegt ist. Dasselbe
+  Addon aus mehreren Märkten ist ein Eintrag mit den Versionen je Quelle.
 * Suche über einen lokalen Index (SQLite mit FTS5), damit das Fenster auch ohne
   Netz und während eines Scans bedienbar bleibt.
 * Addons werden erkannt, nicht eingetragen: über die Projektkennungen in der
   `.toc` und über einen Fingerprint des Ordners. Updates funktionieren damit
   auch für Addons, die von Hand installiert wurden.
+* Detailseite mit Bildergalerie, Beschreibung, Dateien, Screenshots und Quellen;
+  der Installationsstand gilt für den gewählten Spielordner.
 * Installation entpackt mit Ordnerkorrektur, sichert vorher den alten Stand und
-  verschiebt Gelöschtes in den Papierkorb des Desktops und holt es auf Wunsch zurück.
-* Dunkle und helle Darstellung, Umschaltung im Fenster, Wahl wird gemerkt.
+  verschiebt Gelöschtes in den Papierkorb des Desktops und holt es auf Wunsch
+  zurück.
+* Vier Sprachen (deutsch, englisch, spanisch, französisch) und drei Farbschemata
+  (dunkel, hell, mono); die Wahl wird gemerkt.
 
 ## Screenshots
 
 | | |
 |---|---|
-| ![Scan](docs/screenshots/scan.png) | ![Clients](docs/screenshots/clients.png) |
-| Scan beim Start | Gefundene Clients je Herkunft |
-| ![Installiert](docs/screenshots/installiert.png) | ![Katalog](docs/screenshots/katalog.png) |
-| Addons je Client-Ordner | Katalog, geliefert vom Dienst |
-| ![Einstellungen](docs/screenshots/einstellungen.png) | ![Addon-Detail](docs/screenshots/detail.png) |
-| Sprache, Aussehen, Ablage | Ein Addon mit Quellen, Version und Ziel |
+| ![Clients](docs/screenshots/clients.png) | ![Installiert](docs/screenshots/installiert.png) |
+| Gefundene Clients je Herkunft, Spielordner als Tabelle | Addons je Spielordner, Deinstallieren in den Papierkorb |
+| ![Katalog](docs/screenshots/katalog.png) | ![Addon-Detail](docs/screenshots/detail.png) |
+| Katalog mit Kästchen-Filtern je Quelle und Interface | Detailseite mit Galerie, Reitern und Installationsziel |
+| ![Einstellungen](docs/screenshots/einstellungen.png) | |
+| Sprache, Aussehen, Ablage | |
 
-Der Katalog kommt fertig vom Dienst (`hexwerk-api.weppelmann.eu`): die App haelt
-keinen CurseForge-Schluessel und laedt nur den gepackten Snapshot. Bilder liegen
-offen auf dem CDN und werden direkt geladen.
+Der Katalog kommt fertig vom Dienst (`hexwerk-api.weppelmann.eu`): die App hält
+keinen CurseForge-Schlüssel und lädt nur den gepackten Snapshot. Bilder werden
+erst geholt, wenn ein Eintrag geöffnet wird.
 
 ## Installation
 
-Ein Flatpak ist vorbereitet (`flatpak/de.weppelmann.Hexwerk.yml`, Runtime
-`org.gnome.Platform//51`) und baut im Sandkasten, ist aber noch nicht
-veröffentlicht. Bauanleitung: [`flatpak/README.md`](flatpak/README.md).
-
-Aus dem Quelltext, Kommandozeile:
+Aus dem Quelltext:
 
 ```bash
-cargo build --release
-./target/release/hexwerk scan
+cargo build --release                       # Kommandozeile
+npm --prefix ui ci && npm --prefix ui run build
+cd crates/desktop && cargo build --release --features custom-protocol
 ```
 
-Oberfläche: sie braucht die GTK4- und libadwaita-Entwicklungspakete. Fehlen sie
-auf dem System, baut man sie in einem Container:
+Das Fenster braucht WebKitGTK und GTK 3 zur Bauzeit:
 
 ```bash
-podman build -t hexwerk-buildenv -f packaging/Containerfile .
-podman run --rm -v "$PWD":/work:z -w /work hexwerk-buildenv \
-  sh -lc 'cd crates/ui-gtk && cargo build --release'
+sudo dnf install webkit2gtk4.1-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel
 ```
+
+Ein Flatpak ist vorbereitet (`flatpak/de.weppelmann.Hexwerk.yml`), mit der
+Tauri-Fassung aber noch nicht gebaut: das Manifest muss das Frontend mitbauen
+und WebKit aus der Runtime nehmen. Bauanleitung:
+[`flatpak/README.md`](flatpak/README.md).
 
 ## Benutzung
 
@@ -74,18 +77,18 @@ hexwerk index                # lokalen Index aus dem Dateisystem bauen
 hexwerk index --net bags     # Quellen befragen und Katalog füllen
 hexwerk search weakauras     # im lokalen Index suchen
 hexwerk keys list            # Quellen mit Schlüssel und ihre Herkunft
-hexwerk keys set wago <token>
+hexwerk keys set curseforge <key>
 hexwerk keys test            # jede Quelle mit einer echten Anfrage prüfen
 ```
 
-Im Fenster: links die Ansichten, in der Kopfleiste der Umschalter zwischen
-System, Dunkel und Hell. Der Katalog liest ausschließlich den lokalen Index,
-der beim Start im Hintergrund aus den Quellen ergänzt wird.
+Im Fenster: links die Ansichten, in der Kopfleiste der Umschalter zwischen den
+Farbschemata. Der Katalog liest ausschließlich den lokalen Index, der beim Start
+im Hintergrund aus den Quellen ergänzt wird.
 
 ## Quellen und Schlüssel
 
-Ohne Zugangsdaten nutzbar: **GitHub**, **Tukui**, **WoWInterface**.
-Mit eigenem Schlüssel: **Wago** (Token) und **CurseForge** (API-Key). Beide sind
+Ohne Zugangsdaten nutzbar: **WoWInterface** (über den Dienst). Mit eigenem
+Schlüssel: **CurseForge** (API-Key) und **Wago** (Token). Beide sind
 abgeschaltet, solange kein Schlüssel hinterlegt ist.
 
 Hexwerk liefert bewusst keinen fremden Schlüssel mit: CurseForge vergibt Keys an
@@ -93,9 +96,6 @@ den einzelnen Entwickler und nicht übertragbar. Ein eigener Key wird gesetzt
 über `hexwerk keys set curseforge <key>`, über `~/.config/hexwerk/keys.json`
 (Modus 0600) oder über `HEXWERK_CURSEFORGE_KEY`. Ausgegeben wird ein Schlüssel
 nie vollständig, nur die letzten vier Zeichen.
-
-Die gemessenen Endpunkte und Antwortformen stehen in
-[`docs/QUELLEN.md`](docs/QUELLEN.md).
 
 ## Aufbau
 
@@ -105,36 +105,39 @@ Die gemessenen Endpunkte und Antwortformen stehen in
 | `crates/sources` | Quellen: GitHub, Tukui, WoWInterface, Wago, CurseForge, Fingerprint |
 | `crates/index` | lokaler Index (SQLite, FTS5) für Suche, Katalog und Bestand |
 | `crates/install` | Installation, Sicherung, Papierkorb |
-| `crates/ui-gtk` | Oberfläche (GTK4, libadwaita) |
+| `crates/desktop` | Fenster (Tauri 2): Befehle, keine Fachlogik |
+| `ui/` | Oberfläche (Vue 3), baut gegen `weppelmann-ui` |
 | `src/` | Kommandozeile |
+| `crates/ui-gtk` | alte GTK-Fassung, abgelöst; liegt noch im Baum und wird entfernt |
+
+Die Oberfläche teilt ihre Bausteine mit wledambilight und crosspoint
+([`weppelmann-ui`](https://github.com/Smotherer007/weppelmann-ui)), eingebunden
+als Untermodul.
 
 Datenfluss und Datenmodell als Diagramm in
 [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md). Arbeitspakete und Risiken in
-[`PLAN.md`](PLAN.md). Entwicklungsumgebung und Prüfwerkzeuge in
-[`docs/ENTWICKLUNG.md`](docs/ENTWICKLUNG.md).
+[`PLAN.md`](PLAN.md).
 
 ## Stand
 
-Version 0.1.0, kein Release. Kern und Oberfläche laufen, der Katalog zieht echte
-Daten aus den Quellen.
+Version 0.3.0, kein öffentliches Release.
 
 | Teil | Stand |
 |---|---|
-| Präfix-Erkennung | fertig, 48 Tests |
-| Quellen | fertig, 50 Tests, echter Netztest über `crates/sources/examples/probe.rs` |
-| Index | fertig, 37 Tests |
-| Installation | fertig, 30 Tests |
-| Oberfläche | fünf Bildschirme, Dunkel und Hell, Katalog und Detail aus dem Index |
-| Flatpak | baut im Sandkasten (GNOME 51 plus Rust-Erweiterung), lokal installiert und gegen das echte Präfix geprüft |
+| Präfix-Erkennung | fertig |
+| Quellen | fertig, echter Netztest über `crates/sources/examples/probe.rs` |
+| Index | fertig, Katalog 27.695 Einträge |
+| Installation | fertig, 36 Tests |
+| Fenster | fünf Ansichten, vier Sprachen, drei Farbschemata |
+| Tests | 93 in Rust |
+| Flatpak | vorbereitet, mit der Tauri-Fassung noch nicht gebaut |
 
 Offen:
 
-* Addons leeren (Clear): ein Client-Ordner auf Wunsch zurück auf null, mit Sicherung,
-  Papierkorb und Rückgängig. Beschreibung in [`PLAN.md`](PLAN.md), Abschnitt 14.
 * Veröffentlichung als Flatpak.
+* Notizen zu einem Addon (die GTK-Fassung hatte sie).
+* Kontextmenü auf einem Addon (installieren, deinstallieren, Ordner öffnen).
 * Addon-Profile (schaltbare Sammlungen).
-* Bilder in der Detailansicht aus den Quellen.
-* Nachladen beim Scrollen im Katalog.
 
 ## Lizenz
 

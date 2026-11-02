@@ -1151,6 +1151,12 @@
     "es": "PRIORIDAD DE FUENTES",
     "fr": "PRIORITÉ DES SOURCES"
   },
+  "set.save": {
+    "de": "Speichern",
+    "en": "Save",
+    "es": "Guardar",
+    "fr": "Enregistrer"
+  },
   "set.saved": {
     "de": "Einstellungen gespeichert",
     "en": "Settings saved",
