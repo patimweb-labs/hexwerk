@@ -1,5 +1,12 @@
 # Änderungen
 
+## [0.5.1](https://github.com/patimweb-labs/hexwerk/compare/v0.5.0...v0.5.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **ci:** Flatpak-Job bekommt die fertigen Binaries ([#10](https://github.com/patimweb-labs/hexwerk/issues/10)) ([bf4bf9e](https://github.com/patimweb-labs/hexwerk/commit/bf4bf9e31ff8150c27d0be0b2803d4c6b28c5525))
+
 ## [0.5.0](https://github.com/patimweb-labs/hexwerk/compare/v0.4.2...v0.5.0) (2026-11-03)
 
 
