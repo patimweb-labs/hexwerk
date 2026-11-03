@@ -73,13 +73,43 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # Die Oberflaeche ist Tauri (WebKitGTK). Ohne diese Pakete baut nur die
+      # Kommandozeile, und das Fenster - die eigentliche Anwendung - waere in
+      # der CI nie uebersetzt worden.
+      - name: WebKit-Pakete
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev pkg-config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Die Oberflaeche wird ins Binary eingebettet (custom-protocol), muss also
+      # vor dem Bau fertig sein. Die Bibliothek kommt als Untermodul und bringt
+      # nur Quellcode mit; die Tokens sind ein Bauergebnis.
+      - name: Oberflaeche bauen
+        run: |
+          npm --prefix weppelmann-ui install --no-audit --no-fund
+          npm --prefix weppelmann-ui run tokens
+          npm --prefix ui ci
+          npm --prefix ui run build
       - run: cargo build --release --locked --bin hexwerk
-      # Der Flatpak-Job baut im Container ohne Rust und bekommt das Binary
-      # hier fertig gebaut.
+      - name: Fenster bauen
+        # crates/desktop ist ein eigener Workspace (Tauri zieht WebKit nach),
+        # deshalb von dort bauen statt mit -p aus dem Wurzel-Workspace.
+        working-directory: crates/desktop
+        run: cargo build --release --features custom-protocol
+      # Der Flatpak-Job baut im Container ohne cargo und ohne npm und bekommt
+      # beide Binaries hier fertig gebaut.
       - uses: actions/upload-artifact@v4
         with:
           name: hexwerk
           path: target/release/hexwerk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexwerk-desktop
+          path: crates/desktop/target/release/hexwerk-desktop
           if-no-files-found: error
 
   metadaten:
@@ -156,9 +186,11 @@ jobs:
 
   flatpak:
     name: Flatpak bauen
-    # Kein Warten auf build/gtk: Rust wird im Sandkasten gebaut, die fertigen
-    # Binaries der anderen Jobs werden hier nicht gebraucht.
-    needs: [flatpak-voraussetzungen]
+    # Das Manifest nimmt fertige Binaries aus `prebuilt/`: im Sandkasten gibt es
+    # bewusst kein cargo und kein npm. Der Job braucht den Release-Build also
+    # wirklich — die fruehere Fassung wartete nicht darauf und war deshalb
+    # dauerhaft rot ("Unable to get source file '../prebuilt/hexwerk'").
+    needs: [flatpak-voraussetzungen, build]
     if: needs.flatpak-voraussetzungen.outputs.quellen == 'true'
     runs-on: ubuntu-latest
     # Container mit fertigem flatpak-builder und Flathub-Gegenstelle; ohne ihn
@@ -170,6 +202,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      # Dieselben zwei Schritte wie im Release-Workflow.
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexwerk
+          path: prebuilt
+      - uses: actions/download-artifact@v4
+        with:
+          name: hexwerk-desktop
+          path: prebuilt
+      - name: Ausfuehrbar machen
+        run: |
+          chmod +x prebuilt/hexwerk prebuilt/hexwerk-desktop
+          ls -l prebuilt
       # Die Action liest Runtime, SDK und sdk-extensions aus dem Manifest und
       # installiert sie aus Flathub; gebaut wird danach im Sandkasten.
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
