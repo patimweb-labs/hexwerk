@@ -1,5 +1,12 @@
 # Änderungen
 
+## [0.5.0](https://github.com/patimweb-labs/hexwerk/compare/v0.4.2...v0.5.0) (2026-11-03)
+
+
+### Features
+
+* **clients:** eigenen Spielordner angeben und wieder entfernen ([#7](https://github.com/patimweb-labs/hexwerk/issues/7)) ([e4771b4](https://github.com/patimweb-labs/hexwerk/commit/e4771b4c0ef3f6d82ce1110b460933f0c6004c72))
+
 ## [0.4.2](https://github.com/patimweb-labs/hexwerk/compare/v0.4.1...v0.4.2) (2026-11-02)
 
 
