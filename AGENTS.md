@@ -59,7 +59,8 @@ Richtung der Abhängigkeiten: `domain ← adapters ← ipc ← ui`. Nie zurück.
 
 ```bash
 # alles prüfen (das ist der Befehl vor jedem Commit)
-cargo fmt --all --check && cargo clippy --all-targets -- -D warnings && cargo test
+cargo fmt --all --check && cargo clippy --all-targets -- -D warnings && cargo test --workspace
+(cd crates/desktop && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test)
 npm --prefix ui run lint && npm --prefix ui run typecheck && npm --prefix ui run test
 npm --prefix tests/e2e run test        # Playwright, headless
 
@@ -67,6 +68,11 @@ npm --prefix ui run dev                # Frontend autark, Backend gemockt
 npm --prefix ui run build              # Produktionsbuild
 cargo tauri build                      # Paket bauen
 ```
+
+`cargo test` **mit** `--workspace`: ohne das prüft Cargo nur das Wurzelpaket und
+meldet „0 passed". `crates/desktop` steht in einer eigenen `[workspace]`-Tabelle
+(Tauri braucht das), wird von `--workspace` und `cargo fmt --all` also nicht
+erfasst und bekommt seinen eigenen Aufruf.
 
 Frontend-Entwicklung läuft **ohne** das echte Backend: `ui/` startet gegen das
 Mock-Backend aus `@weppelmann/testkit`. Wer für eine UI-Aufgabe das echte

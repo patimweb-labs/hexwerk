@@ -192,6 +192,31 @@ impl SearchRoots {
 
 pub mod finders;
 
+/// Prueft, ob ein Ordner eine WoW-Installation ist: er muss mindestens ein
+/// `_retail_`-artiges Verzeichnis enthalten. Das ist die Pruefung, die die
+/// Oberflaeche vor dem Speichern eines selbst gewaehlten Ordners ausfuehrt —
+/// ein Tippfehler soll nicht als Client in der Liste landen.
+pub fn ist_wow_ordner(pfad: &Path) -> bool {
+    !describe(pfad).is_empty()
+}
+
+/// Der Ordner, der zu einem eingegebenen Pfad gespeichert werden soll.
+///
+/// Der Nutzer zeigt oft auf das Verzeichnis, in dem die Addons liegen
+/// (`…/_retail_`), weil er von dort kommt. Gespeichert wird dann der Ordner
+/// darueber, denn dort liegen die `_…_`-Verzeichnisse, die [`describe`]
+/// erwartet. Ist der Pfad selbst schon richtig, bleibt er, wie er ist.
+pub fn wow_ordner(pfad: &Path) -> Option<PathBuf> {
+    let pfad = pfad.canonicalize().unwrap_or_else(|_| pfad.to_path_buf());
+    if ist_wow_ordner(&pfad) {
+        return Some(pfad);
+    }
+    let name = pfad.file_name().and_then(|s| s.to_str())?;
+    let ist_flavor = name.starts_with('_') && name.ends_with('_');
+    let eltern = pfad.parent()?;
+    (ist_flavor && ist_wow_ordner(eltern)).then(|| eltern.to_path_buf())
+}
+
 /// Sucht in allen bekannten Herkuenften plus den uebergebenen Zusatzordnern.
 pub fn discover(extra_paths: &[PathBuf]) -> Discovery {
     discover_at(&SearchRoots::local(), extra_paths)
@@ -217,12 +242,26 @@ pub fn discover_at(roots: &SearchRoots, extra_paths: &[PathBuf]) -> Discovery {
 /// Ein Spielordner kann von mehreren Herkuenften erreichbar sein (Faugus-
 /// Praefix mit `drive_c` und `pfx/drive_c`, Steam-Praefix unter `~/Games`).
 /// Gezaehlt wird deshalb der echte Pfad, nicht der Weg dorthin.
+///
+/// Bei Gleichstand gewinnt der selbst angegebene Ordner: nur er laesst sich in
+/// der Oberflaeche wieder austragen. Verloere er gegen Steam, bliebe der Pfad
+/// in den Einstellungen stehen, ohne dass jemand ihn dort entfernen koennte.
 fn dedup(clients: &mut Vec<Client>) {
-    let mut seen = std::collections::HashSet::new();
-    clients.retain(|c| {
-        let key = std::fs::canonicalize(&c.game_dir).unwrap_or_else(|_| c.game_dir.clone());
-        seen.insert(key)
-    });
+    let mut out: Vec<Client> = Vec::new();
+    let mut stellen: std::collections::HashMap<PathBuf, usize> = std::collections::HashMap::new();
+    for client in clients.drain(..) {
+        let key =
+            std::fs::canonicalize(&client.game_dir).unwrap_or_else(|_| client.game_dir.clone());
+        match stellen.get(&key) {
+            Some(&i) if client.origin == Origin::Manual => out[i] = client,
+            Some(_) => {}
+            None => {
+                stellen.insert(key, out.len());
+                out.push(client);
+            }
+        }
+    }
+    *clients = out;
     clients.sort_by(|a, b| {
         a.origin
             .label()

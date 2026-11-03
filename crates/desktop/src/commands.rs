@@ -36,7 +36,12 @@ pub struct FlavorDto {
 pub struct ClientDto {
     pub id: String,
     pub label: String,
+    /// Anzeigetext der Herkunft („Faugus“, „Manuell“).
     pub origin: String,
+    /// Stabiler Kennwert derselben Herkunft (`faugus`, `manual`) fuer
+    /// Vergleiche in der Oberflaeche. Ein Vergleich auf den Anzeigetext ginge
+    /// schief, sobald jemand die Beschriftung aendert.
+    pub origin_slug: String,
     pub prefix: String,
     pub game_dir: String,
     pub flavors: Vec<FlavorDto>,
@@ -79,7 +84,14 @@ fn flavor_label(flavor: hexwerk::Flavor) -> String {
 #[tauri::command]
 pub async fn scan() -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let discovered = hexwerk::discover(&[]);
+        // Selbst angegebene Ordner kommen aus den Einstellungen; ohne sie wuerde
+        // eine Installation ausserhalb der Programmordner nie gefunden.
+        let zusatz: Vec<std::path::PathBuf> = crate::settings::Settings::load()
+            .manual_paths
+            .into_iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+        let discovered = hexwerk::discover(&zusatz);
         let mut addon_count = 0;
 
         let clients = discovered
@@ -113,11 +125,7 @@ pub async fn scan() -> Result<ScanResult, String> {
                             label: flavor_label(flavor_dir.flavor),
                             addons_dir: flavor_dir.addons_dir.display().to_string(),
                             interface: flavor_dir.interface_numbers,
-                            game_version: flavor_dir
-                                .game_version
-                                .as_ref()
-                                .map(|v| v.clone())
-                                .unwrap_or_default(),
+                            game_version: flavor_dir.game_version.clone().unwrap_or_default(),
                             size_bytes,
                             addons,
                         }
@@ -128,6 +136,7 @@ pub async fn scan() -> Result<ScanResult, String> {
                     id: client.id,
                     label: client.label,
                     origin: client.origin.label().to_string(),
+                    origin_slug: client.origin.slug().to_string(),
                     prefix: client.prefix.display().to_string(),
                     game_dir: client.game_dir.display().to_string(),
                     flavors,
@@ -162,7 +171,6 @@ pub async fn scan() -> Result<ScanResult, String> {
     .await
     .map_err(|e| e.to_string())
 }
-
 
 // ---------------------------------------------------------------- Katalog
 
@@ -312,7 +320,6 @@ pub fn catalog_search(query: String, limit: Option<u32>) -> Result<Vec<ItemDto>,
 // mit dem Eintrag, den die Liste geholt hat — eine zweite Abfrage waere eine
 // zweite Wahrheit.
 
-
 // ------------------------------------------------------------ Installieren
 
 /// Ergebnis einer Installation.
@@ -340,7 +347,9 @@ pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis,
         use hexwerk_sources::Http as _;
         let http = hexwerk_sources::UreqHttp::new();
         let request = hexwerk_sources::Request::get(&url);
-        let antwort = http.request(&request).map_err(|e| format!("Download: {e}"))?;
+        let antwort = http
+            .request(&request)
+            .map_err(|e| format!("Download: {e}"))?;
         if !antwort.is_success() {
             return Err(format!("Download: HTTP {}", antwort.status));
         }
@@ -357,7 +366,6 @@ pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis,
     .map_err(|e| e.to_string())?
 }
 
-
 // ------------------------------------------------------------- Einstellungen
 
 /// Einstellungen lesen. Dieselbe Datei wie die GTK-Oberflaeche.
@@ -367,11 +375,81 @@ pub fn settings_get() -> crate::settings::Settings {
 }
 
 /// Einstellungen schreiben.
+///
+/// Die selbst angegebenen Spielordner bleiben dabei unangetastet: sie haben
+/// eigene Befehle (`ordner_hinzufuegen` / `ordner_entfernen`), und ein
+/// Einstellungs-Rundlauf aus der Oberflaeche darf sie nicht loeschen, nur weil
+/// eine aeltere Fassung das Feld nicht kennt.
 #[tauri::command]
-pub fn settings_set(settings: crate::settings::Settings) -> Result<(), String> {
+pub fn settings_set(mut settings: crate::settings::Settings) -> Result<(), String> {
+    settings.manual_paths = crate::settings::Settings::load().manual_paths;
     settings.save()
 }
 
+/// Einen selbst gewaehlten Spielordner aufnehmen.
+///
+/// Geprueft wird vor dem Speichern: ein Ordner ohne `_retail_`-artiges
+/// Verzeichnis ist kein World of Warcraft und wird mit Begruendung abgelehnt,
+/// damit ein Tippfehler nicht als leerer Client in der Liste steht. Zeigt der
+/// Pfad auf das `_retail_`-Verzeichnis selbst, wird der Ordner darueber
+/// gespeichert — dort liegen die Spiele, und dort sucht der Scan.
+#[tauri::command]
+pub fn ordner_hinzufuegen(pfad: String) -> Result<Vec<String>, String> {
+    let mut s = crate::settings::Settings::load();
+    if aufnehmen(&mut s, &pfad)? {
+        s.save()?;
+    }
+    Ok(s.manual_paths)
+}
+
+/// Einen selbst gewaehlten Ordner wieder austragen.
+#[tauri::command]
+pub fn ordner_entfernen(pfad: String) -> Result<Vec<String>, String> {
+    let mut s = crate::settings::Settings::load();
+    if austragen(&mut s, &pfad) {
+        s.save()?;
+    }
+    Ok(s.manual_paths)
+}
+
+/// Pruefen und eintragen — ohne Datei, damit das, was schiefgehen kann, ohne
+/// Platte pruefbar ist. `Ok(true)` heisst: die Liste ist gewachsen.
+pub fn aufnehmen(s: &mut crate::settings::Settings, pfad: &str) -> Result<bool, String> {
+    let eingegeben = std::path::PathBuf::from(pfad.trim());
+    if !eingegeben.is_dir() {
+        return Err(format!("Ordner nicht gefunden: {}", eingegeben.display()));
+    }
+    let Some(ordner) = hexwerk::wow_ordner(&eingegeben) else {
+        return Err(format!(
+            "Kein World-of-Warcraft-Ordner: {}. Erwartet wird ein Ordner mit _retail_, \
+             _classic_ oder _classic_era_, darin Interface/AddOns oder Wow*.exe.",
+            eingegeben.display()
+        ));
+    };
+    let neu = ordner.display().to_string();
+    if s.manual_paths.contains(&neu) {
+        return Ok(false);
+    }
+    s.manual_paths.push(neu);
+    Ok(true)
+}
+
+/// Austragen — verglichen wird der echte Pfad, nicht die Zeichenkette:
+/// derselbe Ordner laesst sich als `~/wow`, `/home/u/wow` oder mit `/.`
+/// eintragen, und ein Eintrag, den dieser Befehl stehen laesst, waere in der
+/// Oberflaeche nicht mehr zu loeschen. `Ok(true)` heisst: die Liste ist kuerzer.
+pub fn austragen(s: &mut crate::settings::Settings, pfad: &str) -> bool {
+    let weg = kanonisch(std::path::Path::new(pfad.trim()));
+    let vorher = s.manual_paths.len();
+    s.manual_paths
+        .retain(|p| kanonisch(std::path::Path::new(p)) != weg);
+    s.manual_paths.len() != vorher
+}
+
+/// Der echte Pfad; ein Pfad, den es nicht (mehr) gibt, bleibt wie er ist.
+fn kanonisch(pfad: &std::path::Path) -> std::path::PathBuf {
+    pfad.canonicalize().unwrap_or_else(|_| pfad.to_path_buf())
+}
 
 // ------------------------------------------------------------ Katalog holen
 
@@ -414,12 +492,15 @@ pub async fn catalog_sync() -> Result<SyncErgebnis, String> {
             hexwerk_index::SyncOutcome::Imported { version, .. } => (version, true),
         };
         let eintraege = idx.stats().map(|s| s.catalogue).unwrap_or(0);
-        Ok(SyncErgebnis { version, eintraege, neu })
+        Ok(SyncErgebnis {
+            version,
+            eintraege,
+            neu,
+        })
     })
     .await
     .map_err(|e| e.to_string())?
 }
-
 
 // -------------------------------------------------------------- Programm-Info
 
@@ -447,7 +528,6 @@ pub fn app_info() -> Info {
     }
 }
 
-
 // ------------------------------------------------------------------- Bilder
 
 /// Ein Bild, wie es angekommen ist: Adresse und fertige data-URL.
@@ -462,12 +542,24 @@ fn base64(daten: &[u8]) -> String {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut aus = String::with_capacity(daten.len().div_ceil(3) * 4);
     for stueck in daten.chunks(3) {
-        let b = [stueck[0], *stueck.get(1).unwrap_or(&0), *stueck.get(2).unwrap_or(&0)];
+        let b = [
+            stueck[0],
+            *stueck.get(1).unwrap_or(&0),
+            *stueck.get(2).unwrap_or(&0),
+        ];
         let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
         aus.push(ALPHABET[(n >> 18) as usize & 63] as char);
         aus.push(ALPHABET[(n >> 12) as usize & 63] as char);
-        aus.push(if stueck.len() > 1 { ALPHABET[(n >> 6) as usize & 63] as char } else { '=' });
-        aus.push(if stueck.len() > 2 { ALPHABET[n as usize & 63] as char } else { '=' });
+        aus.push(if stueck.len() > 1 {
+            ALPHABET[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        aus.push(if stueck.len() > 2 {
+            ALPHABET[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     aus
 }
@@ -513,7 +605,6 @@ pub async fn fetch_images(urls: Vec<String>) -> Vec<BildDto> {
     .unwrap_or_default()
 }
 
-
 /// Einen Link im Systembrowser oeffnen.
 ///
 /// In der Web-Ansicht reicht `target="_blank"` nicht: WebKitGTK gibt den
@@ -539,7 +630,6 @@ pub fn oeffne_url(url: String) -> Result<(), String> {
         .map(|_| ())
         .map_err(|e| format!("{programm}: {e}"))
 }
-
 
 // --------------------------------------------------------------- Deinstallieren
 
@@ -573,7 +663,7 @@ pub fn zurueckholen(name: String) -> Result<String, String> {
             text.lines()
                 .find_map(|zeile| zeile.strip_prefix("Path=").map(str::to_string))
         })
-        .map(|pfad| std::path::PathBuf::from(pfad))
+        .map(std::path::PathBuf::from)
         .ok_or_else(|| "Pfad im Papierkorb-Eintrag fehlt".to_string())?;
     let ziel = if original.is_absolute() {
         original
@@ -587,7 +677,6 @@ pub fn zurueckholen(name: String) -> Result<String, String> {
     let _ = std::fs::remove_file(wurzel.join("info").join(format!("{name}.trashinfo")));
     Ok(ziel.display().to_string())
 }
-
 
 /// Ist dieses Addon im angegebenen Ziel installiert?
 ///
@@ -603,7 +692,6 @@ pub fn installiert_in(addons_dir: String, folder: String) -> Option<String> {
         .find(|a| a.folder == folder)
         .map(|a| a.version.unwrap_or_default())
 }
-
 
 // ------------------------------------------------------------ Katalog leeren
 
@@ -624,7 +712,7 @@ pub struct LeerErgebnis {
 #[tauri::command]
 pub fn katalog_leeren() -> Result<LeerErgebnis, String> {
     let mut index = hexwerk_index::Index::open(&hexwerk_index::Index::default_path())?;
-    let vorher = index.stats().map(|s| s.catalogue as usize).unwrap_or(0);
+    let vorher = index.stats().map(|s| s.catalogue).unwrap_or(0);
     index.clear()?;
 
     let cache = hexwerk::data_root().join("catalog");

@@ -10,7 +10,7 @@
 //! Anwendung die Datei nicht ausduennt.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +52,10 @@ pub struct Settings {
     /// `dark`, `light` oder `mono`.
     #[serde(default = "thema")]
     pub theme: String,
+    /// Selbst angegebene Spielordner (Windows-Laufwerk, Netzlaufwerk, anderer
+    /// Installationsort). Sie werden bei jedem Scan mitgeprueft.
+    #[serde(default)]
+    pub manual_paths: Vec<String>,
     /// Alles, was diese Fassung nicht kennt, bleibt in der Datei.
     #[serde(flatten)]
     pub rest: BTreeMap<String, serde_json::Value>,
@@ -66,6 +70,7 @@ impl Default for Settings {
             keys: BTreeMap::new(),
             urls: BTreeMap::new(),
             theme: thema(),
+            manual_paths: Vec::new(),
             rest: BTreeMap::new(),
         }
     }
@@ -83,12 +88,24 @@ impl Settings {
     /// Lesen; fehlt die Datei oder ist sie kaputt, gelten die Vorgaben.
     /// Eine kaputte Datei ist kein Grund, das Fenster nicht zu oeffnen.
     pub fn load() -> Self {
-        let Some(pfad) = pfad() else { return Self::default() };
-        let Ok(text) = std::fs::read_to_string(&pfad) else { return Self::default() };
+        match pfad() {
+            Some(pfad) => Self::load_at(&pfad),
+            None => Self::default(),
+        }
+    }
+
+    /// Wie [`Settings::load`], aber aus einer genannten Datei. Der Test
+    /// braucht keinen Zugriff auf `$HOME`.
+    pub fn load_at(pfad: &Path) -> Self {
+        let Ok(text) = std::fs::read_to_string(pfad) else {
+            return Self::default();
+        };
         let mut werte: Self = serde_json::from_str(&text).unwrap_or_default();
         // Alte Dateien nennen Quellen, die inzwischen entfernt sind. Sie werden
         // hier fallen gelassen, statt in der Oberflaeche zu erscheinen.
-        werte.source_priority.retain(|k| VORHANDEN.contains(&k.as_str()));
+        werte
+            .source_priority
+            .retain(|k| VORHANDEN.contains(&k.as_str()));
         if werte.source_priority.is_empty() {
             werte.source_priority = prioritaet();
         }
@@ -96,11 +113,17 @@ impl Settings {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let Some(pfad) = pfad() else { return Err("kein Konfigurationsverzeichnis".into()) };
+        let Some(pfad) = pfad() else {
+            return Err("kein Konfigurationsverzeichnis".into());
+        };
+        self.save_at(&pfad)
+    }
+
+    pub fn save_at(&self, pfad: &Path) -> Result<(), String> {
         if let Some(dir) = pfad.parent() {
             std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
         let text = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
-        std::fs::write(&pfad, text + "\n").map_err(|e| e.to_string())
+        std::fs::write(pfad, text + "\n").map_err(|e| e.to_string())
     }
 }

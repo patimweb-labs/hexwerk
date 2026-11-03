@@ -23,7 +23,10 @@ export interface Flavor {
 export interface Client {
   id: string;
   label: string;
+  /** Anzeigetext der Herkunft („Faugus“, „Manuell“). */
   origin: string;
+  /** Stabiler Kennwert derselben Herkunft (`faugus`, `manual`) fuer Vergleiche. */
+  origin_slug: string;
   prefix: string;
   game_dir: string;
   flavors: Flavor[];
@@ -112,6 +115,8 @@ export interface Settings {
   keys: Record<string, string>;
   urls: Record<string, string>;
   theme: string;
+  /** Selbst angegebene Spielordner; eigene Befehle, nicht ueber settings_set. */
+  manual_paths?: string[];
 }
 
 export function settingsGet(): Promise<Settings> {
@@ -181,4 +186,14 @@ export interface LeerErgebnis {
 /** Katalog und Index leeren, dazu den gepackten Snapshot im Cache. */
 export function katalogLeeren(): Promise<LeerErgebnis> {
   return invoke<LeerErgebnis>("katalog_leeren");
+}
+
+/** Einen selbst gewaehlten Spielordner aufnehmen; liefert die neue Liste. */
+export function ordnerHinzufuegen(pfad: string): Promise<string[]> {
+  return invoke<string[]>("ordner_hinzufuegen", { pfad });
+}
+
+/** Einen selbst gewaehlten Ordner wieder austragen. */
+export function ordnerEntfernen(pfad: string): Promise<string[]> {
+  return invoke<string[]>("ordner_entfernen", { pfad });
 }

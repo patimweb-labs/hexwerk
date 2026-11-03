@@ -6,7 +6,11 @@ fn main() {
             "version {} · {} Eintraege · {}",
             e.version,
             e.eintraege,
-            if e.neu { "neu uebernommen" } else { "war schon aktuell" }
+            if e.neu {
+                "neu uebernommen"
+            } else {
+                "war schon aktuell"
+            }
         ),
         Err(fehler) => {
             eprintln!("Sync fehlgeschlagen: {fehler}");

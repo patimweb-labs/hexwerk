@@ -4,7 +4,9 @@
 mod common;
 
 use common::Tree;
-use hexwerk_core::{discover_at, Flavor, NoteStatus, Origin, SearchRoots};
+use hexwerk_core::{
+    discover_at, ist_wow_ordner, wow_ordner, Flavor, NoteStatus, Origin, SearchRoots,
+};
 
 const WOW: &str = "drive_c/Program Files (x86)/World of Warcraft";
 
@@ -131,6 +133,63 @@ fn derselbe_manuelle_ordner_zaehlt_einmal() {
         &[t.path("wow"), t.path("wow"), t.path("wow/.")],
     );
     assert_eq!(d.clients.len(), 1);
+}
+
+#[test]
+fn manueller_ordner_gewinnt_gegen_eine_herkunft() {
+    // Derselbe Ordner ist ueber Steam erreichbar und steht zusaetzlich in den
+    // Einstellungen. Bleibt der Steam-Eintrag stehen, ist der selbst angegebene
+    // Pfad nicht mehr zu entfernen.
+    let t = Tree::new("manuell_gewinnt");
+    let game_dir =
+        t.path("Steam/steamapps/compatdata/7/pfx/drive_c/Program Files/World of Warcraft");
+    t.addon(
+        "Steam/steamapps/compatdata/7/pfx/drive_c/Program Files/World of Warcraft/_retail_",
+        "ElvUI",
+        "11509",
+    );
+
+    let mut r = roots(&t);
+    r.steam = vec![t.path("Steam")];
+    let d = discover_at(&r, &[game_dir.clone()]);
+
+    assert_eq!(d.clients.len(), 1, "ein Ordner, nicht zwei");
+    assert_eq!(d.clients[0].origin, Origin::Manual);
+    assert_eq!(d.clients[0].prefix, game_dir);
+}
+
+#[test]
+fn ist_wow_ordner_erkennt_nur_spielordner() {
+    let t = Tree::new("ist_wow_ordner");
+    t.addon("wow/_retail_", "ElvUI", "11509");
+    t.dir("leer");
+    // Der Addon-Ordner selbst ist kein Spielordner: die `_…_`-Ebene fehlt.
+    t.dir("wow/_retail_/Interface/AddOns");
+
+    assert!(ist_wow_ordner(&t.path("wow")));
+    assert!(!ist_wow_ordner(&t.path("leer")));
+    assert!(!ist_wow_ordner(&t.path("gibt_es_nicht")));
+}
+
+#[test]
+fn wow_ordner_nimmt_bei_bedarf_die_ebene_darueber() {
+    // Wer aus dem Addon-Ordner kommt, zeigt auf `…/_retail_`. Gespeichert wird
+    // der Ordner darueber, denn dort sucht der Scan.
+    let t = Tree::new("wow_ordner");
+    t.addon("wow/_retail_", "ElvUI", "11509");
+    let retail = t.path("wow/_retail_");
+    let erwartet = retail
+        .canonicalize()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
+
+    assert_eq!(wow_ordner(&retail), Some(erwartet.clone()));
+    assert_eq!(wow_ordner(&t.path("wow")), Some(erwartet));
+    assert_eq!(wow_ordner(&t.dir("leer")), None);
+    // Zwei Ebenen zu tief gibt nichts her: dort liegen keine `_…_`-Ordner.
+    assert_eq!(wow_ordner(&t.path("wow/_retail_/Interface")), None);
 }
 
 #[test]

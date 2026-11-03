@@ -1,4 +1,34 @@
 {
+  "cl.add.button": {
+    "de": "Hinzufügen",
+    "en": "Add",
+    "es": "Añadir",
+    "fr": "Ajouter"
+  },
+  "cl.add.error": {
+    "de": "Ordner nicht übernommen",
+    "en": "Folder not added",
+    "es": "Carpeta no añadida",
+    "fr": "Dossier non ajouté"
+  },
+  "cl.add.hint": {
+    "de": "Der Ordner, in dem _retail_, _classic_ oder _classic_era_ liegt — auch auf einem anderen Laufwerk oder im Netz. Der Spielordner selbst wird auch angenommen.",
+    "en": "The folder that contains _retail_, _classic_ or _classic_era_ — also on another drive or over the network. The game folder itself is accepted too.",
+    "es": "La carpeta que contiene _retail_, _classic_ o _classic_era_, también en otra unidad o en la red. También se acepta la carpeta del juego.",
+    "fr": "Le dossier qui contient _retail_, _classic_ ou _classic_era_, y compris sur un autre disque ou sur le réseau. Le dossier du jeu lui-même est aussi accepté."
+  },
+  "cl.add.placeholder": {
+    "de": "…/drive_c/Program Files (x86)/World of Warcraft",
+    "en": "…/drive_c/Program Files (x86)/World of Warcraft",
+    "es": "…/drive_c/Program Files (x86)/World of Warcraft",
+    "fr": "…/drive_c/Program Files (x86)/World of Warcraft"
+  },
+  "cl.add.title": {
+    "de": "Eigenen Spielordner angeben",
+    "en": "Add your own game folder",
+    "es": "Indicar tu propia carpeta del juego",
+    "fr": "Indiquer votre propre dossier de jeu"
+  },
   "cl.addon.one": {
     "de": "1 Addon",
     "en": "1 addon",
@@ -64,6 +94,12 @@
     "en": "No WoW installation found",
     "es": "No se encontro ninguna instalacion de WoW",
     "fr": "Aucune installation WoW trouvee"
+  },
+  "cl.remove": {
+    "de": "Entfernen",
+    "en": "Remove",
+    "es": "Quitar",
+    "fr": "Retirer"
   },
   "cl.rescan": {
     "de": "Erneut scannen",
