@@ -35,6 +35,22 @@ Platte.
 3. Das Ergebnis geht als Modell an die Oberfläche — kein Pfad wird im Frontend
    zusammengesetzt.
 
+## „Eigenen Spielordner angeben"
+
+1. Die Clients-Ansicht schickt den eingetippten Pfad an `ordner_hinzufuegen`.
+2. `hexwerk::wow_ordner` prüft ihn: liegt dort ein `_retail_`-artiges
+   Verzeichnis (mit `Interface/AddOns` oder `Wow*.exe`)? Zeigt der Pfad auf das
+   `_retail_` selbst, gilt der Ordner darüber. Sonst kommt eine Begründung
+   zurück, und sie steht am Formularfeld.
+3. Der Pfad landet in `manual_paths` der Einstellungsdatei
+   (`~/.config/hexwerk/settings.json`); `settings_set` lässt das Feld stehen,
+   damit ein Einstellungs-Rundlauf die Ordner nicht löscht.
+4. Der nächste `scan` reicht die Liste als `extra_paths` an `discover`. Taucht
+   derselbe Ordner zusätzlich über Steam auf, gewinnt der eigene Eintrag — nur
+   er lässt sich in der Oberfläche wieder austragen.
+5. `ordner_entfernen` vergleicht den echten Pfad, entfernt den Eintrag, und die
+   Ansicht scannt erneut.
+
 ## Grundsatz
 
 Ein Weg: Oberfläche → Befehl → Fachpaket → Index/Dateisystem → Ereignis →

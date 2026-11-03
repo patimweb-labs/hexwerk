@@ -11,7 +11,9 @@ Kein Hintergrunddienst, kein Konto.
 ## Funktionen
 
 * Erkennt Steam und Proton, Faugus und UMU, Heroic, Lutris, Bottles,
-  PortProton und jeden Ordner, den du selbst auswählst.
+  PortProton und jeden Ordner, den du selbst auswählst. Den eigenen Ordner
+  trägst du in der Clients-Ansicht ein — der Pfad wird vorher geprüft, ein
+  Tippfehler kommt als Begründung zurück statt als leerer Client in der Liste.
 * Alle Client-Versionen: Retail, Classic, Classic Era, Anniversary, Forever und
   die PTR-Varianten, jede mit eigener Addon-Liste.
 * Katalog aus mehreren Quellen, ohne Zugangsdaten über 27.000 Einträge, dazu
