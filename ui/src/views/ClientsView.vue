@@ -5,10 +5,52 @@
 //
 // Das ist die Ansicht zum Nachsehen und Aufräumen; die Arbeit (Addons
 // durchsuchen) passiert im Katalog und unter "Installiert".
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import * as UI from "@weppelmann/components";
 import { t } from "../i18n";
 import { bytes, lastScan, rescan, state } from "../store";
+import { ordnerEntfernen, ordnerHinzufuegen, type Client } from "../api";
+
+/** Pfad, den der Nutzer eintippt oder einfuegt. */
+const pfad = ref("");
+const fehler = ref<string | null>(null);
+const laeuft = ref(false);
+
+/**
+ * Ordner aufnehmen: pruefen, speichern, neu scannen. Die Pruefung selbst
+ * passiert im Rust-Teil; hier steht nur, was mit dem Ergebnis geschieht.
+ */
+async function hinzufuegen() {
+  const wert = pfad.value.trim();
+  if (!wert || laeuft.value) return;
+  laeuft.value = true;
+  fehler.value = null;
+  try {
+    await ordnerHinzufuegen(wert);
+    pfad.value = "";
+    await rescan();
+  } catch (e) {
+    // Der Rust-Teil liefert die Begruendung als String.
+    fehler.value = typeof e === "string" ? e : String(e);
+  } finally {
+    laeuft.value = false;
+  }
+}
+
+/** Einen selbst angegebenen Ordner wieder austragen. */
+async function entfernen(client: Client) {
+  if (laeuft.value) return;
+  laeuft.value = true;
+  fehler.value = null;
+  try {
+    await ordnerEntfernen(client.prefix);
+    await rescan();
+  } catch (e) {
+    fehler.value = typeof e === "string" ? e : String(e);
+  } finally {
+    laeuft.value = false;
+  }
+}
 
 const gesamt = computed(() => state.clients.reduce(
   (summe, c) => summe + c.flavors.reduce((s, f) => s + f.size_bytes, 0), 0));
@@ -23,7 +65,7 @@ const ordnerSpalten = [
   { key: "size", label: t("dt.cap.size"), align: "end" as const },
 ];
 
-function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
+function ordnerTabelle(flavors: Client["flavors"]) {
   return {
     kind: "fertig" as const,
     rows: flavors.map((f) => ({
@@ -44,6 +86,24 @@ function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
       <p class="cl__sub">{{ t("cl.sub") }}</p>
     </header>
 
+    <!-- Eigener Ordner: fuer Installationen ausserhalb der Programmordner
+         (anderes Laufwerk, Netzlaufwerk, eigener Pfad). -->
+    <section class="eigen">
+      <UI.WpFormField :label="t('cl.add.title')" :hint="t('cl.add.hint')"
+                      :error="fehler ? `${t('cl.add.error')}: ${fehler}` : undefined">
+        <template #default="{ id, describedby, invalid }">
+          <div class="eigen__zeile">
+            <UI.WpInput :id="id" v-model="pfad" :aria-describedby="describedby"
+                        :aria-invalid="invalid || undefined"
+                        :state="invalid ? 'invalid' : 'default'"
+                        :placeholder="t('cl.add.placeholder')" @keyup.enter="hinzufuegen" />
+            <UI.WpButton :label="t('cl.add.button')" size="sm"
+                         :state="laeuft ? 'busy' : 'default'" @press="hinzufuegen" />
+          </div>
+        </template>
+      </UI.WpFormField>
+    </section>
+
     <UI.WpEmptyState v-if="state.clients.length === 0 && !state.loading"
                      :title="t('cl.none.title')" :text="t('cl.none.text')" />
 
@@ -51,6 +111,8 @@ function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
       <UI.WpCard v-for="c in state.clients" :key="c.id" :title="c.label" class="karte" flush>
         <template #actions>
           <UI.WpBadge tone="neutral" :label="c.origin.toUpperCase()" />
+          <UI.WpButton v-if="c.origin_slug === 'manual'" :label="t('cl.remove')" size="sm"
+                       :state="laeuft ? 'busy' : 'default'" @press="entfernen(c)" />
         </template>
         <UI.WpTable class="ordner-tabelle" :columns="ordnerSpalten" :state="ordnerTabelle(c.flavors)" />
       </UI.WpCard>
@@ -77,6 +139,9 @@ function ordnerTabelle(flavors: (typeof state.clients)[number]["flavors"]) {
 .cl__titel { margin: 0; font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-xl); }
 .cl__sub { margin: 2px 0 0; font-size: var(--wp-font-size-sm); color: var(--wp-color-text-muted); }
 .cl__liste { display: flex; flex-direction: column; gap: var(--wp-space-3); }
+/* Eigener Ordner: ruhiger Kasten, eine Zeile mit Feld und Knopf. */
+.eigen { padding: var(--wp-space-3); border: var(--wp-size-border) solid var(--wp-color-border-subtle); }
+.eigen__zeile { display: flex; gap: var(--wp-space-2); align-items: center; }
 .karte__pfad { margin: 0 0 var(--wp-space-2); font-family: var(--wp-font-family-mono); font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
 .hinweis { padding: var(--wp-space-3); border: var(--wp-size-border) dashed var(--wp-color-border-subtle); }
 .hinweis__titel { margin: 0 0 4px; font-family: var(--wp-font-family-display); font-size: var(--wp-font-size-sm); }

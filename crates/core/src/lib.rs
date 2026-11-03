@@ -13,7 +13,8 @@ pub mod toc;
 
 pub use addon::{scan_addons, InstalledAddon};
 pub use clients::{
-    discover, discover_at, Client, Discovery, Note, NoteStatus, Origin, SearchRoots,
+    discover, discover_at, ist_wow_ordner, wow_ordner, Client, Discovery, Note, NoteStatus, Origin,
+    SearchRoots,
 };
 pub use flavor::{Flavor, FlavorDir};
 pub use game_version::GameVersion;

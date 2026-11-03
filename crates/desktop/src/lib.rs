@@ -19,6 +19,8 @@ pub fn run() {
             commands::install,
             commands::settings_get,
             commands::settings_set,
+            commands::ordner_hinzufuegen,
+            commands::ordner_entfernen,
             commands::catalog_sync,
             commands::app_info,
             commands::fetch_images,
