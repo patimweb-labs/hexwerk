@@ -255,7 +255,7 @@ fn absorb(target: &mut Entry, donor: Entry) {
         target.author = donor.author;
     }
     for url in donor.screenshots {
-        if !target.screenshots.iter().any(|known| *known == url) {
+        if !target.screenshots.contains(&url) {
             target.screenshots.push(url);
         }
     }

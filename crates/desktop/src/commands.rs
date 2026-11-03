@@ -125,11 +125,7 @@ pub async fn scan() -> Result<ScanResult, String> {
                             label: flavor_label(flavor_dir.flavor),
                             addons_dir: flavor_dir.addons_dir.display().to_string(),
                             interface: flavor_dir.interface_numbers,
-                            game_version: flavor_dir
-                                .game_version
-                                .as_ref()
-                                .map(|v| v.clone())
-                                .unwrap_or_default(),
+                            game_version: flavor_dir.game_version.clone().unwrap_or_default(),
                             size_bytes,
                             addons,
                         }
@@ -667,7 +663,7 @@ pub fn zurueckholen(name: String) -> Result<String, String> {
             text.lines()
                 .find_map(|zeile| zeile.strip_prefix("Path=").map(str::to_string))
         })
-        .map(|pfad| std::path::PathBuf::from(pfad))
+        .map(std::path::PathBuf::from)
         .ok_or_else(|| "Pfad im Papierkorb-Eintrag fehlt".to_string())?;
     let ziel = if original.is_absolute() {
         original
@@ -716,7 +712,7 @@ pub struct LeerErgebnis {
 #[tauri::command]
 pub fn katalog_leeren() -> Result<LeerErgebnis, String> {
     let mut index = hexwerk_index::Index::open(&hexwerk_index::Index::default_path())?;
-    let vorher = index.stats().map(|s| s.catalogue as usize).unwrap_or(0);
+    let vorher = index.stats().map(|s| s.catalogue).unwrap_or(0);
     index.clear()?;
 
     let cache = hexwerk::data_root().join("catalog");

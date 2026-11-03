@@ -2,7 +2,10 @@
 
 fn main() {
     let s = hexwerk_desktop::settings::Settings::load();
-    println!("Sprache {} · Thema {} · Rangfolge {:?}", s.language, s.theme, s.source_priority);
+    println!(
+        "Sprache {} · Thema {} · Rangfolge {:?}",
+        s.language, s.theme, s.source_priority
+    );
     let pfad = hexwerk_desktop::settings::pfad();
     if let Some(p) = pfad {
         println!("Datei: {}", p.display());
