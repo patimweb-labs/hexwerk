@@ -1,5 +1,12 @@
 # Änderungen
 
+## [0.5.2](https://github.com/patimweb-labs/hexwerk/compare/v0.5.1...v0.5.2) (2026-11-15)
+
+
+### Bug Fixes
+
+* große Pakete zuverlässig laden ([#15](https://github.com/patimweb-labs/hexwerk/issues/15)) ([22d0097](https://github.com/patimweb-labs/hexwerk/commit/22d00978645254c7971f295d108ca8c774ebde7f))
+
 ## [0.5.1](https://github.com/patimweb-labs/hexwerk/compare/v0.5.0...v0.5.1) (2026-11-03)
 
 
