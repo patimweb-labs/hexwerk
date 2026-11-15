@@ -48,6 +48,9 @@ pub enum InstallError {
     NotFound(String),
     /// Beim Wiederherstellen ist das Ziel schon belegt.
     AlreadyInstalled(String),
+    /// Das ZIP entpackt sich zu mehr als der Grenze (Bytes) - ein kaputtes
+    /// Archiv oder eine ZIP-Bombe.
+    TooLarge(u64),
 }
 
 impl std::fmt::Display for InstallError {
@@ -62,6 +65,11 @@ impl std::fmt::Display for InstallError {
             InstallError::EmptyArchive => write!(f, "ZIP enthaelt kein Addon"),
             InstallError::NotFound(p) => write!(f, "nicht gefunden: {p}"),
             InstallError::AlreadyInstalled(p) => write!(f, "Ziel ist belegt: {p}"),
+            InstallError::TooLarge(limit) => write!(
+                f,
+                "ZIP entpackt sich zu mehr als {} MB",
+                limit / (1024 * 1024)
+            ),
         }
     }
 }
