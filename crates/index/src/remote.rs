@@ -98,7 +98,7 @@ impl RemoteCatalog {
 
         std::fs::create_dir_all(cache_dir).map_err(|err| format!("Ablage: {err}"))?;
         let packed: PathBuf = cache_dir.join("catalog.sqlite.zst");
-        self.download_snapshot(&packed)?;
+        self.download_snapshot(&packed, manifest.bytes)?;
 
         let bytes = std::fs::read(&packed).map_err(|err| format!("Paket lesen: {err}"))?;
         let mut hasher = Sha256::new();
@@ -127,19 +127,89 @@ impl RemoteCatalog {
         })
     }
 
-    fn download_snapshot(&self, target: &Path) -> Result<(), String> {
+    /// Agent fuer den Katalog: keine Gesamtzeit, nur Stillstand begrenzt.
+    ///
+    /// WARUM: eine Gesamtzeit ist eine versteckte Groessengrenze - 300 s
+    /// reichen bei langsamer Leitung nicht fuer einen wachsenden Katalog.
+    fn download_agent(&self) -> ureq::Agent {
+        ureq::AgentBuilder::new()
+            .timeout_connect(std::time::Duration::from_secs(30))
+            .timeout_read(std::time::Duration::from_secs(60))
+            .redirects(2)
+            .build()
+    }
+
+    /// Laedt den Katalog nach `target`, mit bis zu drei Versuchen.
+    ///
+    /// Geschrieben wird erst in `<target>.part` und nach erfolgreicher
+    /// Laengenpruefung umbenannt: ein abgebrochener Lauf hinterlaesst nie eine
+    /// halbe Datei unter dem richtigen Namen.
+    fn download_snapshot(&self, target: &Path, expected: u64) -> Result<(), String> {
+        let mut last = String::new();
+        for attempt in 0..3u32 {
+            if attempt > 0 {
+                std::thread::sleep(std::time::Duration::from_secs(1 << attempt));
+            }
+            match self.download_snapshot_once(target, expected) {
+                Ok(()) => return Ok(()),
+                Err(Fehlschlag::Endgueltig(err)) => return Err(err),
+                Err(Fehlschlag::Nochmal(err)) => last = err,
+            }
+        }
+        Err(last)
+    }
+
+    fn download_snapshot_once(&self, target: &Path, expected: u64) -> Result<(), Fehlschlag> {
         let url = format!("{}/v1/catalog/snapshot", self.base);
         let response = self
-            .agent()
+            .download_agent()
             .get(&url)
-            .timeout(std::time::Duration::from_secs(300))
             .set("Authorization", &format!("Bearer {}", self.key))
             .call()
-            .map_err(|err| format!("Katalog nicht abrufbar ({url}): {err}"))?;
+            .map_err(|err| {
+                let text = format!("Katalog nicht abrufbar ({url}): {err}");
+                match err {
+                    ureq::Error::Status(code, _) if code < 500 && code != 408 => {
+                        Fehlschlag::Endgueltig(text)
+                    }
+                    _ => Fehlschlag::Nochmal(text),
+                }
+            })?;
+        let mut part = target.as_os_str().to_owned();
+        part.push(".part");
+        let part = PathBuf::from(part);
         let mut reader = response.into_reader();
-        let mut file = std::fs::File::create(target).map_err(|err| format!("Zieldatei: {err}"))?;
-        std::io::copy(&mut reader, &mut file).map_err(|err| format!("Schreiben: {err}"))?;
+        let mut file = std::fs::File::create(&part)
+            .map_err(|err| Fehlschlag::Endgueltig(format!("Zieldatei: {err}")))?;
+        let written = std::io::copy(&mut reader, &mut file).map_err(|err| {
+            let _ = std::fs::remove_file(&part);
+            Fehlschlag::Nochmal(format!("Katalog abgebrochen: {err}"))
+        })?;
+        drop(file);
+        if let Err(err) = check_length(written, expected) {
+            let _ = std::fs::remove_file(&part);
+            return Err(Fehlschlag::Nochmal(err));
+        }
+        std::fs::rename(&part, target)
+            .map_err(|err| Fehlschlag::Endgueltig(format!("Ablegen: {err}")))
+    }
+}
+
+/// Ob ein Fehler einen weiteren Versuch lohnt.
+enum Fehlschlag {
+    Nochmal(String),
+    Endgueltig(String),
+}
+
+/// Vergleicht die geladene Laenge mit der aus dem Manifest. `0` heisst: das
+/// Manifest nennt keine Groesse, dann bleibt nur die Pruefsumme.
+fn check_length(written: u64, expected: u64) -> Result<(), String> {
+    if expected == 0 || written == expected {
         Ok(())
+    } else {
+        Err(format!(
+            "Katalog unvollständig: {written} von {expected} Bytes"
+        ))
     }
 }
 
@@ -151,6 +221,14 @@ mod tests {
     fn adresse_ohne_schraegstrich() {
         let remote = RemoteCatalog::new("https://example.org/", "k");
         assert_eq!(remote.base, "https://example.org");
+    }
+
+    #[test]
+    fn laenge_wird_geprueft() {
+        assert!(check_length(10, 10).is_ok());
+        assert!(check_length(10, 0).is_ok(), "ohne Angabe keine Pruefung");
+        let err = check_length(5, 10).unwrap_err();
+        assert!(err.contains("5 von 10"), "{err}");
     }
 
     #[test]

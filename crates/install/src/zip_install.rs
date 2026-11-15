@@ -17,6 +17,15 @@ use crate::backup;
 use crate::plan::Installed;
 use crate::{InstallError, Paths};
 
+/// Hoechstens so viele Bytes entpackt ein Archiv insgesamt.
+///
+/// WARUM: ein ZIP von wenigen KB kann sich zu Terabytes entpacken (ZIP-Bombe)
+/// und das Prefix volllaufen lassen. Die groessten echten Addons liegen
+/// entpackt im niedrigen dreistelligen MB-Bereich; 4 GiB fasst jedes davon.
+/// Gezaehlt wird, was wirklich herauskommt, nicht die Groesse im Kopf des
+/// Eintrags - die kann luegen.
+const UNPACKED_LIMIT: u64 = 4 * 1024 * 1024 * 1024;
+
 /// Was ein ZIP ergibt, ohne dass etwas geschrieben wurde.
 ///
 /// Fuer die Oberflaeche gedacht: sie kann vor dem Klick zeigen, welcher Ordner
@@ -362,7 +371,17 @@ fn is_macos_junk(rel: &Path) -> bool {
 }
 
 fn extract(data: &[u8], dest: &Path, entries: &[(usize, PathBuf)]) -> Result<(), InstallError> {
+    extract_limited(data, dest, entries, UNPACKED_LIMIT)
+}
+
+fn extract_limited(
+    data: &[u8],
+    dest: &Path,
+    entries: &[(usize, PathBuf)],
+    limit: u64,
+) -> Result<(), InstallError> {
     let mut archive = open(data)?;
+    let mut remaining = limit;
     for (index, rel) in entries {
         let mut entry = archive.by_index(*index)?;
         let target = dest.join(rel);
@@ -379,7 +398,14 @@ fn extract(data: &[u8], dest: &Path, entries: &[(usize, PathBuf)]) -> Result<(),
             fs::create_dir_all(parent)?;
         }
         let mut out = fs::File::create(&target)?;
-        io::copy(&mut entry, &mut out)?;
+        // Ein Byte mehr zulassen als erlaubt: kommt es an, ist die Grenze
+        // ueberschritten. Der halbe Inhalt liegt im Arbeitsordner und
+        // verschwindet mit ihm.
+        let written = io::copy(&mut (&mut entry).take(remaining + 1), &mut out)?;
+        if written > remaining {
+            return Err(InstallError::TooLarge(limit));
+        }
+        remaining -= written;
     }
     Ok(())
 }
@@ -434,6 +460,24 @@ impl Drop for Staging {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn entpacken_hat_eine_obergrenze() {
+        use crate::testutil::{temp_dir, zip_of, FakeEntry};
+        let data = zip_of(&[
+            FakeEntry::text("A/a.lua", &"x".repeat(600)),
+            FakeEntry::text("A/b.lua", &"y".repeat(600)),
+        ]);
+        let entries = vec![(0, PathBuf::from("A/a.lua")), (1, PathBuf::from("A/b.lua"))];
+
+        let dest = temp_dir("grenze-ok");
+        super::extract_limited(&data, &dest, &entries, 1200).unwrap();
+        assert_eq!(fs::read(dest.join("A/b.lua")).unwrap().len(), 600);
+
+        let dest = temp_dir("grenze-drueber");
+        let err = super::extract_limited(&data, &dest, &entries, 1000).unwrap_err();
+        assert!(matches!(err, InstallError::TooLarge(1000)), "{err}");
+    }
+
     use super::*;
     use crate::testutil::{temp_dir, zip_of, FakeEntry};
 
