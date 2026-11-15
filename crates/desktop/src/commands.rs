@@ -343,13 +343,19 @@ pub struct InstallErgebnis {
 #[tauri::command]
 pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        // `request` kommt aus dem Trait, nicht aus dem Typ.
-        use hexwerk_sources::Http as _;
+        // Ueber den Download-Weg, nicht `request`: der hat 30 s Gesamtzeit und
+        // liess damit jedes groessere Paket auf einer normalen Leitung
+        // scheitern. Der Download-Weg begrenzt nur Stillstand und wiederholt
+        // bei Netz- und Serverfehlern.
         let http = hexwerk_sources::UreqHttp::new();
         let request = hexwerk_sources::Request::get(&url);
-        let antwort = http
-            .request(&request)
-            .map_err(|e| format!("Download: {e}"))?;
+        let antwort = hexwerk_sources::download_with_retry(
+            &http,
+            &request,
+            hexwerk_sources::Retry::default(),
+            &mut |_, _| {},
+        )
+        .map_err(|e| format!("Download: {e}"))?;
         if !antwort.is_success() {
             return Err(format!("Download: HTTP {}", antwort.status));
         }

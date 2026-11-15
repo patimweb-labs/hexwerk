@@ -19,7 +19,7 @@ pub mod wago;
 pub mod wowinterface;
 
 pub use cache::Cache;
-pub use http::{Http, HttpResponse, Request, UreqHttp};
+pub use http::{download_with_retry, Http, HttpResponse, Request, Retry, UreqHttp};
 pub use keys::{KeyOrigin, KeyProvider, Secret};
 pub use merge::{merge, Entry, Release};
 pub use registry::Registry;
@@ -35,7 +35,7 @@ pub(crate) fn download_via_http(
     url: &str,
     progress: &mut dyn FnMut(u64, Option<u64>),
 ) -> Result<Vec<u8>, SourceError> {
-    let response = http.download(request, progress)?;
+    let response = http::download_with_retry(http, request, http::Retry::default(), progress)?;
     if let Some(err) = response.error(url) {
         return Err(err);
     }
@@ -101,6 +101,11 @@ pub enum SourceError {
     Parse(String),
     RateLimited,
     NotFound,
+    /// Die Datei ist groesser als [`http::DOWNLOAD_LIMIT`].
+    TooLarge {
+        bytes: u64,
+        limit: u64,
+    },
 }
 
 impl std::fmt::Display for SourceError {
@@ -112,6 +117,12 @@ impl std::fmt::Display for SourceError {
             SourceError::Parse(e) => write!(f, "Antwort nicht lesbar: {e}"),
             SourceError::RateLimited => write!(f, "Anfragen gedrosselt"),
             SourceError::NotFound => write!(f, "nicht gefunden"),
+            SourceError::TooLarge { bytes, limit } => write!(
+                f,
+                "Datei zu groß: {} MB (Grenze {} MB)",
+                bytes / (1024 * 1024),
+                limit / (1024 * 1024)
+            ),
         }
     }
 }
