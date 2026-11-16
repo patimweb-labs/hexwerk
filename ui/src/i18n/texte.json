@@ -509,6 +509,24 @@
     "es": "DESTINO DE INSTALACION",
     "fr": "CIBLE D INSTALLATION"
   },
+  "dt.install.progress": {
+    "de": "{} von {}",
+    "en": "{} of {}",
+    "es": "{} de {}",
+    "fr": "{} sur {}"
+  },
+  "dt.install.unpack": {
+    "de": "Entpacken …",
+    "en": "Unpacking …",
+    "es": "Descomprimiendo …",
+    "fr": "Decompression …"
+  },
+  "dt.install.status": {
+    "de": "Fortschritt der Installation",
+    "en": "Installation progress",
+    "es": "Progreso de la instalacion",
+    "fr": "Progression de l installation"
+  },
   "dt.installed": {
     "de": "installiert",
     "en": "installed",
@@ -911,6 +929,18 @@
     "es": "Instalar actualizaciones…",
     "fr": "Installer les mises a jour…"
   },
+  "iv.update": {
+    "de": "Aktualisieren",
+    "en": "Update",
+    "es": "Actualizar",
+    "fr": "Mettre a jour"
+  },
+  "iv.update.n": {
+    "de": "Alle aktualisieren ({})",
+    "en": "Update all ({})",
+    "es": "Actualizar todo ({})",
+    "fr": "Tout mettre a jour ({})"
+  },
   "iv.update.none": {
     "de": "keine Updates",
     "en": "no updates",
@@ -1018,6 +1048,12 @@
     "en": "Origins",
     "es": "Orígenes",
     "fr": "Origines"
+  },
+  "rail.updates": {
+    "de": "Updates",
+    "en": "Updates",
+    "es": "Actualizaciones",
+    "fr": "Mises a jour"
   },
   "rail.sources": {
     "de": "QUELLEN",
@@ -1432,5 +1468,17 @@
     "en": "file system",
     "es": "sistema de archivos",
     "fr": "systeme de fichiers"
+  },
+  "up.available": {
+    "de": "{} Updates verfügbar",
+    "en": "{} updates available",
+    "es": "{} actualizaciones disponibles",
+    "fr": "{} mises a jour disponibles"
+  },
+  "up.done": {
+    "de": "{} aktualisiert",
+    "en": "{} updated",
+    "es": "{} actualizados",
+    "fr": "{} mis a jour"
   }
 }

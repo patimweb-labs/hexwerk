@@ -428,6 +428,45 @@ fn update_gegen_hoechste_version_je_quelle() {
 }
 
 #[test]
+fn je_ordner_ein_update_mit_der_hoechsten_version() {
+    let dir = TempDir::new().expect("tempdir");
+    let mut index = Index::open_in_memory().expect("Index");
+    index
+        .sync_clients(&discovery(vec![retail_client(dir.path())]))
+        .expect("Scan");
+    index
+        .sync_catalogue(&[entry(
+            "dbm",
+            "Deadly Boss Mods",
+            "MysticalOS",
+            vec![
+                // Beide Quellen sind weiter als 11.0.0, Tukui am weitesten.
+                release(Source::WowInterface, "11.0.5", &[11_509]),
+                release(Source::Tukui, "11.1.0", &[11_509]),
+            ],
+        )])
+        .expect("Katalog");
+
+    assert_eq!(
+        index.updates().expect("Updates").len(),
+        2,
+        "eine Zeile je Quelle"
+    );
+    let pending = index.pending_updates().expect("Updates");
+    assert_eq!(pending.len(), 1, "unerwartet: {pending:?}");
+    let update = &pending[0];
+    assert_eq!(update.folder, "DBM-Core");
+    assert_eq!(update.available_version, "11.1.0");
+    assert_eq!(update.source, Source::Tukui);
+    // Das Ziel steht dabei: ohne Nachschlagen installierbar.
+    assert!(
+        Path::new(&update.addons_dir).starts_with(dir.path()),
+        "{}",
+        update.addons_dir
+    );
+}
+
+#[test]
 fn verknuepfung_ueber_externe_kennung() {
     let dir = TempDir::new().expect("tempdir");
     let mut index = Index::open_in_memory().expect("Index");

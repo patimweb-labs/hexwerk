@@ -192,6 +192,8 @@ pub struct UpdateHint {
 pub struct Update {
     pub client_id: String,
     pub client_label: String,
+    /// AddOns-Verzeichnis des Clients - dorthin geht die Installation.
+    pub addons_dir: String,
     pub folder: String,
     pub addon_id: i64,
     pub addon_name: String,
@@ -796,7 +798,8 @@ impl Index {
             let mut stmt = self
                 .conn()
                 .prepare(
-                    "SELECT i.client_id, c.label, i.folder, i.addon_id, a.name, i.version
+                    "SELECT i.client_id, c.label, i.folder, i.addon_id, a.name, i.version,
+                            c.addons_dir
                      FROM installed i
                      JOIN clients c ON c.id = i.client_id
                      JOIN addons a ON a.id = i.addon_id
@@ -813,6 +816,7 @@ impl Index {
                         row.get::<_, i64>(3)?,
                         row.get::<_, String>(4)?,
                         row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
                     ))
                 })
                 .map_err(|e| format!("Updates lesen: {e}"))?;
@@ -828,12 +832,13 @@ impl Index {
         };
         let sources = self.sources_for(&ids)?;
         let mut out = Vec::new();
-        for (client_id, client_label, folder, addon_id, addon_name, installed) in raw {
+        for (client_id, client_label, folder, addon_id, addon_name, installed, addons_dir) in raw {
             let per_source = sources.get(&addon_id).map(Vec::as_slice).unwrap_or(&[]);
             for source in newer_sources(&installed, per_source) {
                 out.push(Update {
                     client_id: client_id.clone(),
                     client_label: client_label.clone(),
+                    addons_dir: addons_dir.clone(),
                     folder: folder.clone(),
                     addon_id,
                     addon_name: addon_name.clone(),
@@ -849,6 +854,32 @@ impl Index {
             }
         }
         Ok(out)
+    }
+
+    /// Ein Update je installiertem Ordner: das mit der hoechsten Version.
+    ///
+    /// [`Index::updates`] liefert eine Zeile je Quelle - richtig fuer die
+    /// Quellenwahl, aber die Oberflaeche will je Ordner genau eine Antwort auf
+    /// „gibt es etwas Neues, und was?". Bei gleicher Version gewinnt die zuerst
+    /// gelieferte Quelle.
+    pub fn pending_updates(&self) -> Result<Vec<Update>, String> {
+        let mut best: Vec<Update> = Vec::new();
+        for update in self.updates()? {
+            match best
+                .iter_mut()
+                .find(|b| b.addons_dir == update.addons_dir && b.folder == update.folder)
+            {
+                Some(known) => {
+                    if version::compare(&update.available_version, &known.available_version)
+                        == Ordering::Greater
+                    {
+                        *known = update;
+                    }
+                }
+                None => best.push(update),
+            }
+        }
+        Ok(best)
     }
 
     /// IDs der Katalogeintraege mit mindestens einem faelligen Update.
