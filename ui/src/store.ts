@@ -2,7 +2,7 @@
 // keine Ansicht haelt eigene Kopien der Wahrheit.
 import { reactive, ref } from "vue";
 import { setSprache, sprache, t } from "./i18n";
-import { appInfo, katalogLeeren, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, type Client, type Item, type Note, type ScanResult, type Stats, type Settings, type Info } from "./api";
+import { appInfo, katalogLeeren, catalogSearch, catalogStats, catalogSync, install, scan, settingsGet, settingsSet, updates, type Client, type Fortschritt, type Item, type Note, type ScanResult, type Stats, type Settings, type Info, type Update } from "./api";
 
 export const state = reactive<{
   clients: Client[];
@@ -41,6 +41,9 @@ export async function rescan() {
   } finally {
     state.loading = false;
   }
+  // Der Scan hat den Index neu beschrieben: was installiert ist, kann jetzt
+  // aktueller oder veralteter sein.
+  await ladeUpdates();
 }
 
 export function client(): Client | undefined {
@@ -116,7 +119,9 @@ export const installation = reactive<{
   ziel: number;
   fehler: string | null;
   erfolg: string | null;
-}>({ laeuft: false, ziel: 0, fehler: null, erfolg: null });
+  /** Letzte Meldung des laufenden Downloads; `null`, solange nichts laeuft. */
+  fortschritt: Fortschritt | null;
+}>({ laeuft: false, ziel: 0, fehler: null, erfolg: null, fortschritt: null });
 
 /** Ein Release installieren und danach neu scannen. */
 export async function installiere(item: Item, addonsDir: string) {
@@ -125,8 +130,9 @@ export async function installiere(item: Item, addonsDir: string) {
   installation.laeuft = true;
   installation.fehler = null;
   installation.erfolg = null;
+  installation.fortschritt = { kind: "laedt", done: 0, total: release.size_bytes };
   try {
-    const ergebnis = await install(addonsDir, release.download_url);
+    const ergebnis = await install(addonsDir, release.download_url, (f) => (installation.fortschritt = f));
     installation.erfolg = `${ergebnis.folder.split("/").pop()} ${ergebnis.version ?? ""}`.trim();
     zeigeMeldung(`${t("dt.installed")}: ${installation.erfolg}`, "ok");
     // Ein Weg in den Index: der Scan liest den Ordner neu.
@@ -136,7 +142,81 @@ export async function installiere(item: Item, addonsDir: string) {
     zeigeMeldung(String(fehler), "error");
   } finally {
     installation.laeuft = false;
+    installation.fortschritt = null;
   }
+}
+
+// ------------------------------------------------------------------ Updates
+
+/** Faellige Updates aus dem Index, eines je installiertem Ordner. */
+export const aktualisierung = reactive<{ liste: Update[] }>({ liste: [] });
+
+export async function ladeUpdates() {
+  try {
+    aktualisierung.liste = await updates();
+  } catch {
+    // Ohne Index (erster Start) gibt es nichts zu vergleichen.
+    aktualisierung.liste = [];
+  }
+}
+
+/** Das Update fuer einen Ordner, falls eines faellig ist. */
+export function updateFuer(addonsDir: string, folder: string): Update | undefined {
+  return aktualisierung.liste.find((u) => u.addons_dir === addonsDir && u.folder === folder);
+}
+
+/**
+ * Was wirklich geladen werden muss: ein Addon mit mehreren Ordnern
+ * (`DBM-Core`, `DBM-StatusBarTimers`, …) hat je Ordner eine Zeile, aber ein
+ * ZIP. Das soll nur einmal geladen und entpackt werden.
+ */
+export function zuLaden(liste: Update[]): Update[] {
+  const gesehen = new Set<string>();
+  return liste.filter((u) => {
+    const schluessel = `${u.addons_dir}\n${u.download_url}`;
+    if (gesehen.has(schluessel)) return false;
+    gesehen.add(schluessel);
+    return true;
+  });
+}
+
+/**
+ * Updates nacheinander installieren und danach einmal neu scannen.
+ *
+ * Nacheinander, nicht parallel: der Fortschrittsbalken zeigt einen Download,
+ * und zwei Installationen in denselben AddOns-Ordner sollen sich nicht
+ * kreuzen. Ein Fehler bricht nicht ab - die uebrigen laufen weiter, gemeldet
+ * wird am Ende.
+ */
+export async function aktualisiere(liste: Update[]) {
+  const auftraege = zuLaden(liste);
+  if (!auftraege.length || installation.laeuft) return;
+  installation.laeuft = true;
+  installation.fehler = null;
+  installation.erfolg = null;
+  const fehler: string[] = [];
+  let fertig = 0;
+  try {
+    for (const u of auftraege) {
+      installation.fortschritt = { kind: "laedt", done: 0, total: u.size_bytes };
+      try {
+        await install(u.addons_dir, u.download_url, (f) => (installation.fortschritt = f));
+        fertig += 1;
+      } catch (e) {
+        fehler.push(`${u.name}: ${String(e)}`);
+      }
+    }
+  } finally {
+    installation.laeuft = false;
+    installation.fortschritt = null;
+  }
+  if (fehler.length) {
+    installation.fehler = fehler.join("\n");
+    zeigeMeldung(fehler[0], "error");
+  } else {
+    zeigeMeldung(t("up.done", fertig), "ok");
+  }
+  await rescan();
 }
 
 // ------------------------------------------------------------- Einstellungen
@@ -183,8 +263,24 @@ export const sync = reactive<{
   fehler: string | null;
 }>({ laeuft: false, bericht: "", fehler: null });
 
+/**
+ * Wie viele Updates zuletzt gemeldet wurden. Eigener Zaehler statt „vorher"
+ * aus der Liste: der Scan beim Start laedt die Liste parallel und koennte sie
+ * schon gefuellt haben - dann ginge die erste Meldung verloren.
+ */
+let gemeldet = 0;
+
+/**
+ * Melden nur, wenn es mehr geworden sind. Dieselbe Zahl bei jeder
+ * stuendlichen Pruefung waere Laerm; weniger heisst, es wurde installiert.
+ */
+export function sollMelden(bisher: number, jetzt: number): boolean {
+  return jetzt > bisher;
+}
+
 /** Katalog vom Dienst holen und anzeigen. */
 export async function ladeKatalog() {
+  if (sync.laeuft) return;
   sync.laeuft = true;
   sync.fehler = null;
   sync.bericht = "";
@@ -195,6 +291,11 @@ export async function ladeKatalog() {
       : `Katalog ${e.version} war aktuell · ${e.eintraege} Einträge`;
     katalog.stats = await catalogStats();
     await suchen(katalog.suche);
+    // Neuer Katalog, neue Versionen: hier faellt auf, dass etwas raus ist.
+    await ladeUpdates();
+    const anzahl = aktualisierung.liste.length;
+    if (sollMelden(gemeldet, anzahl)) zeigeMeldung(t("up.available", anzahl), "info");
+    gemeldet = anzahl;
   } catch (fehler) {
     sync.fehler = String(fehler);
   } finally {

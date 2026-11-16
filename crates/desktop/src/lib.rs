@@ -17,6 +17,7 @@ pub fn run() {
             commands::catalog_stats,
             commands::catalog_search,
             commands::install,
+            commands::updates,
             commands::settings_get,
             commands::settings_set,
             commands::ordner_hinzufuegen,

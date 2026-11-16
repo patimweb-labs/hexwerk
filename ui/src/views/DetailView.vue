@@ -11,8 +11,10 @@ import { IconChevronRight } from "@weppelmann/icons";
 import { fetchImages, installiertIn, oeffneUrl } from "../api";
 import { t } from "../i18n";
 import { bytes, gewaehlt, installiere, installation, lokales, ziele } from "../store";
+import { fortschrittAnzeige } from "../fortschritt";
 
 const item = computed(() => gewaehlt());
+const anzeige = computed(() => (installation.fortschritt ? fortschrittAnzeige(installation.fortschritt) : null));
 const lokal = computed(() => (item.value ? null : lokales.value));
 
 const zielWahl = ref("");
@@ -143,6 +145,11 @@ function weiter(richtung: -1 | 1) {
                      @press="installiere(item, zielWahl)" />
       </div>
     </header>
+
+    <div v-if="anzeige" class="dt__fortschritt" role="status" aria-live="polite">
+      <UI.WpProgress :value="anzeige.wert" :max="anzeige.max" :label="t('dt.install.status')" />
+      <span class="dt__fortschritt-text">{{ anzeige.text }}</span>
+    </div>
 
     <p v-if="installation.fehler" class="dt__fehler">{{ installation.fehler }}</p>
     <p v-if="installation.erfolg" class="dt__erfolg">{{ t("dt.installed") }}: {{ installation.erfolg }}</p>
@@ -278,6 +285,9 @@ function weiter(richtung: -1 | 1) {
 .dt__unter { margin: var(--wp-space-3) 0 var(--wp-space-1); font-size: var(--wp-font-size-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--wp-color-text-faint); }
 .bilder { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--wp-space-2); }
 .dt__leer { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-text-faint); }
+.dt__fortschritt { display: flex; align-items: center; gap: var(--wp-space-3); }
+.dt__fortschritt-text { flex: none; font-size: var(--wp-font-size-xs); color: var(--wp-color-text-muted);
+  font-variant-numeric: tabular-nums; }
 .dt__fehler { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-error); }
 .dt__erfolg { margin: 0; font-size: var(--wp-font-size-xs); color: var(--wp-color-status-ok); }
 </style>

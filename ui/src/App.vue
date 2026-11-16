@@ -13,7 +13,7 @@ import { computed, onMounted } from "vue";
 import * as UI from "@weppelmann/components";
 import { IconFolder, IconMoon, IconPlug, IconSearch, IconSettings, IconSun } from "@weppelmann/icons";
 import { t } from "./i18n";
-import { ansicht, einstellungen, gewaehlt, installation, katalog, ladeKatalog, ladeStats, lastScan, meldung, quellenName, rescan, state, sync, thema, wendeThema } from "./store";
+import { aktualisierung, ansicht, einstellungen, gewaehlt, installation, katalog, ladeKatalog, ladeStats, lastScan, meldung, quellenName, rescan, state, sync, thema, wendeThema } from "./store";
 import ClientsView from "./views/ClientsView.vue";
 import InstalliertView from "./views/InstalliertView.vue";
 import KatalogView from "./views/KatalogView.vue";
@@ -53,6 +53,7 @@ const kopf = computed(() => {
 const bestand = computed(() => [
   { key: t("rail.addons"), value: String(state.addonCount), mono: true },
   { key: t("rail.origins"), value: String(state.notes.length), mono: true },
+  { key: t("rail.updates"), value: String(aktualisierung.liste.length), mono: true },
 ]);
 
 // Quellen mit Anzahl aus dem Index; der Zustand kommt aus dem letzten Lauf.
@@ -91,6 +92,12 @@ onMounted(() => {
   // Laufs stehen: `ladeKatalog` hatte nach dem Entfernen des Knopfes keinen
   // Aufrufer mehr.
   ladeKatalog();
+  // Neue Addon-Versionen erscheinen im Dienst laufend; wer die App offen
+  // laesst, soll sie trotzdem sehen. Stuendlich reicht: der Abruf ist ein
+  // kleines Manifest, der Katalog kommt nur bei neuem Stand.
+  window.setInterval(() => {
+    if (!installation.laeuft) ladeKatalog();
+  }, 60 * 60 * 1000);
 });
 </script>
 

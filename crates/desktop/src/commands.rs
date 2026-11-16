@@ -94,6 +94,19 @@ pub async fn scan() -> Result<ScanResult, String> {
         let discovered = hexwerk::discover(&zusatz);
         let mut addon_count = 0;
 
+        // Der Scan ist der eine Weg, auf dem installierte Addons in den Index
+        // kommen (wie `index.sync_clients` in der GTK-Fassung). Ohne diesen
+        // Schritt weiss die Detailseite nichts von Installationen und es gibt
+        // keine Update-Erkennung: der Katalog fragt den Index, und der kennt
+        // nur, was hier hineingeschrieben wurde.
+        //
+        // Dieselbe Entdeckung wie fuer die Anzeige - frueher lief hier ein
+        // zweites `discover(&[])` ohne die eigenen Ordner, und deren Addons
+        // bekamen nie einen Update-Hinweis.
+        let index_fehler = hexwerk_index::Index::open(&hexwerk_index::Index::default_path())
+            .and_then(|mut idx| idx.sync_clients(&discovered).map(|_| ()))
+            .err();
+
         let clients = discovered
             .clients
             .into_iter()
@@ -144,7 +157,7 @@ pub async fn scan() -> Result<ScanResult, String> {
             })
             .collect();
 
-        let notes = discovered
+        let mut notes: Vec<NoteDto> = discovered
             .notes
             .into_iter()
             .map(|note| NoteDto {
@@ -153,13 +166,14 @@ pub async fn scan() -> Result<ScanResult, String> {
                 detail: note.detail,
             })
             .collect();
-
-        // Der Scan ist der eine Weg, auf dem installierte Addons in den Index
-        // kommen (wie `index.sync_clients` in der GTK-Fassung). Ohne diesen
-        // Schritt weiss die Detailseite nichts von Installationen: der Katalog
-        // fragt den Index, und der kennt nur, was hier hineingeschrieben wurde.
-        if let Ok(mut idx) = hexwerk_index::Index::open(&hexwerk_index::Index::default_path()) {
-            let _ = idx.sync_clients(&hexwerk::discover(&[]));
+        // Nicht verschlucken: ohne Index keine Update-Hinweise, und das soll
+        // man in der Liste der Hinweise sehen.
+        if let Some(fehler) = index_fehler {
+            notes.push(NoteDto {
+                step: "Index".to_string(),
+                level: "error".to_string(),
+                detail: fehler,
+            });
         }
 
         ScanResult {
@@ -341,7 +355,11 @@ pub struct InstallErgebnis {
 /// `addons_dir` ist der Zielordner aus dem Scan, nicht ein Client-Name: die
 /// Oberflaeche weiss, wohin sie will, und muss hier nicht nachgeschlagen werden.
 #[tauri::command]
-pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis, String> {
+pub async fn install(
+    addons_dir: String,
+    url: String,
+    fortschritt: tauri::ipc::Channel<Fortschritt>,
+) -> Result<InstallErgebnis, String> {
     tauri::async_runtime::spawn_blocking(move || {
         // Ueber den Download-Weg, nicht `request`: der hat 30 s Gesamtzeit und
         // liess damit jedes groessere Paket auf einer normalen Leitung
@@ -349,16 +367,24 @@ pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis,
         // bei Netz- und Serverfehlern.
         let http = hexwerk_sources::UreqHttp::new();
         let request = hexwerk_sources::Request::get(&url);
+        let mut drossel = Drossel::default();
         let antwort = hexwerk_sources::download_with_retry(
             &http,
             &request,
             hexwerk_sources::Retry::default(),
-            &mut |_, _| {},
+            &mut |done, total| {
+                if let Some(meldung) = drossel.melde(done, total) {
+                    // Ein geschlossenes Fenster ist kein Grund, den Download
+                    // abzubrechen - der Fehler beim Senden wird verworfen.
+                    let _ = fortschritt.send(meldung);
+                }
+            },
         )
         .map_err(|e| format!("Download: {e}"))?;
         if !antwort.is_success() {
             return Err(format!("Download: HTTP {}", antwort.status));
         }
+        let _ = fortschritt.send(Fortschritt::Entpackt);
         let ziel = std::path::Path::new(&addons_dir);
         let pfade = hexwerk_install::Paths::system();
         let installiert = hexwerk_install::install_zip(&antwort.body, ziel, None, &pfade)
@@ -370,6 +396,91 @@ pub async fn install(addons_dir: String, url: String) -> Result<InstallErgebnis,
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Was eine laufende Installation gerade tut. Gegenstueck: `Fortschritt` in
+/// `ui/src/api.ts`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Fortschritt {
+    /// Download laeuft. `total` nur, wenn der Server die Groesse nennt.
+    Laedt { done: u64, total: Option<u64> },
+    /// Download fertig, das ZIP wird entpackt.
+    Entpackt,
+}
+
+/// Entscheidet, welche Fortschrittsmeldungen ueber die Bruecke gehen.
+///
+/// WARUM: der Download meldet je 64 KiB, bei 100 MB also 1600-mal. Jede
+/// Meldung ist eine IPC-Nachricht und ein Neuzeichnen; fuer den Balken reicht
+/// eine je ganzem Prozent. Ohne Gesamtgroesse eine je MiB.
+#[derive(Debug, Default)]
+pub struct Drossel {
+    zuletzt: Option<u64>,
+}
+
+impl Drossel {
+    pub fn melde(&mut self, done: u64, total: Option<u64>) -> Option<Fortschritt> {
+        let stufe = match total {
+            Some(t) if t > 0 => done.saturating_mul(100) / t,
+            _ => done / (1024 * 1024),
+        };
+        // Nach einer Wiederholung beginnt `done` wieder bei null; dann muss
+        // der Balken zurueckspringen, nicht stehen bleiben.
+        if self.zuletzt == Some(stufe) {
+            return None;
+        }
+        self.zuletzt = Some(stufe);
+        Some(Fortschritt::Laedt { done, total })
+    }
+}
+
+// ------------------------------------------------------------------ Updates
+
+/// Ein faelliges Update fuer einen installierten Ordner.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UpdateDto {
+    pub addons_dir: String,
+    pub folder: String,
+    pub addon_id: i64,
+    pub name: String,
+    pub installed: String,
+    pub available: String,
+    pub source: String,
+    pub download_url: String,
+    pub released_at: Option<String>,
+    pub size_bytes: Option<u64>,
+}
+
+impl From<hexwerk_index::Update> for UpdateDto {
+    fn from(u: hexwerk_index::Update) -> Self {
+        Self {
+            addons_dir: u.addons_dir,
+            folder: u.folder,
+            addon_id: u.addon_id,
+            name: u.addon_name,
+            installed: u.installed_version,
+            available: u.available_version,
+            source: hexwerk_index::source_key(u.source).to_string(),
+            download_url: u.download_url,
+            released_at: u.released_at,
+            size_bytes: u.size_bytes,
+        }
+    }
+}
+
+/// Alle faelligen Updates, eines je installiertem Ordner.
+///
+/// Grundlage ist der Index: der Scan schreibt, was installiert ist, der
+/// Katalogabgleich, was es gibt. Neu gefragt wird nach beidem.
+#[tauri::command]
+pub fn updates() -> Result<Vec<UpdateDto>, String> {
+    let idx = index()?;
+    Ok(idx
+        .pending_updates()?
+        .into_iter()
+        .map(UpdateDto::from)
+        .collect())
 }
 
 // ------------------------------------------------------------- Einstellungen

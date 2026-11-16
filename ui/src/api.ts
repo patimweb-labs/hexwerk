@@ -1,6 +1,6 @@
 // Der Vertrag zum Rust-Teil. Jeder Befehl hier hat ein Gegenstueck in
 // crates/desktop/src/commands.rs.
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 
 export interface Addon {
   folder: string;
@@ -103,9 +103,45 @@ export interface InstallErgebnis {
   version: string | null;
 }
 
-/** Ein Release laden und in ein Addon-Verzeichnis entpacken. */
-export function install(addonsDir: string, url: string): Promise<InstallErgebnis> {
-  return invoke<InstallErgebnis>("install", { addonsDir, url });
+/** Was eine laufende Installation gerade tut (`Fortschritt` in commands.rs). */
+export type Fortschritt =
+  | { kind: "laedt"; done: number; total: number | null }
+  | { kind: "entpackt" };
+
+/**
+ * Ein Release laden und in ein Addon-Verzeichnis entpacken.
+ *
+ * `beiFortschritt` bekommt hoechstens eine Meldung je Prozent (ohne bekannte
+ * Groesse eine je MiB) und am Ende `entpackt`.
+ */
+export function install(
+  addonsDir: string,
+  url: string,
+  beiFortschritt: (f: Fortschritt) => void = () => {},
+): Promise<InstallErgebnis> {
+  const fortschritt = new Channel<Fortschritt>();
+  fortschritt.onmessage = beiFortschritt;
+  return invoke<InstallErgebnis>("install", { addonsDir, url, fortschritt });
+}
+
+/** Ein faelliges Update fuer einen installierten Ordner (`UpdateDto` in commands.rs). */
+export interface Update {
+  addons_dir: string;
+  folder: string;
+  addon_id: number;
+  name: string;
+  installed: string;
+  available: string;
+  /** Kurzkennung der Quelle (`wowi`, `curseforge`, …), Anzeige ueber `quellenName`. */
+  source: string;
+  download_url: string;
+  released_at: string | null;
+  size_bytes: number | null;
+}
+
+/** Alle faelligen Updates, eines je installiertem Ordner. */
+export function updates(): Promise<Update[]> {
+  return invoke<Update[]>("updates");
 }
 
 export interface Settings {
