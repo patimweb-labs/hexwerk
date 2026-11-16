@@ -1,5 +1,12 @@
 # Änderungen
 
+## [0.6.0](https://github.com/patimweb-labs/hexwerk/compare/v0.5.2...v0.6.0) (2026-11-16)
+
+
+### Features
+
+* Update-Hinweise und Fortschritt bei der Installation ([#18](https://github.com/patimweb-labs/hexwerk/issues/18)) ([24b7370](https://github.com/patimweb-labs/hexwerk/commit/24b7370e6b44983371ad720f739406cb3bae41bf))
+
 ## [0.5.2](https://github.com/patimweb-labs/hexwerk/compare/v0.5.1...v0.5.2) (2026-11-15)
 
 
