@@ -5,7 +5,14 @@
       "release-type": "rust",
       "package-name": "hexwerk",
       "changelog-path": "CHANGELOG.md",
-      "include-component-in-tag": false
+      "include-component-in-tag": false,
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "crates/desktop/Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value === \"hexwerk-core\" || @.name.value === \"hexwerk-index\" || @.name.value === \"hexwerk-install\" || @.name.value === \"hexwerk-sources\")].version"
+        }
+      ]
     }
   }
 }
